@@ -4,7 +4,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'absensi-secret-key-2024';
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
 
     if (!token) {
         return res.status(401).json({ error: 'Token tidak ditemukan' });

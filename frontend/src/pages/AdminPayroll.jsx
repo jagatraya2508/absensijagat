@@ -5,20 +5,19 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function downloadFile(path, filename) {
     const token = localStorage.getItem('token');
-    fetch(`${API_BASE}${path}`, { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => {
-            if (!res.ok) throw new Error('Download failed');
-            return res.blob();
-        })
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        })
-        .catch(err => alert('Gagal download: ' + err.message));
+    if (!token) {
+        alert('Gagal download: Anda harus login terlebih dahulu.');
+        return;
+    }
+    const separator = path.includes('?') ? '&' : '?';
+    const url = `${API_BASE}${path}${separator}token=${token}`;
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 export default function AdminPayroll() {
@@ -27,6 +26,7 @@ export default function AdminPayroll() {
     const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showSlipModal, setShowSlipModal] = useState(false);
+    const [isMaximized, setIsMaximized] = useState(false);
     const [selectedRun, setSelectedRun] = useState(null);
     const [selectedSlip, setSelectedSlip] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -67,8 +67,12 @@ export default function AdminPayroll() {
         try {
             const data = await payrollAPI.getById(run.id);
             setSelectedRun(data);
+            setIsMaximized(false);
             setShowDetailModal(true);
-        } catch (err) { alert('Gagal memuat detail'); }
+        } catch (err) { 
+            console.error('Error in openDetail:', err);
+            alert('Gagal memuat detail: ' + (err.message || JSON.stringify(err))); 
+        }
     }
 
     async function handleFinalize(id) {
@@ -217,7 +221,7 @@ export default function AdminPayroll() {
             {/* Detail Modal */}
             {showDetailModal && selectedRun && (
                 <div className="modal-overlay">
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 1000 }}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={isMaximized ? { width: '100vw', height: '100vh', maxWidth: '100%', maxHeight: '100%', margin: 0, borderRadius: 0, display: 'flex', flexDirection: 'column' } : { maxWidth: 1200, width: '95%', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
                         <div className="modal-header">
                             <h3 className="modal-title">
                                 Payroll {monthNames[selectedRun.period_month - 1]} {selectedRun.period_year}
@@ -225,11 +229,16 @@ export default function AdminPayroll() {
                                     {selectedRun.status === 'finalized' ? 'Final' : 'Draft'}
                                 </span>
                             </h3>
-                            <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button className="modal-close" onClick={() => setIsMaximized(!isMaximized)} title={isMaximized ? "Perkecil" : "Perbesar"}>
+                                    {isMaximized ? '🗗' : '🗖'}
+                                </button>
+                                <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                            </div>
                         </div>
-                        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', overflowX: 'auto' }}>
+                        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
                             {selectedRun.items && selectedRun.items.length > 0 ? (
-                                <table className="table" style={{ fontSize: '0.8rem', minWidth: 900 }}>
+                                <table className="table" style={{ fontSize: '0.8rem', minWidth: 1100 }}>
                                     <thead>
                                         <tr>
                                             <th>Karyawan</th>
@@ -256,14 +265,14 @@ export default function AdminPayroll() {
                                                             {item.salary_type === 'daily' ? `Harian (${item.working_days}hr)` : item.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
                                                         </span>
                                                     </td>
-                                                    <td style={{ textAlign: 'right' }}>{formatCurrency(item.basic_salary)}</td>
-                                                    <td style={{ textAlign: 'right' }}>{formatCurrency(tunjangan)}</td>
-                                                    <td style={{ textAlign: 'right' }}>{formatCurrency(item.overtime_amount)}</td>
-                                                    <td style={{ textAlign: 'right' }}>{formatCurrency(item.gross_income)}</td>
-                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)' }}>-{formatCurrency(bpjsTotal)}</td>
-                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)' }}>-{formatCurrency(item.pph21_amount)}</td>
-                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)' }}>-{formatCurrency(item.loan_deduction)}</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)' }}>{formatCurrency(item.net_salary)}</td>
+                                                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.basic_salary)}</td>
+                                                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(tunjangan)}</td>
+                                                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.overtime_amount)}</td>
+                                                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.gross_income)}</td>
+                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(bpjsTotal)}</td>
+                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(item.pph21_amount)}</td>
+                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(item.loan_deduction)}</td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)', whiteSpace: 'nowrap' }}>{formatCurrency(item.net_salary)}</td>
                                                     <td>
                                                         <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }} onClick={() => viewSlip(selectedRun.id, item.user_id)}>📄 Slip</button>
                                                     </td>
@@ -274,14 +283,14 @@ export default function AdminPayroll() {
                                     <tfoot>
                                         <tr style={{ borderTop: '2px solid rgba(255,255,255,0.2)' }}>
                                             <td style={{ fontWeight: 700 }}>TOTAL</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.basic_salary), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_amount), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.gross_income), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.bpjs_kes_employee) + parseFloat(i.bpjs_jht_employee) + parseFloat(i.bpjs_jp_employee), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.pph21_amount), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.loan_deduction), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.net_salary), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.basic_salary), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_amount), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.gross_income), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.bpjs_kes_employee) + parseFloat(i.bpjs_jht_employee) + parseFloat(i.bpjs_jp_employee), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.pph21_amount), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.loan_deduction), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)', whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.net_salary), 0))}</td>
                                             <td></td>
                                         </tr>
                                     </tfoot>
