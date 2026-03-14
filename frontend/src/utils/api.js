@@ -416,6 +416,74 @@ export const offDaysAPI = {
     delete: (id) => request(`/off-days/${id}`, { method: 'DELETE' }),
 };
 
+// Employees API (HR Detail)
+export const employeesAPI = {
+    getAll: () => request('/employees'),
+    getById: (id) => request(`/employees/${id}`),
+    update: (id, data) => request(`/employees/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+};
+
+// Overtime API
+export const overtimeAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/overtime?${query}`);
+    },
+    create: (data) => request('/overtime', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/overtime/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    updateStatus: (id, status) => request(`/overtime/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+    }),
+    delete: (id) => request(`/overtime/${id}`, { method: 'DELETE' }),
+};
+
+// Loans API
+export const loansAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/loans?${query}`);
+    },
+    getById: (id) => request(`/loans/${id}`),
+    create: (data) => request('/loans', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/loans/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    recordPayment: (id, data) => request(`/loans/${id}/payment`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/loans/${id}`, { method: 'DELETE' }),
+};
+
+// Payroll API
+export const payrollAPI = {
+    getAll: () => request('/payroll'),
+    getById: (id) => request(`/payroll/${id}`),
+    generate: (data) => request('/payroll/generate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    finalize: (id) => request(`/payroll/${id}/finalize`, {
+        method: 'PUT',
+    }),
+    getSlip: (runId, userId) => request(`/payroll/${runId}/slip/${userId}`),
+    delete: (id) => request(`/payroll/${id}`, { method: 'DELETE' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -426,5 +494,9 @@ export default {
     announcementsAPI,
     settingsAPI,
     scheduleAPI,
-    offDaysAPI
+    offDaysAPI,
+    employeesAPI,
+    overtimeAPI,
+    loansAPI,
+    payrollAPI
 };

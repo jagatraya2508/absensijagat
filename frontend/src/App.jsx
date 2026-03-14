@@ -16,6 +16,12 @@ import AdminAnnouncements from './pages/AdminAnnouncements';
 import AdminSettings from './pages/AdminSettings';
 import ChangePassword from './pages/ChangePassword';
 import OffDays from './pages/OffDays';
+import AdminEmployees from './pages/AdminEmployees';
+import AdminOvertime from './pages/AdminOvertime';
+import AdminLoans from './pages/AdminLoans';
+import AdminPayroll from './pages/AdminPayroll';
+import AdminAssessments from './pages/AdminAssessments';
+import AdminRecruitment from './pages/AdminRecruitment';
 
 function ProtectedRoute({ children, adminOnly = false }) {
     const { user, loading } = useAuth();
@@ -206,6 +212,72 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminSettings />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/employees"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminEmployees />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/overtime"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminOvertime />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/loans"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminLoans />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/payroll"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminPayroll />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/assessments"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminAssessments />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/recruitment"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminRecruitment />
                         </AppLayout>
                     </ProtectedRoute>
                 }
