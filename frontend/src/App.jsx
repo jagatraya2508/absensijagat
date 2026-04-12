@@ -17,13 +17,18 @@ import AdminSettings from './pages/AdminSettings';
 import ChangePassword from './pages/ChangePassword';
 import OffDays from './pages/OffDays';
 import AdminEmployees from './pages/AdminEmployees';
-import AdminOvertime from './pages/AdminOvertime';
+
 import AdminLoans from './pages/AdminLoans';
 import AdminPayroll from './pages/AdminPayroll';
 import AdminAssessments from './pages/AdminAssessments';
 import AdminRecruitment from './pages/AdminRecruitment';
+import AdminWorkSchedule from './pages/AdminWorkSchedule';
+import AdminDepartments from './pages/AdminDepartments';
+import AdminPositions from './pages/AdminPositions';
+import ManagerApprovals from './pages/ManagerApprovals';
+import Overtime from './pages/Overtime';
 
-function ProtectedRoute({ children, adminOnly = false }) {
+function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false }) {
     const { user, loading } = useAuth();
 
     if (loading) {
@@ -39,6 +44,10 @@ function ProtectedRoute({ children, adminOnly = false }) {
     }
 
     if (adminOnly && user.role !== 'admin') {
+        return <Navigate to="/" replace />;
+    }
+
+    if (managerOrAdmin && user.role !== 'admin' && user.role !== 'manager') {
         return <Navigate to="/" replace />;
     }
 
@@ -185,11 +194,33 @@ function AppRoutes() {
             />
 
             <Route
+                path="/overtime"
+                element={
+                    <ProtectedRoute>
+                        <AppLayout>
+                            <Overtime />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
                 path="/admin/leaves"
                 element={
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminLeaves />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/approvals"
+                element={
+                    <ProtectedRoute managerOrAdmin>
+                        <AppLayout>
+                            <ManagerApprovals />
                         </AppLayout>
                     </ProtectedRoute>
                 }
@@ -228,16 +259,7 @@ function AppRoutes() {
                 }
             />
 
-            <Route
-                path="/admin/overtime"
-                element={
-                    <ProtectedRoute adminOnly>
-                        <AppLayout>
-                            <AdminOvertime />
-                        </AppLayout>
-                    </ProtectedRoute>
-                }
-            />
+
 
             <Route
                 path="/admin/loans"
@@ -278,6 +300,39 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminRecruitment />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/work-schedule"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminWorkSchedule />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/departments"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminDepartments />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/positions"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminPositions />
                         </AppLayout>
                     </ProtectedRoute>
                 }

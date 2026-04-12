@@ -17,17 +17,20 @@ export default function Sidebar() {
         { path: '/attendance', icon: '📸', label: 'Absensi' },
         { path: '/history', icon: '📋', label: 'Riwayat' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
+        { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
         { path: '/change-password', icon: '🔑', label: 'Ubah Password' },
     ];
 
     const adminItems = [
         { path: '/off-days', icon: '📅', label: 'Atur Libur' },
         { path: '/admin/locations', icon: '📍', label: 'Kelola Lokasi' },
+        { path: '/admin/departments', icon: '🏢', label: 'Master Departemen' },
+        { path: '/admin/positions', icon: '🏅', label: 'Master Jabatan' },
         { path: '/admin/users', icon: '👥', label: 'Kelola User' },
         { path: '/admin/employees', icon: '👤', label: 'Data Karyawan' },
         { path: '/admin/face-registration', icon: '🔐', label: 'Registrasi Wajah' },
         { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin' },
-        { path: '/admin/overtime', icon: '⏰', label: 'Lembur' },
+        { path: '/admin/work-schedule', icon: '🕐', label: 'Jadwal Kerja' },
         { path: '/admin/loans', icon: '💰', label: 'Pinjaman' },
         { path: '/admin/payroll', icon: '💵', label: 'Payroll' },
         { path: '/admin/assessments', icon: '📋', label: 'Penilaian' },
@@ -62,6 +65,25 @@ export default function Sidebar() {
                             {item.label}
                         </NavLink>
                     ))}
+
+                    {(user?.role === 'admin' || user?.role === 'manager') && (
+                        <>
+                            <div style={{
+                                margin: '1rem 0',
+                                padding: '0 1rem',
+                                fontSize: '0.7rem',
+                                color: 'var(--gray-500)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em'
+                            }}>
+                                Task Pimpinan
+                            </div>
+                            <NavLink to="/approvals" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+                                <span className="sidebar-link-icon">✅</span>
+                                Persetujuan Lembur
+                            </NavLink>
+                        </>
+                    )}
 
                     {user?.role === 'admin' && (
                         <>
@@ -98,7 +120,7 @@ export default function Sidebar() {
                     <div className="sidebar-user-info">
                         <div className="sidebar-user-name">{user?.name}</div>
                         <div className="sidebar-user-role">
-                            {user?.role === 'admin' ? 'Administrator' : 'Karyawan'}
+                            {user?.role === 'admin' ? 'Administrator' : user?.role === 'manager' ? 'Pimpinan / Manager' : 'Karyawan'}
                         </div>
                     </div>
                     <button className="sidebar-logout" onClick={handleLogout} title="Logout">

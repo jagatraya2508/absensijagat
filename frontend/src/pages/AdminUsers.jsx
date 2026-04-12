@@ -168,8 +168,8 @@ export default function AdminUsers() {
                                         <td>{user.name}</td>
                                         <td>{user.email || '-'}</td>
                                         <td>
-                                            <span className={`badge ${user.role === 'admin' ? 'badge-primary' : 'badge-success'}`}>
-                                                {user.role === 'admin' ? 'Admin' : 'Karyawan'}
+                                            <span className={`badge ${user.role === 'admin' ? 'badge-primary' : user.role === 'manager' ? 'badge-info' : 'badge-success'}`}>
+                                                {user.role === 'admin' ? 'Admin' : user.role === 'manager' ? 'Pimpinan / Manager' : 'Karyawan'}
                                             </span>
                                         </td>
                                         <td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
@@ -284,6 +284,7 @@ export default function AdminUsers() {
                                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                     >
                                         <option value="employee">Karyawan</option>
+                                        <option value="manager">Pimpinan / Manager</option>
                                         <option value="admin">Admin</option>
                                     </select>
                                 </div>

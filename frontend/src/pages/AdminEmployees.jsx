@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { employeesAPI, authAPI } from '../utils/api';
+import { employeesAPI, authAPI, departmentsAPI, positionsAPI } from '../utils/api';
 
 const TABS = [
     { id: 'personal', label: '👤 Data Pribadi' },
@@ -10,6 +10,8 @@ const TABS = [
 
 export default function AdminEmployees() {
     const [employees, setEmployees] = useState([]);
+    const [masterDepartments, setMasterDepartments] = useState([]);
+    const [masterPositions, setMasterPositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -28,7 +30,21 @@ export default function AdminEmployees() {
         tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: ''
     });
 
-    useEffect(() => { fetchEmployees(); }, []);
+    useEffect(() => { 
+        fetchEmployees(); 
+        fetchMasters();
+    }, []);
+
+    async function fetchMasters() {
+        try {
+            const depts = await departmentsAPI.getAll();
+            const pos = await positionsAPI.getAll();
+            setMasterDepartments(depts);
+            setMasterPositions(pos);
+        } catch (err) {
+            console.error('Failed to fetch masters:', err);
+        }
+    }
 
     async function fetchEmployees() {
         try {
@@ -293,11 +309,27 @@ export default function AdminEmployees() {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                         <div className="form-group">
                                             <label className="form-label">Departemen</label>
-                                            <input className="form-input" value={formData.department} onChange={e => updateField('department', e.target.value)} placeholder="Cth: IT, HR, Marketing" />
+                                            <select className="form-input form-select" value={formData.department} onChange={e => updateField('department', e.target.value)}>
+                                                <option value="">Pilih Departemen...</option>
+                                                {masterDepartments.map(d => (
+                                                    <option key={d.id} value={d.name}>{d.name}</option>
+                                                ))}
+                                                {formData.department && !masterDepartments.find(d => d.name === formData.department) && (
+                                                    <option value={formData.department}>{formData.department}</option>
+                                                )}
+                                            </select>
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Jabatan</label>
-                                            <input className="form-input" value={formData.position} onChange={e => updateField('position', e.target.value)} placeholder="Cth: Staff, Supervisor" />
+                                            <select className="form-input form-select" value={formData.position} onChange={e => updateField('position', e.target.value)}>
+                                                <option value="">Pilih Jabatan...</option>
+                                                {masterPositions.map(p => (
+                                                    <option key={p.id} value={p.name}>{p.name}</option>
+                                                ))}
+                                                {formData.position && !masterPositions.find(p => p.name === formData.position) && (
+                                                    <option value={formData.position}>{formData.position}</option>
+                                                )}
+                                            </select>
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tanggal Masuk</label>

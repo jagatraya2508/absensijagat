@@ -350,7 +350,7 @@ export default function AdminAssessments() {
 
             {/* Modal */}
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editId ? '✏️ Edit Penilaian' : '➕ Buat Penilaian Baru'}</h2>

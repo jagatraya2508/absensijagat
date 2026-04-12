@@ -484,6 +484,34 @@ export const payrollAPI = {
     delete: (id) => request(`/payroll/${id}`, { method: 'DELETE' }),
 };
 
+// Departments API
+export const departmentsAPI = {
+    getAll: () => request('/departments'),
+    create: (data) => request('/departments', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/departments/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/departments/${id}`, { method: 'DELETE' }),
+};
+
+// Positions API
+export const positionsAPI = {
+    getAll: () => request('/positions'),
+    create: (data) => request('/positions', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/positions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/positions/${id}`, { method: 'DELETE' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -498,5 +526,7 @@ export default {
     employeesAPI,
     overtimeAPI,
     loansAPI,
-    payrollAPI
+    payrollAPI,
+    departmentsAPI,
+    positionsAPI
 };

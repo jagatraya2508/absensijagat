@@ -26,4 +26,11 @@ function isAdmin(req, res, next) {
     next();
 }
 
-module.exports = { authenticateToken, isAdmin, JWT_SECRET };
+function isManagerOrAdmin(req, res, next) {
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+        return res.status(403).json({ error: 'Akses ditolak. Memerlukan hak akses manajer atau admin.' });
+    }
+    next();
+}
+
+module.exports = { authenticateToken, isAdmin, isManagerOrAdmin, JWT_SECRET };

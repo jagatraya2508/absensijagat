@@ -648,7 +648,7 @@ export default function AdminRecruitment() {
 
             {/* ==================== POSITION MODAL ==================== */}
             {showPositionModal && (
-                <div className="modal-overlay" onClick={() => setShowPositionModal(false)}>
+                <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editPositionId ? '✏️ Edit Lowongan' : '➕ Tambah Lowongan'}</h2>
@@ -729,7 +729,7 @@ export default function AdminRecruitment() {
 
             {/* ==================== CANDIDATE MODAL ==================== */}
             {showCandidateModal && (
-                <div className="modal-overlay" onClick={() => setShowCandidateModal(false)}>
+                <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">➕ Tambah Kandidat</h2>
@@ -817,7 +817,7 @@ export default function AdminRecruitment() {
 
             {/* ==================== INTERVIEW MODAL ==================== */}
             {showInterviewModal && (
-                <div className="modal-overlay" onClick={() => setShowInterviewModal(false)}>
+                <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editInterviewId ? '✏️ Edit Interview' : '➕ Jadwalkan Interview'}</h2>

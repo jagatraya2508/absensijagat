@@ -41,6 +41,8 @@ app.use('/api/leaves', leavesRoutes);
 app.use('/api/face', faceRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/departments', require('./routes/departments'));
+app.use('/api/positions', require('./routes/positions'));
 app.use('/api/schedule', require('./routes/schedule'));
 app.use('/api/off-days', require('./routes/offDays'));
 app.use('/api/employees', require('./routes/employees'));
@@ -49,6 +51,7 @@ app.use('/api/loans', require('./routes/loans'));
 app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/assessments', require('./routes/assessments'));
 app.use('/api/recruitment', require('./routes/recruitment'));
+app.use('/api/work-schedules', require('./routes/workSchedules'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
