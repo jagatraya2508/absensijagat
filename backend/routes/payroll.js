@@ -440,12 +440,13 @@ router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
             { x: 60, w: 110, label: 'Nama Karyawan' },
             { x: 170, w: 75, label: 'Gaji Pokok' },
             { x: 245, w: 70, label: 'Tunjangan' },
-            { x: 315, w: 65, label: 'Lembur' },
-            { x: 380, w: 75, label: 'Gross' },
-            { x: 455, w: 65, label: 'BPJS' },
-            { x: 520, w: 65, label: 'PPh 21' },
-            { x: 585, w: 65, label: 'Pot.Pinjaman' },
-            { x: 650, w: 80, label: 'Gaji Bersih' },
+            { x: 315, w: 60, label: 'Jam Lembur' },
+            { x: 375, w: 65, label: 'Nilai Lembur' },
+            { x: 440, w: 75, label: 'Gross' },
+            { x: 515, w: 65, label: 'BPJS' },
+            { x: 580, w: 65, label: 'PPh 21' },
+            { x: 645, w: 65, label: 'Pot.Pinjaman' },
+            { x: 710, w: 80, label: 'Gaji Bersih' },
         ];
 
         // Header
@@ -453,7 +454,7 @@ router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
         doc.font('Helvetica-Bold').fontSize(7);
         cols.forEach(c => doc.text(c.label, c.x, y, { width: c.w, align: c.x > 160 ? 'right' : 'left' }));
         y += 14;
-        doc.moveTo(30, y).lineTo(730, y).stroke();
+        doc.moveTo(30, y).lineTo(790, y).stroke();
         y += 5;
 
         // Rows
@@ -469,12 +470,13 @@ router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
             doc.text(item.user_name, cols[1].x, y, { width: cols[1].w });
             doc.text(fmtCurrency(item.basic_salary), cols[2].x, y, { width: cols[2].w, align: 'right' });
             doc.text(fmtCurrency(tunj), cols[3].x, y, { width: cols[3].w, align: 'right' });
-            doc.text(fmtCurrency(item.overtime_amount), cols[4].x, y, { width: cols[4].w, align: 'right' });
-            doc.text(fmtCurrency(item.gross_income), cols[5].x, y, { width: cols[5].w, align: 'right' });
-            doc.text(fmtCurrency(bpjs), cols[6].x, y, { width: cols[6].w, align: 'right' });
-            doc.text(fmtCurrency(item.pph21_amount), cols[7].x, y, { width: cols[7].w, align: 'right' });
-            doc.text(fmtCurrency(item.loan_deduction), cols[8].x, y, { width: cols[8].w, align: 'right' });
-            doc.text(fmtCurrency(item.net_salary), cols[9].x, y, { width: cols[9].w, align: 'right' });
+            doc.text(item.overtime_hours + ' jam', cols[4].x, y, { width: cols[4].w, align: 'right' });
+            doc.text(fmtCurrency(item.overtime_amount), cols[5].x, y, { width: cols[5].w, align: 'right' });
+            doc.text(fmtCurrency(item.gross_income), cols[6].x, y, { width: cols[6].w, align: 'right' });
+            doc.text(fmtCurrency(bpjs), cols[7].x, y, { width: cols[7].w, align: 'right' });
+            doc.text(fmtCurrency(item.pph21_amount), cols[8].x, y, { width: cols[8].w, align: 'right' });
+            doc.text(fmtCurrency(item.loan_deduction), cols[9].x, y, { width: cols[9].w, align: 'right' });
+            doc.text(fmtCurrency(item.net_salary), cols[10].x, y, { width: cols[10].w, align: 'right' });
 
             totalBasic += parseFloat(item.basic_salary);
             totalTunj += tunj;
@@ -489,18 +491,19 @@ router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
 
         // Total row
         y += 5;
-        doc.moveTo(30, y).lineTo(730, y).stroke();
+        doc.moveTo(30, y).lineTo(790, y).stroke();
         y += 5;
         doc.font('Helvetica-Bold').fontSize(7);
         doc.text('TOTAL', cols[1].x, y, { width: cols[1].w });
         doc.text(fmtCurrency(totalBasic), cols[2].x, y, { width: cols[2].w, align: 'right' });
         doc.text(fmtCurrency(totalTunj), cols[3].x, y, { width: cols[3].w, align: 'right' });
-        doc.text(fmtCurrency(totalOT), cols[4].x, y, { width: cols[4].w, align: 'right' });
-        doc.text(fmtCurrency(totalGross), cols[5].x, y, { width: cols[5].w, align: 'right' });
-        doc.text(fmtCurrency(totalBPJS), cols[6].x, y, { width: cols[6].w, align: 'right' });
-        doc.text(fmtCurrency(totalPPh), cols[7].x, y, { width: cols[7].w, align: 'right' });
-        doc.text(fmtCurrency(totalLoan), cols[8].x, y, { width: cols[8].w, align: 'right' });
-        doc.text(fmtCurrency(totalNet), cols[9].x, y, { width: cols[9].w, align: 'right' });
+        doc.text('', cols[4].x, y, { width: cols[4].w, align: 'right' });
+        doc.text(fmtCurrency(totalOT), cols[5].x, y, { width: cols[5].w, align: 'right' });
+        doc.text(fmtCurrency(totalGross), cols[6].x, y, { width: cols[6].w, align: 'right' });
+        doc.text(fmtCurrency(totalBPJS), cols[7].x, y, { width: cols[7].w, align: 'right' });
+        doc.text(fmtCurrency(totalPPh), cols[8].x, y, { width: cols[8].w, align: 'right' });
+        doc.text(fmtCurrency(totalLoan), cols[9].x, y, { width: cols[9].w, align: 'right' });
+        doc.text(fmtCurrency(totalNet), cols[10].x, y, { width: cols[10].w, align: 'right' });
 
         doc.fontSize(7).font('Helvetica').text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 30, 560);
         doc.end();
@@ -543,7 +546,7 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
         ws.getCell('A2').alignment = { horizontal: 'center' };
 
         // Header
-        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'Lembur', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
+        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'Jam Lembur', 'Nilai Lembur', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
         ws.getRow(4).values = headers;
         ws.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         ws.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
@@ -561,6 +564,7 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
                 parseFloat(item.basic_salary),
                 parseFloat(item.transport_allowance),
                 parseFloat(item.meal_allowance),
+                parseFloat(item.overtime_hours),
                 parseFloat(item.overtime_amount),
                 parseFloat(item.gross_income),
                 bpjsEmp,
@@ -571,14 +575,20 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
         });
 
         // Total row
-        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', totalNet]);
+        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', totalNet]);
         totalRow.font = { bold: true };
-        totalRow.getCell(13).numFmt = '#,##0';
+        totalRow.getCell(14).numFmt = '#,##0';
 
         // Format currency columns
-        for (let col = 5; col <= 13; col++) {
-            ws.getColumn(col).numFmt = '#,##0';
-            ws.getColumn(col).width = 16;
+        for (let col = 5; col <= 14; col++) {
+            if (col === 8) {
+                // Jam Lembur
+                ws.getColumn(col).numFmt = '0';
+                ws.getColumn(col).width = 12;
+            } else {
+                ws.getColumn(col).numFmt = '#,##0';
+                ws.getColumn(col).width = 16;
+            }
         }
         ws.getColumn(1).width = 5;
         ws.getColumn(2).width = 12;

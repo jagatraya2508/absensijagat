@@ -39,9 +39,15 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
             [id]
         );
 
+        const locationResult = await pool.query(
+            'SELECT location_id FROM user_locations WHERE user_id = $1',
+            [id]
+        );
+
         const employee = {
             ...userResult.rows[0],
-            details: detailResult.rows[0] || null
+            details: detailResult.rows[0] || null,
+            location_ids: locationResult.rows.map(r => r.location_id)
         };
 
         res.json(employee);
@@ -62,7 +68,8 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             bank_name, bank_account, bank_holder,
             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
             basic_salary, salary_type, transport_allowance, meal_allowance, overtime_rate,
-            tax_status, emergency_contact_name, emergency_contact_phone
+            tax_status, emergency_contact_name, emergency_contact_phone,
+            location_ids
         } = req.body;
 
         // Check user exists
@@ -125,6 +132,17 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             basic_salary || 0, salary_type || 'monthly', transport_allowance || 0, meal_allowance || 0, overtime_rate || 50000,
             tax_status || 'TK/0', emergency_contact_name || null, emergency_contact_phone || null
         ]);
+
+        // Manage locations
+        if (Array.isArray(location_ids)) {
+            await pool.query('DELETE FROM user_locations WHERE user_id = $1', [id]);
+            if (location_ids.length > 0) {
+                // Bulk insert
+                const values = location_ids.map((locId, i) => `($1, $${i + 2})`).join(', ');
+                const params = [id, ...location_ids];
+                await pool.query(`INSERT INTO user_locations (user_id, location_id) VALUES ${values}`, params);
+            }
+        }
 
         res.json(result.rows[0]);
     } catch (error) {

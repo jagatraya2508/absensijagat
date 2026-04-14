@@ -244,7 +244,8 @@ export default function AdminPayroll() {
                                             <th>Karyawan</th>
                                             <th style={{ textAlign: 'right' }}>Gaji Pokok</th>
                                             <th style={{ textAlign: 'right' }}>Tunjangan</th>
-                                            <th style={{ textAlign: 'right' }}>Lembur</th>
+                                            <th style={{ textAlign: 'center' }}>Jam Lembur</th>
+                                            <th style={{ textAlign: 'right' }}>Nilai Lembur</th>
                                             <th style={{ textAlign: 'right' }}>Gross</th>
                                             <th style={{ textAlign: 'right' }}>BPJS</th>
                                             <th style={{ textAlign: 'right' }}>PPh 21</th>
@@ -267,6 +268,7 @@ export default function AdminPayroll() {
                                                     </td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.basic_salary)}</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(tunjangan)}</td>
+                                                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{parseFloat(item.overtime_hours)} jam</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.overtime_amount)}</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.gross_income)}</td>
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(bpjsTotal)}</td>
@@ -285,6 +287,7 @@ export default function AdminPayroll() {
                                             <td style={{ fontWeight: 700 }}>TOTAL</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.basic_salary), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance), 0))}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>{selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_hours), 0)} jam</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_amount), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.gross_income), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.bpjs_kes_employee) + parseFloat(i.bpjs_jht_employee) + parseFloat(i.bpjs_jp_employee), 0))}</td>

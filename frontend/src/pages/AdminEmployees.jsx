@@ -1,17 +1,22 @@
-import { useState, useEffect } from 'react';
-import { employeesAPI, authAPI, departmentsAPI, positionsAPI } from '../utils/api';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI } from '../utils/api';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const TABS = [
     { id: 'personal', label: '👤 Data Pribadi' },
     { id: 'work', label: '💼 Data Kerja' },
     { id: 'bank', label: '🏦 Bank & Pajak' },
     { id: 'salary', label: '💰 Gaji & Tunjangan' },
+    { id: 'locations', label: '📍 Lokasi Absen' },
 ];
 
 export default function AdminEmployees() {
     const [employees, setEmployees] = useState([]);
     const [masterDepartments, setMasterDepartments] = useState([]);
     const [masterPositions, setMasterPositions] = useState([]);
+    const [masterLocations, setMasterLocations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -20,6 +25,7 @@ export default function AdminEmployees() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [search, setSearch] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
     const [formData, setFormData] = useState({
         nik: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
@@ -27,7 +33,8 @@ export default function AdminEmployees() {
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
-        tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: ''
+        tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
+        location_ids: []
     });
 
     useEffect(() => { 
@@ -39,8 +46,10 @@ export default function AdminEmployees() {
         try {
             const depts = await departmentsAPI.getAll();
             const pos = await positionsAPI.getAll();
+            const loc = await locationsAPI.getAll();
             setMasterDepartments(depts);
             setMasterPositions(pos);
+            setMasterLocations(loc.filter(l => l.is_active));
         } catch (err) {
             console.error('Failed to fetch masters:', err);
         }
@@ -79,7 +88,8 @@ export default function AdminEmployees() {
                 meal_allowance: d.meal_allowance || 0, overtime_rate: d.overtime_rate || 50000,
                 tax_status: d.tax_status || 'TK/0',
                 emergency_contact_name: d.emergency_contact_name || '',
-                emergency_contact_phone: d.emergency_contact_phone || ''
+                emergency_contact_phone: d.emergency_contact_phone || '',
+                location_ids: data.location_ids || []
             });
             setActiveTab('personal');
             setShowModal(true);
@@ -110,15 +120,213 @@ export default function AdminEmployees() {
         setFormData(prev => ({ ...prev, [field]: value }));
     }
 
+    function toggleLocation(locId) {
+        setFormData(prev => {
+            const ids = prev.location_ids || [];
+            if (ids.includes(locId)) {
+                return { ...prev, location_ids: ids.filter(id => id !== locId) };
+            } else {
+                return { ...prev, location_ids: [...ids, locId] };
+            }
+        });
+    }
+
     function formatCurrency(val) {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
     }
 
-    const filteredEmployees = employees.filter(e =>
-        e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.employee_id.toLowerCase().includes(search.toLowerCase()) ||
-        (e.department || '').toLowerCase().includes(search.toLowerCase())
-    );
+    // Sort handler
+    function handleSort(key) {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    }
+
+    function getSortIcon(key) {
+        if (sortConfig.key !== key) return '⇅';
+        return sortConfig.direction === 'asc' ? '▲' : '▼';
+    }
+
+    const filteredEmployees = useMemo(() => {
+        let result = employees.filter(e =>
+            e.name.toLowerCase().includes(search.toLowerCase()) ||
+            e.employee_id.toLowerCase().includes(search.toLowerCase()) ||
+            (e.department || '').toLowerCase().includes(search.toLowerCase())
+        );
+
+        // Sort
+        if (sortConfig.key) {
+            result = [...result].sort((a, b) => {
+                let aVal = a[sortConfig.key];
+                let bVal = b[sortConfig.key];
+
+                // Handle numeric fields
+                if (sortConfig.key === 'basic_salary') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                } else {
+                    aVal = (aVal || '').toString().toLowerCase();
+                    bVal = (bVal || '').toString().toLowerCase();
+                }
+
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return result;
+    }, [employees, search, sortConfig]);
+
+    // Export to Excel
+    function handleExportExcel() {
+        const data = filteredEmployees.map((emp, i) => ({
+            'No': i + 1,
+            'ID Karyawan': emp.employee_id,
+            'Nama': emp.name,
+            'Departemen': emp.department || '-',
+            'Jabatan': emp.position || '-',
+            'Gaji Pokok': emp.basic_salary || 0,
+            'Tipe Gaji': emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        // Set column widths
+        ws['!cols'] = [
+            { wch: 5 },  // No
+            { wch: 14 }, // ID
+            { wch: 28 }, // Nama
+            { wch: 18 }, // Departemen
+            { wch: 18 }, // Jabatan
+            { wch: 18 }, // Gaji Pokok
+            { wch: 12 }, // Tipe Gaji
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Data Karyawan');
+        XLSX.writeFile(wb, `Data_Karyawan_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    // Export to PDF
+    function handleExportPDF() {
+        const doc = new jsPDF('landscape', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+
+        // Header
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('Data Karyawan', pageWidth / 2, 15, { align: 'center' });
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}  |  Total: ${filteredEmployees.length} karyawan`, pageWidth / 2, 22, { align: 'center' });
+
+        const tableData = filteredEmployees.map((emp, i) => [
+            i + 1,
+            emp.employee_id,
+            emp.name,
+            emp.department || '-',
+            emp.position || '-',
+            formatCurrency(emp.basic_salary),
+            emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
+        ]);
+
+        doc.autoTable({
+            startY: 28,
+            head: [['No', 'ID Karyawan', 'Nama', 'Departemen', 'Jabatan', 'Gaji Pokok', 'Tipe Gaji']],
+            body: tableData,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [30, 41, 82], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+            alternateRowStyles: { fillColor: [240, 243, 255] },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 12 },
+                1: { cellWidth: 28 },
+                2: { cellWidth: 50 },
+                5: { halign: 'right' },
+                6: { halign: 'center', cellWidth: 22 }
+            },
+            didDrawPage: (data) => {
+                // Footer
+                doc.setFontSize(7);
+                doc.setTextColor(150);
+                doc.text(`Halaman ${data.pageNumber}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 7, { align: 'center' });
+            }
+        });
+
+        doc.save(`Data_Karyawan_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    // Print
+    function handlePrint() {
+        const printContent = `
+            <html>
+            <head>
+                <title>Data Karyawan</title>
+                <style>
+                    @page { size: landscape; margin: 15mm; }
+                    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; margin: 0; padding: 0; }
+                    .print-header { text-align: center; margin-bottom: 20px; }
+                    .print-header h1 { font-size: 20px; margin: 0 0 4px; color: #1e2952; }
+                    .print-header p { font-size: 11px; color: #666; margin: 0; }
+                    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+                    th { background: #1e2952; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+                    td { padding: 7px 10px; border-bottom: 1px solid #e0e0e0; }
+                    tr:nth-child(even) td { background: #f5f7ff; }
+                    tr:hover td { background: #eef1ff; }
+                    .text-right { text-align: right; }
+                    .text-center { text-align: center; }
+                    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; }
+                    .badge-success { background: #d1fae5; color: #065f46; }
+                    .badge-warning { background: #fef3c7; color: #92400e; }
+                    .badge-info { background: #dbeafe; color: #1e40af; }
+                    .footer { text-align: center; margin-top: 20px; font-size: 9px; color: #999; }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>📋 Data Karyawan</h1>
+                    <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}  •  Total: ${filteredEmployees.length} karyawan</p>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="text-center">No</th>
+                            <th>ID Karyawan</th>
+                            <th>Nama</th>
+                            <th>Departemen</th>
+                            <th>Jabatan</th>
+                            <th class="text-right">Gaji Pokok</th>
+                            <th class="text-center">Tipe Gaji</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredEmployees.map((emp, i) => `
+                            <tr>
+                                <td class="text-center">${i + 1}</td>
+                                <td>${emp.employee_id}</td>
+                                <td>${emp.name}</td>
+                                <td>${emp.department || '-'}</td>
+                                <td>${emp.position || '-'}</td>
+                                <td class="text-right">${formatCurrency(emp.basic_salary)}</td>
+                                <td class="text-center">
+                                    <span class="badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}">
+                                        ${emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <div class="footer">Dokumen ini dicetak secara otomatis oleh Sistem Absensi Karyawan</div>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+    }
 
     return (
         <div>
@@ -134,16 +342,60 @@ export default function AdminEmployees() {
             )}
 
             <div className="card">
-                <div className="card-header">
+                <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
                     <h2 className="card-title">Daftar Karyawan</h2>
-                    <input
-                        type="text"
-                        className="form-input"
-                        placeholder="🔍 Cari karyawan..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        style={{ maxWidth: 280 }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="🔍 Cari karyawan..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            style={{ maxWidth: 240 }}
+                        />
+                        <button
+                            className="btn"
+                            onClick={handlePrint}
+                            title="Print Data Karyawan"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                transition: 'all 0.2s', cursor: 'pointer'
+                            }}
+                        >
+                            🖨️ Print
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={handleExportPDF}
+                            title="Ekspor ke PDF"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #ef4444, #f87171)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                transition: 'all 0.2s', cursor: 'pointer'
+                            }}
+                        >
+                            📄 PDF
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={handleExportExcel}
+                            title="Ekspor ke Excel"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #22c55e, #4ade80)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                transition: 'all 0.2s', cursor: 'pointer'
+                            }}
+                        >
+                            📊 Excel
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -160,12 +412,24 @@ export default function AdminEmployees() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Nama</th>
-                                    <th>Departemen</th>
-                                    <th>Jabatan</th>
-                                    <th>Gaji Pokok</th>
-                                    <th>Tipe</th>
+                                    <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Nama <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'name' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('name')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('department')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Departemen <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'department' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('department')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('position')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Jabatan <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'position' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('position')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('basic_salary')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Gaji Pokok <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'basic_salary' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('basic_salary')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('salary_type')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Tipe <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'salary_type' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('salary_type')}</span>
+                                    </th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -415,6 +679,43 @@ export default function AdminEmployees() {
                                             • <strong>Harian</strong> = gaji per hari × jumlah hari hadir (absensi)<br />
                                             • <strong>Mingguan</strong> = gaji per minggu × jumlah minggu bekerja<br />
                                             • <strong>Bulanan</strong> = gaji tetap per bulan
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tab: Lokasi Absen */}
+                                {activeTab === 'locations' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
+                                            ℹ️ <strong>Pengaturan Lokasi Absen:</strong><br />
+                                            Centang lokasi mana saja yang diizinkan untuk karyawan ini melakukan absensi. <br/>
+                                            <em>Jika tidak ada satupun yang dicentang, maka karyawan diizinkan absen di semua lokasi (Default).</em>
+                                        </div>
+
+                                        <div className="card" style={{ padding: '1rem', border: '1px solid var(--gray-700)' }}>
+                                            {masterLocations.length === 0 ? (
+                                                <p style={{ textAlign: 'center', color: 'var(--gray-400)', margin: '1rem 0' }}>Belum ada master lokasi yang aktif.</p>
+                                            ) : (
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                    {masterLocations.map(loc => {
+                                                        const isChecked = formData.location_ids && formData.location_ids.includes(loc.id);
+                                                        return (
+                                                            <div key={loc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: isChecked ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)', border: isChecked ? '1px solid var(--primary-500)' : '1px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => toggleLocation(loc.id)}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={isChecked} 
+                                                                    onChange={() => {}} // dummy onChange to suppress warning, handled by parent onClick
+                                                                    style={{ cursor: 'pointer' }}
+                                                                />
+                                                                <div>
+                                                                    <div style={{ fontWeight: 500, color: isChecked ? 'var(--primary-400)' : 'var(--text-primary)' }}>{loc.name}</div>
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Radius: {loc.radius_meters}m</div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

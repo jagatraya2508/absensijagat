@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { faceAPI } from '../utils/api';
 import useFaceApi from '../hooks/useFaceApi';
 
@@ -10,6 +10,9 @@ export default function AdminFaceRegistration() {
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [search, setSearch] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
+    const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'registered', 'unregistered'
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -41,6 +44,55 @@ export default function AdminFaceRegistration() {
             setLoading(false);
         }
     }
+
+    // Sort handler
+    function handleSort(key) {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    }
+
+    function getSortIcon(key) {
+        if (sortConfig.key !== key) return '⇅';
+        return sortConfig.direction === 'asc' ? '▲' : '▼';
+    }
+
+    // Filtered & sorted users
+    const filteredUsers = useMemo(() => {
+        let result = users.filter(u =>
+            u.name.toLowerCase().includes(search.toLowerCase()) ||
+            u.employee_id.toLowerCase().includes(search.toLowerCase())
+        );
+
+        // Apply status filter
+        if (filterStatus === 'registered') {
+            result = result.filter(u => u.has_face);
+        } else if (filterStatus === 'unregistered') {
+            result = result.filter(u => !u.has_face);
+        }
+
+        // Sort
+        if (sortConfig.key) {
+            result = [...result].sort((a, b) => {
+                let aVal, bVal;
+
+                if (sortConfig.key === 'has_face') {
+                    aVal = a.has_face ? 1 : 0;
+                    bVal = b.has_face ? 1 : 0;
+                } else {
+                    aVal = (a[sortConfig.key] || '').toString().toLowerCase();
+                    bVal = (b[sortConfig.key] || '').toString().toLowerCase();
+                }
+
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return result;
+    }, [users, search, sortConfig, filterStatus]);
 
     async function startCamera() {
         try {
@@ -245,35 +297,63 @@ export default function AdminFaceRegistration() {
 
             {/* Users List */}
             <div className="card">
-                <div className="card-header">
+                <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
                     <h2 className="card-title">👥 Daftar Karyawan</h2>
-                    <span className="badge badge-primary">
-                        {users.filter(u => u.has_face).length}/{users.length} Terdaftar
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="🔍 Cari karyawan..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            style={{ maxWidth: 200 }}
+                        />
+                        <select
+                            className="form-input form-select"
+                            value={filterStatus}
+                            onChange={e => setFilterStatus(e.target.value)}
+                            style={{ maxWidth: 170 }}
+                        >
+                            <option value="all">Semua Status</option>
+                            <option value="registered">✅ Terdaftar</option>
+                            <option value="unregistered">❌ Belum Terdaftar</option>
+                        </select>
+                        <span className="badge badge-primary">
+                            {users.filter(u => u.has_face).length}/{users.length} Terdaftar
+                        </span>
+                    </div>
                 </div>
 
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '2rem' }}>
                         <div className="loading-spinner" style={{ margin: '0 auto' }} />
                     </div>
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-state-icon">👥</div>
-                        <p className="empty-state-text">Belum ada karyawan terdaftar</p>
+                        <p className="empty-state-text">
+                            {search || filterStatus !== 'all' ? 'Tidak ada karyawan yang cocok' : 'Belum ada karyawan terdaftar'}
+                        </p>
                     </div>
                 ) : (
                     <div className="table-container">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Employee ID</th>
-                                    <th>Nama</th>
-                                    <th>Status Wajah</th>
+                                    <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Employee ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Nama <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'name' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('name')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('has_face')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Status Wajah <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'has_face' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('has_face')}</span>
+                                    </th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map((user) => (
+                                {filteredUsers.map((user) => (
                                     <tr key={user.id}>
                                         <td style={{ fontWeight: 500 }}>{user.employee_id}</td>
                                         <td>{user.name}</td>

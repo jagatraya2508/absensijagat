@@ -94,11 +94,23 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
                 );
                 isValid = distance <= nearestLocation.radius_meters;
             }
-        } else {
-            // Find nearest active location
-            const locationsResult = await pool.query(
-                'SELECT * FROM attendance_locations WHERE is_active = true'
-            );
+            // Find nearest active location among ALLOWED locations (Option B: if no allowed locations, allow ALL)
+            const allowedCheck = await pool.query('SELECT location_id FROM user_locations WHERE user_id = $1', [req.user.id]);
+            let locationsResult;
+            
+            if (allowedCheck.rows.length > 0) {
+                // User has restricted locations
+                const allowedIds = allowedCheck.rows.map(r => r.location_id);
+                locationsResult = await pool.query(
+                    'SELECT * FROM attendance_locations WHERE is_active = true AND id = ANY($1)',
+                    [allowedIds]
+                );
+            } else {
+                // Option B: Fallback to ALL active locations
+                locationsResult = await pool.query(
+                    'SELECT * FROM attendance_locations WHERE is_active = true'
+                );
+            }
 
             let minDistance = Infinity;
             for (const loc of locationsResult.rows) {
@@ -215,9 +227,20 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
                 isValid = distance <= nearestLocation.radius_meters;
             }
         } else {
-            const locationsResult = await pool.query(
-                'SELECT * FROM attendance_locations WHERE is_active = true'
-            );
+            const allowedCheck = await pool.query('SELECT location_id FROM user_locations WHERE user_id = $1', [req.user.id]);
+            let locationsResult;
+
+            if (allowedCheck.rows.length > 0) {
+                const allowedIds = allowedCheck.rows.map(r => r.location_id);
+                locationsResult = await pool.query(
+                    'SELECT * FROM attendance_locations WHERE is_active = true AND id = ANY($1)',
+                    [allowedIds]
+                );
+            } else {
+                locationsResult = await pool.query(
+                    'SELECT * FROM attendance_locations WHERE is_active = true'
+                );
+            }
 
             let minDistance = Infinity;
             for (const loc of locationsResult.rows) {

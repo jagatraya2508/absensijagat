@@ -116,6 +116,14 @@ CREATE TABLE IF NOT EXISTS user_off_days (
 CREATE INDEX IF NOT EXISTS idx_off_days_user_id ON user_off_days(user_id);
 CREATE INDEX IF NOT EXISTS idx_off_days_date ON user_off_days(off_date);
 
+-- Tabel User Locations (Lokasi Absensi yang Diizinkan per Karyawan)
+CREATE TABLE IF NOT EXISTS user_locations (
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    location_id INTEGER REFERENCES attendance_locations(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, location_id)
+);
+
 -- ============================================
 -- MODUL HR & PAYROLL
 -- ============================================
@@ -253,6 +261,30 @@ CREATE TABLE IF NOT EXISTS payroll_items (
 
 CREATE INDEX IF NOT EXISTS idx_payroll_item_run ON payroll_items(payroll_run_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_item_user ON payroll_items(user_id);
+
+-- Tabel BPJS Settings (Pengaturan Tarif BPJS)
+CREATE TABLE IF NOT EXISTS bpjs_settings (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(30) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    employee_rate DECIMAL(6,4) NOT NULL DEFAULT 0,
+    company_rate DECIMAL(6,4) NOT NULL DEFAULT 0,
+    max_salary_base DECIMAL(15,2) DEFAULT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default BPJS rates sesuai peraturan Disnaker
+INSERT INTO bpjs_settings (code, name, description, employee_rate, company_rate, max_salary_base) VALUES
+('BPJS_KES', 'BPJS Kesehatan', 'Jaminan Kesehatan Nasional (JKN)', 0.0100, 0.0400, 12000000),
+('BPJS_JHT', 'BPJS JHT', 'Jaminan Hari Tua', 0.0200, 0.0370, NULL),
+('BPJS_JP', 'BPJS JP', 'Jaminan Pensiun', 0.0100, 0.0200, 10042300),
+('BPJS_JKK', 'BPJS JKK', 'Jaminan Kecelakaan Kerja (Kelompok I - Risiko Sangat Rendah)', 0.0000, 0.0024, NULL),
+('BPJS_JKM', 'BPJS JKM', 'Jaminan Kematian', 0.0000, 0.0030, NULL)
+ON CONFLICT (code) DO NOTHING;
 
 -- ============================================
 -- MODUL PENILAIAN KEDISIPLINAN
