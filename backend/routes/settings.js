@@ -50,6 +50,17 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Get BPJS settings
+router.get('/bpjs', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM bpjs_settings WHERE is_active = true ORDER BY id ASC');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get BPJS settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 // Update logo (Admin only)
 router.post('/logo', authenticateToken, isAdmin, upload.single('logo'), async (req, res) => {
     try {

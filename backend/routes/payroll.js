@@ -114,7 +114,14 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
         `, [month, year, req.user.id, notes || null]);
         const payrollRunId = runResult.rows[0].id;
 
-        // Get all employees with details
+        // Get default BPJS rates from bpjs_settings table
+        const bpjsSettingsResult = await client.query(
+            "SELECT code, employee_rate, company_rate, max_salary_base FROM bpjs_settings WHERE is_active = true"
+        );
+        const defaultRates = {};
+        bpjsSettingsResult.rows.forEach(r => { defaultRates[r.code] = r; });
+
+        // Get all employees with details (including driver info + BPJS enrollment)
         const employees = await client.query(`
             SELECT u.id, u.employee_id, u.name,
                    COALESCE(ed.basic_salary, 0) as basic_salary,
@@ -122,7 +129,22 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                    COALESCE(ed.transport_allowance, 0) as transport_allowance,
                    COALESCE(ed.meal_allowance, 0) as meal_allowance,
                    COALESCE(ed.overtime_rate, 50000) as overtime_rate,
-                   COALESCE(ed.tax_status, 'TK/0') as tax_status
+                   COALESCE(ed.tax_status, 'TK/0') as tax_status,
+                   COALESCE(ed.is_driver, false) as is_driver,
+                   COALESCE(ed.driver_subuh_allowance, 0) as driver_subuh_allowance,
+                   COALESCE(ed.driver_rit_allowance, 0) as driver_rit_allowance,
+                   COALESCE(ed.driver_inap_allowance, 0) as driver_inap_allowance,
+                   COALESCE(ed.driver_ritase_allowance, 0) as driver_ritase_allowance,
+                   COALESCE(ed.bpjs_kes_enrolled, true) as bpjs_kes_enrolled,
+                   COALESCE(ed.bpjs_jht_enrolled, true) as bpjs_jht_enrolled,
+                   COALESCE(ed.bpjs_jp_enrolled, true) as bpjs_jp_enrolled,
+                   COALESCE(ed.bpjs_jkk_enrolled, true) as bpjs_jkk_enrolled,
+                   COALESCE(ed.bpjs_jkm_enrolled, true) as bpjs_jkm_enrolled,
+                   COALESCE(ed.pph21_enabled, true) as pph21_enabled,
+                   ed.bpjs_kes_employee_rate, ed.bpjs_kes_company_rate,
+                   ed.bpjs_jht_employee_rate, ed.bpjs_jht_company_rate,
+                   ed.bpjs_jp_employee_rate, ed.bpjs_jp_company_rate,
+                   ed.bpjs_jkk_rate, ed.bpjs_jkm_rate
             FROM users u
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             WHERE u.role = 'employee'
@@ -193,27 +215,85 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
             const overtimeHours = parseFloat(overtimeResult.rows[0].total_hours);
             const overtimeAmount = parseFloat(overtimeResult.rows[0].total_amount);
 
-            // Calculate BPJS (based on effective monthly salary for consistency)
+            // Calculate driver allowances
+            let driverSubuhDays = 0, driverSubuhAmount = 0;
+            let driverRitTotal = 0, driverRitAmount = 0;
+            let driverOvernightDays = 0, driverOvernightAmount = 0;
+            let driverExtraRit = 0, driverRitaseAmount = 0;
+            let driverTotalAllowance = 0;
+
+            if (emp.is_driver) {
+                const driverResult = await client.query(`
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN is_subuh THEN 1 ELSE 0 END), 0) as total_subuh,
+                        COALESCE(SUM(rit_count), 0) as total_rit,
+                        COALESCE(SUM(CASE WHEN is_overnight THEN 1 ELSE 0 END), 0) as total_overnight,
+                        COALESCE(SUM(GREATEST(rit_count - 1, 0)), 0) as extra_rit
+                    FROM driver_activities
+                    WHERE user_id = $1
+                      AND EXTRACT(MONTH FROM activity_date) = $2
+                      AND EXTRACT(YEAR FROM activity_date) = $3
+                `, [emp.id, month, year]);
+
+                driverSubuhDays = parseInt(driverResult.rows[0].total_subuh);
+                driverRitTotal = parseInt(driverResult.rows[0].total_rit);
+                driverOvernightDays = parseInt(driverResult.rows[0].total_overnight);
+                driverExtraRit = parseInt(driverResult.rows[0].extra_rit);
+
+                driverSubuhAmount = driverSubuhDays * parseFloat(emp.driver_subuh_allowance);
+                driverRitAmount = driverRitTotal * parseFloat(emp.driver_rit_allowance);
+                   driverOvernightAmount = driverOvernightDays * parseFloat(emp.driver_inap_allowance);
+                driverRitaseAmount = driverExtraRit * parseFloat(emp.driver_ritase_allowance);
+                driverTotalAllowance = driverSubuhAmount + driverRitAmount + driverOvernightAmount + driverRitaseAmount;
+            }
+
+            // Calculate BPJS (using rates from bpjs_settings + per-employee overrides)
             const bpjsBase = basicSalary; // effective monthly amount
-            const bpjsKesEmployee = bpjsBase * 0.01;
-            const bpjsKesCompany = bpjsBase * 0.04;
-            const bpjsJhtEmployee = bpjsBase * 0.02;
-            const bpjsJhtCompany = bpjsBase * 0.037;
-            const bpjsJpEmployee = bpjsBase * 0.01;
-            const bpjsJpCompany = bpjsBase * 0.02;
-            const bpjsJkk = bpjsBase * 0.0024;
-            const bpjsJkm = bpjsBase * 0.003;
 
-            // Gross income
-            const grossIncome = basicSalary + transportAllowance + mealAllowance + overtimeAmount;
+            // Helper: get rate (employee override > default from bpjs_settings > fallback)
+            function getRate(overrideRate, settingsCode, rateType, fallback) {
+                if (overrideRate != null) return parseFloat(overrideRate);
+                if (defaultRates[settingsCode]) return parseFloat(defaultRates[settingsCode][rateType]);
+                return fallback;
+            }
 
-            // Calculate PPh 21 (monthly)
-            const annualGross = grossIncome * 12;
-            const annualBpjsDeduction = (bpjsJhtEmployee + bpjsJpEmployee) * 12;
-            const ptkp = getPTKP(emp.tax_status);
-            const annualTaxableIncome = annualGross - annualBpjsDeduction - ptkp;
-            const annualPPh = calculatePPh21(annualTaxableIncome);
-            const monthlyPPh = Math.round(annualPPh / 12);
+            // Apply max salary base cap if configured
+            function getBpjsBase(settingsCode) {
+                const maxBase = defaultRates[settingsCode]?.max_salary_base;
+                if (maxBase && parseFloat(maxBase) > 0) {
+                    return Math.min(bpjsBase, parseFloat(maxBase));
+                }
+                return bpjsBase;
+            }
+
+            const bpjsKesBase = getBpjsBase('BPJS_KES');
+            const bpjsKesEmployee = emp.bpjs_kes_enrolled ? bpjsKesBase * getRate(emp.bpjs_kes_employee_rate, 'BPJS_KES', 'employee_rate', 0.01) : 0;
+            const bpjsKesCompany = emp.bpjs_kes_enrolled ? bpjsKesBase * getRate(emp.bpjs_kes_company_rate, 'BPJS_KES', 'company_rate', 0.04) : 0;
+
+            const bpjsJhtBase = getBpjsBase('BPJS_JHT');
+            const bpjsJhtEmployee = emp.bpjs_jht_enrolled ? bpjsJhtBase * getRate(emp.bpjs_jht_employee_rate, 'BPJS_JHT', 'employee_rate', 0.02) : 0;
+            const bpjsJhtCompany = emp.bpjs_jht_enrolled ? bpjsJhtBase * getRate(emp.bpjs_jht_company_rate, 'BPJS_JHT', 'company_rate', 0.037) : 0;
+
+            const bpjsJpBase = getBpjsBase('BPJS_JP');
+            const bpjsJpEmployee = emp.bpjs_jp_enrolled ? bpjsJpBase * getRate(emp.bpjs_jp_employee_rate, 'BPJS_JP', 'employee_rate', 0.01) : 0;
+            const bpjsJpCompany = emp.bpjs_jp_enrolled ? bpjsJpBase * getRate(emp.bpjs_jp_company_rate, 'BPJS_JP', 'company_rate', 0.02) : 0;
+
+            const bpjsJkk = emp.bpjs_jkk_enrolled ? bpjsBase * getRate(emp.bpjs_jkk_rate, 'BPJS_JKK', 'company_rate', 0.0024) : 0;
+            const bpjsJkm = emp.bpjs_jkm_enrolled ? bpjsBase * getRate(emp.bpjs_jkm_rate, 'BPJS_JKM', 'company_rate', 0.003) : 0;
+
+            // Gross income (including driver allowances)
+            const grossIncome = basicSalary + transportAllowance + mealAllowance + overtimeAmount + driverTotalAllowance;
+
+            // Calculate PPh 21 (monthly) - only if enabled for this employee
+            let monthlyPPh = 0;
+            if (emp.pph21_enabled) {
+                const annualGross = grossIncome * 12;
+                const annualBpjsDeduction = (bpjsJhtEmployee + bpjsJpEmployee) * 12;
+                const ptkp = getPTKP(emp.tax_status);
+                const annualTaxableIncome = annualGross - annualBpjsDeduction - ptkp;
+                const annualPPh = calculatePPh21(annualTaxableIncome);
+                monthlyPPh = Math.round(annualPPh / 12);
+            }
 
             // Get active loan deduction
             const loanResult = await client.query(`
@@ -237,15 +317,21 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                     bpjs_kes_employee, bpjs_kes_company, bpjs_jht_employee, bpjs_jht_company,
                     bpjs_jp_employee, bpjs_jp_company, bpjs_jkk, bpjs_jkm,
                     gross_income, pph21_amount, loan_deduction, total_deductions, net_salary,
-                    salary_type, working_days
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+                    salary_type, working_days,
+                    driver_subuh_days, driver_subuh_amount, driver_rit_total, driver_rit_amount,
+                    driver_overnight_days, driver_overnight_amount, driver_total_allowance,
+                    driver_extra_rit, driver_ritase_amount
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
             `, [
                 payrollRunId, emp.id, basicSalary, transportAllowance, mealAllowance,
                 overtimeHours, overtimeAmount,
                 bpjsKesEmployee, bpjsKesCompany, bpjsJhtEmployee, bpjsJhtCompany,
                 bpjsJpEmployee, bpjsJpCompany, bpjsJkk, bpjsJkm,
                 grossIncome, monthlyPPh, loanDeduction, totalDeductions, netSalary,
-                salaryType, workingDays
+                salaryType, workingDays,
+                driverSubuhDays, driverSubuhAmount, driverRitTotal, driverRitAmount,
+                driverOvernightDays, driverOvernightAmount, driverTotalAllowance,
+                driverExtraRit, driverRitaseAmount
             ]);
         }
 
@@ -670,6 +756,17 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
         addRow('Tunjangan Transport', slip.transport_allowance);
         addRow('Tunjangan Makan', slip.meal_allowance);
         addRow(`Lembur (${slip.overtime_hours} jam)`, slip.overtime_amount);
+        // Driver allowances (if any)
+        if (parseFloat(slip.driver_total_allowance) > 0) {
+            if (parseFloat(slip.driver_subuh_amount) > 0)
+                addRow(`Uang Jalan Subuh (${slip.driver_subuh_days} hari)`, slip.driver_subuh_amount);
+            if (parseFloat(slip.driver_rit_amount) > 0)
+                addRow(`Uang Mel/RIT (${slip.driver_rit_total} trip)`, slip.driver_rit_amount);
+            if (parseFloat(slip.driver_overnight_amount) > 0)
+                addRow(`Uang Menginap (${slip.driver_overnight_days} hari)`, slip.driver_overnight_amount);
+            if (parseFloat(slip.driver_ritase_amount) > 0)
+                addRow(`Uang Ritase Tambahan (${slip.driver_extra_rit} trip)`, slip.driver_ritase_amount);
+        }
         doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
         doc.moveDown(0.3);
         addRow('Total Pendapatan', slip.gross_income, false, true);
@@ -678,11 +775,13 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
         // Potongan
         doc.font('Helvetica-Bold').fontSize(11).text('POTONGAN', 50);
         doc.moveDown(0.3);
-        addRow('BPJS Kesehatan (1%)', slip.bpjs_kes_employee, true);
-        addRow('BPJS JHT (2%)', slip.bpjs_jht_employee, true);
-        addRow('BPJS JP (1%)', slip.bpjs_jp_employee, true);
-        addRow('PPh 21', slip.pph21_amount, true);
-        addRow('Potongan Pinjaman', slip.loan_deduction, true);
+        const bpjsBase = parseFloat(slip.basic_salary) || 1;
+        function fmtPct(val) { const pct = (parseFloat(val) / bpjsBase * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); }
+        if (parseFloat(slip.bpjs_kes_employee) > 0) addRow(`BPJS Kesehatan (${fmtPct(slip.bpjs_kes_employee)}%)`, slip.bpjs_kes_employee, true);
+        if (parseFloat(slip.bpjs_jht_employee) > 0) addRow(`BPJS JHT (${fmtPct(slip.bpjs_jht_employee)}%)`, slip.bpjs_jht_employee, true);
+        if (parseFloat(slip.bpjs_jp_employee) > 0) addRow(`BPJS JP (${fmtPct(slip.bpjs_jp_employee)}%)`, slip.bpjs_jp_employee, true);
+        if (parseFloat(slip.pph21_amount) > 0) addRow('PPh 21', slip.pph21_amount, true);
+        if (parseFloat(slip.loan_deduction) > 0) addRow('Potongan Pinjaman', slip.loan_deduction, true);
         doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
         doc.moveDown(0.3);
         addRow('Total Potongan', slip.total_deductions, true, true);
@@ -693,12 +792,12 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
         doc.moveDown(0.3);
         doc.font('Helvetica').fontSize(9);
         const compItems = [
-            ['BPJS Kesehatan (4%)', slip.bpjs_kes_company],
-            ['BPJS JHT (3.7%)', slip.bpjs_jht_company],
-            ['BPJS JP (2%)', slip.bpjs_jp_company],
-            ['BPJS JKK (0.24%)', slip.bpjs_jkk],
-            ['BPJS JKM (0.3%)', slip.bpjs_jkm],
-        ];
+            [parseFloat(slip.bpjs_kes_company) > 0 ? `BPJS Kesehatan (${fmtPct(slip.bpjs_kes_company)}%)` : null, slip.bpjs_kes_company],
+            [parseFloat(slip.bpjs_jht_company) > 0 ? `BPJS JHT (${fmtPct(slip.bpjs_jht_company)}%)` : null, slip.bpjs_jht_company],
+            [parseFloat(slip.bpjs_jp_company) > 0 ? `BPJS JP (${fmtPct(slip.bpjs_jp_company)}%)` : null, slip.bpjs_jp_company],
+            [parseFloat(slip.bpjs_jkk) > 0 ? `BPJS JKK (${fmtPct(slip.bpjs_jkk)}%)` : null, slip.bpjs_jkk],
+            [parseFloat(slip.bpjs_jkm) > 0 ? `BPJS JKM (${fmtPct(slip.bpjs_jkm)}%)` : null, slip.bpjs_jkm],
+        ].filter(([label]) => label !== null);
         compItems.forEach(([label, val]) => {
             const cy = doc.y;
             doc.text(label, 60, cy, { width: 300 });
@@ -807,13 +906,14 @@ router.get('/:id/slip/:userId/excel', authenticateToken, async (req, res) => {
         Object.assign(ws.getCell(`C${row}`), deductHeaderStyle);
         row++;
 
-        const deductItems = [
-            ['BPJS Kesehatan (1%)', parseFloat(slip.bpjs_kes_employee)],
-            ['BPJS JHT (2%)', parseFloat(slip.bpjs_jht_employee)],
-            ['BPJS JP (1%)', parseFloat(slip.bpjs_jp_employee)],
-            ['PPh 21', parseFloat(slip.pph21_amount)],
-            ['Potongan Pinjaman', parseFloat(slip.loan_deduction)],
-        ];
+        const deductItems = [];
+        const excelBpjsBase = parseFloat(slip.basic_salary) || 1;
+        function excelFmtPct(val) { const pct = (parseFloat(val) / excelBpjsBase * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); }
+        if (parseFloat(slip.bpjs_kes_employee) > 0) deductItems.push([`BPJS Kesehatan (${excelFmtPct(slip.bpjs_kes_employee)}%)`, parseFloat(slip.bpjs_kes_employee)]);
+        if (parseFloat(slip.bpjs_jht_employee) > 0) deductItems.push([`BPJS JHT (${excelFmtPct(slip.bpjs_jht_employee)}%)`, parseFloat(slip.bpjs_jht_employee)]);
+        if (parseFloat(slip.bpjs_jp_employee) > 0) deductItems.push([`BPJS JP (${excelFmtPct(slip.bpjs_jp_employee)}%)`, parseFloat(slip.bpjs_jp_employee)]);
+        deductItems.push(['PPh 21', parseFloat(slip.pph21_amount)]);
+        deductItems.push(['Potongan Pinjaman', parseFloat(slip.loan_deduction)]);
         deductItems.forEach(([label, val]) => {
             ws.getCell(`A${row}`).value = label;
             ws.getCell(`C${row}`).value = val;

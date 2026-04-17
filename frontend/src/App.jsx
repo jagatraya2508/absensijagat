@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { SettingsProvider } from './context/SettingsContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -27,6 +27,9 @@ import AdminDepartments from './pages/AdminDepartments';
 import AdminPositions from './pages/AdminPositions';
 import ManagerApprovals from './pages/ManagerApprovals';
 import Overtime from './pages/Overtime';
+import AdminDriverActivities from './pages/AdminDriverActivities';
+import DriverTracking from './pages/DriverTracking';
+import AdminDriverTracking from './pages/AdminDriverTracking';
 
 function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false }) {
     const { user, loading } = useAuth();
@@ -55,10 +58,17 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false })
 }
 
 function AppLayout({ children }) {
+    const { settings } = useSettings();
+
     return (
         <div className="app-container">
             <Sidebar />
-            <main className="main-content">
+            <main className="main-content" style={{ position: 'relative' }}>
+                {settings?.app_logo && (
+                    <div className="global-logo-container">
+                        <img src={settings.app_logo} alt="Company Logo" className="global-logo" />
+                    </div>
+                )}
                 {children}
             </main>
         </div>
@@ -333,6 +343,39 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminPositions />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/driver-activities"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminDriverActivities />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/driver-tracking"
+                element={
+                    <ProtectedRoute>
+                        <AppLayout>
+                            <DriverTracking />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/driver-tracking"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminDriverTracking />
                         </AppLayout>
                     </ProtectedRoute>
                 }

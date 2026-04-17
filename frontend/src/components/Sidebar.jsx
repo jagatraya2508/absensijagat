@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 
@@ -6,6 +7,12 @@ export default function Sidebar() {
     const { user, logout } = useAuth();
     const { settings } = useSettings();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [openMenus, setOpenMenus] = useState({ master: true });
+
+    function toggleMenu(key) {
+        setOpenMenus(prev => ({ ...prev, [key]: !prev[key] }));
+    }
 
     function handleLogout() {
         logout();
@@ -18,33 +25,42 @@ export default function Sidebar() {
         { path: '/history', icon: '📋', label: 'Riwayat' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
         { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
+        ...(user?.use_tracking ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
         { path: '/change-password', icon: '🔑', label: 'Ubah Password' },
     ];
 
-    const adminItems = [
-        { path: '/off-days', icon: '📅', label: 'Atur Libur' },
+    // Master submenu items
+    const masterItems = [
         { path: '/admin/locations', icon: '📍', label: 'Kelola Lokasi' },
         { path: '/admin/departments', icon: '🏢', label: 'Master Departemen' },
         { path: '/admin/positions', icon: '🏅', label: 'Master Jabatan' },
-        { path: '/admin/users', icon: '👥', label: 'Kelola User' },
         { path: '/admin/employees', icon: '👤', label: 'Data Karyawan' },
         { path: '/admin/face-registration', icon: '🔐', label: 'Registrasi Wajah' },
-        { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin' },
         { path: '/admin/work-schedule', icon: '🕐', label: 'Jadwal Kerja' },
+    ];
+
+    // Other admin items (flat)
+    const adminItems = [
+        { path: '/off-days', icon: '📅', label: 'Atur Libur' },
+        { path: '/admin/announcements', icon: '📢', label: 'Kelola Pengumuman' },
+        { path: '/admin/driver-activities', icon: '🚛', label: 'Aktivitas Driver' },
+        { path: '/admin/driver-tracking', icon: '📍', label: 'Tracking Kunjungan' },
+        { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin' },
         { path: '/admin/loans', icon: '💰', label: 'Pinjaman' },
         { path: '/admin/payroll', icon: '💵', label: 'Payroll' },
         { path: '/admin/assessments', icon: '📋', label: 'Penilaian' },
         { path: '/admin/recruitment', icon: '🧑‍💼', label: 'Recruitment' },
-        { path: '/admin/announcements', icon: '📢', label: 'Kelola Pengumuman' },
-        { path: '/admin/settings', icon: '⚙️', label: 'Pengaturan' },
         { path: '/admin/reports', icon: '📊', label: 'Laporan' },
+        { path: '/admin/users', icon: '👥', label: 'Kelola User' },
+        { path: '/admin/settings', icon: '⚙️', label: 'Pengaturan' },
     ];
+
+    const isMasterActive = masterItems.some(item => location.pathname === item.path);
 
     return (
         <>
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <img src={settings.app_logo} alt="Logo" style={{ width: '40px', height: 'auto' }} />
                     <div>
                         <h1>Absensi</h1>
                         <span>Attendance System</span>
@@ -69,12 +85,13 @@ export default function Sidebar() {
                     {(user?.role === 'admin' || user?.role === 'manager') && (
                         <>
                             <div style={{
-                                margin: '1rem 0',
+                                margin: '1.25rem 0 0.5rem 0',
                                 padding: '0 1rem',
-                                fontSize: '0.7rem',
-                                color: 'var(--gray-500)',
+                                fontSize: '0.85rem',
+                                fontWeight: '700',
+                                color: 'white',
                                 textTransform: 'uppercase',
-                                letterSpacing: '0.1em'
+                                letterSpacing: '0.05em'
                             }}>
                                 Task Pimpinan
                             </div>
@@ -88,15 +105,63 @@ export default function Sidebar() {
                     {user?.role === 'admin' && (
                         <>
                             <div style={{
-                                margin: '1rem 0',
+                                margin: '1.25rem 0 0.5rem 0',
                                 padding: '0 1rem',
-                                fontSize: '0.7rem',
-                                color: 'var(--gray-500)',
+                                fontSize: '0.85rem',
+                                fontWeight: '700',
+                                color: 'white',
                                 textTransform: 'uppercase',
-                                letterSpacing: '0.1em'
+                                letterSpacing: '0.05em'
                             }}>
                                 Admin
                             </div>
+
+                            {/* Master Submenu */}
+                            <div
+                                onClick={() => toggleMenu('master')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '0.65rem 1rem', margin: '0 0.5rem', borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                    background: isMasterActive ? 'rgba(99,102,241,0.1)' : 'transparent',
+                                    color: isMasterActive ? 'white' : 'rgba(255, 255, 255, 0.9)',
+                                    fontWeight: 600, fontSize: '0.85rem',
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                    <span className="sidebar-link-icon">📦</span>
+                                    Master
+                                </div>
+                                <span style={{
+                                    fontSize: '0.65rem', transition: 'transform 0.2s',
+                                    transform: openMenus.master ? 'rotate(180deg)' : 'rotate(0deg)'
+                                }}>▼</span>
+                            </div>
+
+                            <div style={{
+                                display: openMenus.master ? 'block' : 'none',
+                                paddingLeft: '0.75rem',
+                                borderLeft: '2px solid rgba(99,102,241,0.3)',
+                                marginLeft: '1.5rem',
+                                marginTop: '0.25rem',
+                                marginBottom: '0.25rem'
+                            }}>
+                                {masterItems.map((item) => (
+                                    <NavLink
+                                        key={item.path}
+                                        to={item.path}
+                                        className={({ isActive }) =>
+                                            `sidebar-link ${isActive ? 'active' : ''}`
+                                        }
+                                        style={{ fontSize: '0.82rem', padding: '0.5rem 0.75rem' }}
+                                    >
+                                        <span className="sidebar-link-icon">{item.icon}</span>
+                                        {item.label}
+                                    </NavLink>
+                                ))}
+                            </div>
+
+                            {/* Other Admin Items */}
                             {adminItems.map((item) => (
                                 <NavLink
                                     key={item.path}

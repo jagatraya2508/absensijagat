@@ -25,7 +25,10 @@ router.post('/login', async (req, res) => {
         }
 
         const result = await pool.query(
-            'SELECT * FROM users WHERE employee_id = $1',
+            `SELECT u.*, COALESCE(ed.is_driver, false) as is_driver, COALESCE(ed.is_collector, false) as is_collector, COALESCE(ed.use_tracking, false) as use_tracking
+             FROM users u
+             LEFT JOIN employee_details ed ON u.id = ed.user_id
+             WHERE u.employee_id = $1`,
             [employee_id]
         );
 
@@ -54,7 +57,10 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                off_day: user.off_day
+                off_day: user.off_day,
+                is_driver: user.is_driver,
+                is_collector: user.is_collector,
+                use_tracking: user.use_tracking
             }
         });
     } catch (error) {
@@ -118,7 +124,13 @@ router.post('/register', authenticateToken, isAdmin, async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, employee_id, name, email, role, created_at, off_day FROM users WHERE id = $1',
+            `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, u.off_day,
+                    COALESCE(ed.is_driver, false) as is_driver,
+                    COALESCE(ed.is_collector, false) as is_collector,
+                    COALESCE(ed.use_tracking, false) as use_tracking
+             FROM users u
+             LEFT JOIN employee_details ed ON u.id = ed.user_id
+             WHERE u.id = $1`,
             [req.user.id]
         );
 

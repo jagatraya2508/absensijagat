@@ -52,6 +52,9 @@ app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/assessments', require('./routes/assessments'));
 app.use('/api/recruitment', require('./routes/recruitment'));
 app.use('/api/work-schedules', require('./routes/workSchedules'));
+app.use('/api/driver-activities', require('./routes/driverActivities'));
+app.use('/api/driver-tracking', require('./routes/driverTracking'));
+app.use('/api/customers', require('./routes/customers'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

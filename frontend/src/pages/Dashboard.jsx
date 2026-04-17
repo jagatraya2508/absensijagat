@@ -74,66 +74,11 @@ export default function Dashboard() {
 
     return (
         <div>
-            {/* Background Watermark */}
-            <img
-                src={settings.app_logo}
-                alt=""
-                className="dashboard-watermark"
-                onError={(e) => e.target.style.display = 'none'}
-            />
-
             <div className="page-header">
-                <h1 className="page-title">Selamat Datang, {user?.name?.split(' ')[0]}! 👋</h1>
-                <p className="page-subtitle">{today}</p>
+                <h1 className="page-title" style={{ color: '#6D0000' }}>Selamat Datang, {user?.name?.split(' ')[0]}! 👋</h1>
+                <p className="page-subtitle" style={{ color: 'var(--gray-600)' }}>{today}</p>
             </div>
 
-
-            {/* Announcements Section (Top) */}
-            {announcements.length > 0 && (
-                <div className="mb-4">
-                    {announcements.map(item => (
-                        <div key={item.id} className="card-glass mb-3" style={{
-                            background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
-                            borderLeft: '4px solid var(--primary-500)',
-                            padding: '1rem 1.5rem',
-                            position: 'relative',
-                            overflow: 'hidden'
-                        }}>
-                            <div style={{ position: 'absolute', top: -10, right: -10, fontSize: '5rem', opacity: 0.05, transform: 'rotate(15deg)' }}>
-                                📢
-                            </div>
-                            <div className="d-flex align-items-center gap-3 mb-2">
-                                <div style={{
-                                    background: 'var(--primary-500)',
-                                    color: 'white',
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '0.9rem'
-                                }}>
-                                    📢
-                                </div>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>
-                                        {item.title}
-                                    </h3>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--primary-300)' }}>
-                                        {formatDate(item.created_at)}
-                                    </span>
-                                </div>
-                            </div>
-                            <div style={{ paddingLeft: '3.25rem' }}>
-                                <p style={{ margin: 0, whiteSpace: 'pre-line', color: 'var(--gray-200)', lineHeight: '1.6' }}>
-                                    {item.content}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
 
             {/* Status Absensi Hari Ini */}
             <div className="grid grid-2 mb-4">
@@ -179,8 +124,8 @@ export default function Dashboard() {
                         >
                             <span style={{ fontSize: '1.8rem' }}>🏖️</span>
                             <div>
-                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary-300)' }}>Hari Ini Libur</div>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)' }}>Absensi tidak diperlukan hari ini</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#6D0000' }}>Hari Ini Libur</div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-700)' }}>Absensi tidak diperlukan hari ini</div>
                             </div>
                         </div>
                     ) : (
@@ -232,6 +177,14 @@ export default function Dashboard() {
                         <div className="menu-icon bg-purple-100 text-purple-600">🔑</div>
                         <span className="menu-label">Ubah Password</span>
                     </Link>
+
+                    {/* Tracking */}
+                    {user?.use_tracking && (
+                        <Link to="/driver-tracking" className="menu-item">
+                            <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
+                            <span className="menu-label">Tracking</span>
+                        </Link>
+                    )}
 
                     {/* Off Day Setting */}
                     {user?.role === 'admin' && (
@@ -337,6 +290,56 @@ export default function Dashboard() {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Announcements Section (Bottom) */}
+            {announcements.length > 0 && (
+                <div className="mb-4">
+                    <div style={{ marginBottom: '0.75rem' }}>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#6D0000', margin: 0 }}>📢 Pengumuman</h2>
+                    </div>
+                    {announcements.map(item => (
+                        <div key={item.id} className="card-glass mb-3" style={{
+                            background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
+                            borderLeft: '4px solid var(--primary-500)',
+                            padding: '1rem 1.5rem',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ position: 'absolute', top: -10, right: -10, fontSize: '5rem', opacity: 0.05, transform: 'rotate(15deg)' }}>
+                                📢
+                            </div>
+                            <div className="d-flex align-items-center gap-3 mb-2">
+                                <div style={{
+                                    background: 'var(--primary-500)',
+                                    color: 'white',
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    📢
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#6D0000' }}>
+                                        {item.title}
+                                    </h3>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
+                                        {formatDate(item.created_at)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style={{ paddingLeft: '3.25rem' }}>
+                                <p style={{ margin: 0, whiteSpace: 'pre-line', color: 'var(--gray-800)', lineHeight: '1.6' }}>
+                                    {item.content}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 

@@ -9,11 +9,16 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@capacitor/android": "^8.3.1",
+        "@capacitor/cli": "^8.3.1",
+        "@capacitor/core": "^8.3.1",
         "@vladmandic/face-api": "^1.7.15",
         "jspdf": "^4.2.1",
         "jspdf-autotable": "^5.0.7",
+        "leaflet": "^1.9.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-leaflet": "^4.2.1",
         "react-router-dom": "^6.21.1",
         "serve": "^14.2.1",
         "xlsx": "^0.18.5"
@@ -21,7 +26,7 @@
     "devDependencies": {
         "@types/react": "^18.2.43",
         "@types/react-dom": "^18.2.17",
-        "@vitejs/plugin-basic-ssl": "^2.1.4",
+        "@vitejs/plugin-basic-ssl": "^1.1.0",
         "@vitejs/plugin-react": "^4.2.1",
         "vite": "^5.0.8"
     }

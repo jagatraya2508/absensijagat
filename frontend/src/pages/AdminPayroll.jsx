@@ -364,18 +364,23 @@ export default function AdminPayroll() {
                             {/* Potongan */}
                             <h4 style={{ color: 'var(--danger-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>📉 Potongan</h4>
                             <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
-                                {[
-                                    ['BPJS Kesehatan (1%)', selectedSlip.bpjs_kes_employee],
-                                    ['BPJS JHT (2%)', selectedSlip.bpjs_jht_employee],
-                                    ['BPJS JP (1%)', selectedSlip.bpjs_jp_employee],
-                                    ['PPh 21', selectedSlip.pph21_amount],
-                                    ['Potongan Pinjaman', selectedSlip.loan_deduction],
-                                ].map(([label, val]) => (
-                                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <span>{label}</span>
-                                        <span style={{ fontWeight: 500, color: 'var(--danger-500)' }}>-{formatCurrency(val)}</span>
-                                    </div>
-                                ))}
+                                {(() => {
+                                    const base = parseFloat(selectedSlip.basic_salary) || 1;
+                                    const fmtPct = (val) => { const pct = (parseFloat(val) / base * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); };
+                                    const items = [
+                                        [parseFloat(selectedSlip.bpjs_kes_employee) > 0 ? `BPJS Kesehatan (${fmtPct(selectedSlip.bpjs_kes_employee)}%)` : null, selectedSlip.bpjs_kes_employee],
+                                        [parseFloat(selectedSlip.bpjs_jht_employee) > 0 ? `BPJS JHT (${fmtPct(selectedSlip.bpjs_jht_employee)}%)` : null, selectedSlip.bpjs_jht_employee],
+                                        [parseFloat(selectedSlip.bpjs_jp_employee) > 0 ? `BPJS JP (${fmtPct(selectedSlip.bpjs_jp_employee)}%)` : null, selectedSlip.bpjs_jp_employee],
+                                        ['PPh 21', selectedSlip.pph21_amount],
+                                        ['Potongan Pinjaman', selectedSlip.loan_deduction],
+                                    ].filter(([label]) => label !== null);
+                                    return items.map(([label, val]) => (
+                                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <span>{label}</span>
+                                            <span style={{ fontWeight: 500, color: 'var(--danger-500)' }}>-{formatCurrency(val)}</span>
+                                        </div>
+                                    ));
+                                })()}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontWeight: 700, borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: '0.25rem' }}>
                                     <span>Total Potongan</span>
                                     <span style={{ color: 'var(--danger-500)' }}>-{formatCurrency(selectedSlip.total_deductions)}</span>
@@ -385,18 +390,25 @@ export default function AdminPayroll() {
                             {/* BPJS Company (info) */}
                             <h4 style={{ color: 'var(--primary-400)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>🏢 Kontribusi Perusahaan (Info)</h4>
                             <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
-                                {[
-                                    ['BPJS Kesehatan (4%)', selectedSlip.bpjs_kes_company],
-                                    ['BPJS JHT (3.7%)', selectedSlip.bpjs_jht_company],
-                                    ['BPJS JP (2%)', selectedSlip.bpjs_jp_company],
-                                    ['BPJS JKK (0.24%)', selectedSlip.bpjs_jkk],
-                                    ['BPJS JKM (0.3%)', selectedSlip.bpjs_jkm],
-                                ].map(([label, val]) => (
-                                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0' }}>
-                                        <span>{label}</span>
-                                        <span>{formatCurrency(val)}</span>
-                                    </div>
-                                ))}
+                                {(() => {
+                                    const base = parseFloat(selectedSlip.basic_salary) || 1;
+                                    const fmtPct = (val) => { const pct = (parseFloat(val) / base * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); };
+                                    const items = [
+                                        [parseFloat(selectedSlip.bpjs_kes_company) > 0 ? `BPJS Kesehatan (${fmtPct(selectedSlip.bpjs_kes_company)}%)` : null, selectedSlip.bpjs_kes_company],
+                                        [parseFloat(selectedSlip.bpjs_jht_company) > 0 ? `BPJS JHT (${fmtPct(selectedSlip.bpjs_jht_company)}%)` : null, selectedSlip.bpjs_jht_company],
+                                        [parseFloat(selectedSlip.bpjs_jp_company) > 0 ? `BPJS JP (${fmtPct(selectedSlip.bpjs_jp_company)}%)` : null, selectedSlip.bpjs_jp_company],
+                                        [parseFloat(selectedSlip.bpjs_jkk) > 0 ? `BPJS JKK (${fmtPct(selectedSlip.bpjs_jkk)}%)` : null, selectedSlip.bpjs_jkk],
+                                        [parseFloat(selectedSlip.bpjs_jkm) > 0 ? `BPJS JKM (${fmtPct(selectedSlip.bpjs_jkm)}%)` : null, selectedSlip.bpjs_jkm],
+                                    ].filter(([label]) => label !== null);
+                                    return items.length > 0 ? items.map(([label, val]) => (
+                                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0' }}>
+                                            <span>{label}</span>
+                                            <span>{formatCurrency(val)}</span>
+                                        </div>
+                                    )) : (
+                                        <div style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Tidak ada kontribusi BPJS</div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Net Salary */}

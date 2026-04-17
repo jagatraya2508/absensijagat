@@ -1,0 +1,9 @@
+{
+  "appId": "com.jagatraya.absensi",
+  "appName": "Absensi",
+  "webDir": "dist",
+  "server": {
+    "url": "https://absenancol.tri.jagatrayasolusindo.com",
+    "cleartext": true
+  }
+}

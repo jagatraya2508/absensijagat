@@ -390,6 +390,7 @@ export const settingsAPI = {
         method: 'POST',
         body: formData, // FormData for file upload
     }),
+    getBpjs: () => request('/settings/bpjs'),
 };
 
 // Schedule API
@@ -423,6 +424,14 @@ export const employeesAPI = {
     update: (id, data) => request(`/employees/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
+    }),
+    getDocuments: (id) => request(`/employees/${id}/documents`),
+    uploadDocument: (id, formData) => request(`/employees/${id}/documents`, {
+        method: 'POST',
+        body: formData, // FormData for file upload
+    }),
+    deleteDocument: (id, docId) => request(`/employees/${id}/documents/${docId}`, {
+        method: 'DELETE',
     }),
 };
 
@@ -512,6 +521,70 @@ export const positionsAPI = {
     delete: (id) => request(`/positions/${id}`, { method: 'DELETE' }),
 };
 
+// Driver Activities API
+export const driverActivitiesAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/driver-activities?${query}`);
+    },
+    getSummary: (month, year) => request(`/driver-activities/summary?month=${month}&year=${year}`),
+    getDrivers: () => request('/driver-activities/drivers'),
+    create: (data) => request('/driver-activities', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/driver-activities/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/driver-activities/${id}`, { method: 'DELETE' }),
+    bulkCreate: (activities) => request('/driver-activities/bulk', {
+        method: 'POST',
+        body: JSON.stringify({ activities }),
+    }),
+};
+
+// Driver Tracking API
+export const driverTrackingAPI = {
+    // Driver endpoints
+    getMyToday: () => request('/driver-tracking/my-today'),
+    getMyHistory: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/driver-tracking/my-history?${query}`);
+    },
+    checkin: (formData) => request('/driver-tracking/checkin', {
+        method: 'POST',
+        body: formData, // FormData for file upload
+    }),
+    checkout: (id, formData) => request(`/driver-tracking/${id}/checkout`, {
+        method: 'PUT',
+        body: formData, // FormData for file upload
+    }),
+    // Admin endpoints
+    getAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/driver-tracking?${query}`);
+    },
+    getDrivers: () => request('/driver-tracking/drivers'),
+    getById: (id) => request(`/driver-tracking/${id}`),
+    delete: (id) => request(`/driver-tracking/${id}`, { method: 'DELETE' }),
+};
+
+// Customers API
+export const customersAPI = {
+    search: (q = '') => request(`/customers/search?q=${encodeURIComponent(q)}`),
+    getAll: () => request('/customers'),
+    create: (data) => request('/customers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/customers/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/customers/${id}`, { method: 'DELETE' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -528,5 +601,8 @@ export default {
     loansAPI,
     payrollAPI,
     departmentsAPI,
-    positionsAPI
+    positionsAPI,
+    driverActivitiesAPI,
+    driverTrackingAPI,
+    customersAPI
 };
