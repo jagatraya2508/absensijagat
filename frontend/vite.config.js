@@ -10,7 +10,8 @@ export default defineConfig({
         host: true, // Listen on all addresses
         allowedHosts: [
             'absenancol.tri.jagatrayasolusindo.com',
-            'localhost'
+            'localhost',
+            ...(process.env.FRONTEND_ALLOWED_HOSTS ? process.env.FRONTEND_ALLOWED_HOSTS.split(',').map(h => h.trim()) : [])
         ],
 
         proxy: {
