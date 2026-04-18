@@ -10,13 +10,14 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout Code Terbaru dari Github
-        uses: actions/checkout@v4
-
-      - name: Sinkronisasi file ke folder production (/srv/docker/absensi)
+      - name: Git Pull di Folder Production
         run: |
-          echo "Menyalin file terbaru ke direktori production..."
-          rsync -avz --exclude='.git/' --exclude='node_modules/' --exclude='frontend/dist/' ./ /srv/docker/absensi/
+          cd /srv/docker/absensi
+          echo "Menarik kode terbaru (git pull) di server..."
+          git fetch --all
+          git reset --hard origin/main
+          git clean -fd
+          git pull origin main
 
       - name: Build & Install di Host Server
         run: |
@@ -29,4 +30,4 @@ jobs:
           npm install
           npm run build
           
-          echo "✅ Deployment CI/CD via Self-Hosted Runner BERHASIL 100%!"
+          echo "✅ Deployment CI/CD (Git Pull Mode) BERHASIL 100%!"
