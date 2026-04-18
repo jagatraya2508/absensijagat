@@ -1,9 +1,11 @@
 {
   "appId": "com.jagatraya.absensi",
   "appName": "Absensi",
-  "webDir": "dist",
+  "webDir": "mobile-launcher",
   "server": {
-    "url": "https://absenancol.tri.jagatrayasolusindo.com",
+    "allowNavigation": [
+      "*"
+    ],
     "cleartext": true
   }
 }

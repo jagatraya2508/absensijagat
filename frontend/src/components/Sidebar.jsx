@@ -53,6 +53,7 @@ export default function Sidebar() {
         { path: '/admin/reports', icon: '📊', label: 'Laporan' },
         { path: '/admin/users', icon: '👥', label: 'Kelola User' },
         { path: '/admin/settings', icon: '⚙️', label: 'Pengaturan' },
+        { path: '/admin/license', icon: '🔑', label: 'License' },
     ];
 
     const isMasterActive = masterItems.some(item => location.pathname === item.path);

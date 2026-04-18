@@ -7,6 +7,7 @@ export default function AdminFaceRegistration() {
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState(null);
     const [showCamera, setShowCamera] = useState(false);
+    const [useFallback, setUseFallback] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -96,6 +97,11 @@ export default function AdminFaceRegistration() {
 
     async function startCamera() {
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.warn('getUserMedia is not supported, switching to fallback');
+                setUseFallback(true);
+                return;
+            }
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
             });
@@ -103,8 +109,11 @@ export default function AdminFaceRegistration() {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
             }
+            setUseFallback(false);
         } catch (err) {
-            setError('Gagal mengakses kamera: ' + err.message);
+            console.error('Kamera error:', err);
+            // Switch to fallback automatically
+            setUseFallback(true);
         }
     }
 
@@ -122,6 +131,7 @@ export default function AdminFaceRegistration() {
         console.log('Opening camera for user:', user);
         setSelectedUser(user);
         setShowCamera(true);
+        setUseFallback(false);
         setError('');
         setSuccess('');
 
@@ -194,6 +204,38 @@ export default function AdminFaceRegistration() {
         }
     }
 
+    async function handleFallbackCapture(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setProcessing(true);
+        setError('');
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const dataUrl = event.target.result;
+            try {
+                if (!modelsLoaded) throw new Error('Kamera atau model belum siap');
+                
+                const detection = await detectFaceFromImage(dataUrl);
+                if (!detection) {
+                    throw new Error('Wajah tidak terdeteksi. Pastikan wajah terlihat jelas.');
+                }
+                await faceAPI.register(selectedUser.id, detection.descriptor);
+                setSuccess(`Wajah ${selectedUser.name} berhasil didaftarkan!`);
+                await fetchUsers();
+                
+                setTimeout(() => handleCloseCamera(), 1500);
+            } catch (err) {
+                console.error('Face fallback error:', err);
+                setError(err.message || 'Gagal mendaftarkan wajah');
+            } finally {
+                setProcessing(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
     async function handleDeleteFace(user) {
         if (!window.confirm(`Hapus registrasi wajah ${user.name}?`)) {
             return;
@@ -245,49 +287,84 @@ export default function AdminFaceRegistration() {
                     </div>
 
                     <div style={{ position: 'relative', width: '100%', maxWidth: 480, margin: '0 auto' }}>
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            style={{
+                        {useFallback ? (
+                            <div style={{
                                 width: '100%',
+                                minHeight: 300,
+                                background: 'var(--gray-800)',
                                 borderRadius: 'var(--radius-lg)',
-                                transform: 'scaleX(-1)'
-                            }}
-                        />
-                        <canvas ref={canvasRef} style={{ display: 'none' }} />
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '2px dashed var(--gray-600)',
+                                padding: '2rem',
+                                color: 'white',
+                                textAlign: 'center'
+                            }}>
+                                <span style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</span>
+                                <p style={{ marginBottom: '1rem' }}>Koneksi tidak aman (IP lokal). Gunakan tombol di bawah untuk membuka kamera perangkat.</p>
+                                <label className="btn btn-primary btn-lg">
+                                    {processing ? 'Memproses...' : 'Buka Kamera Perangkat'}
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        capture="environment" 
+                                        onChange={handleFallbackCapture} 
+                                        style={{ display: 'none' }}
+                                        disabled={processing || !modelsLoaded}
+                                    />
+                                </label>
+                            </div>
+                        ) : (
+                            <>
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    style={{
+                                        width: '100%',
+                                        borderRadius: 'var(--radius-lg)',
+                                        transform: 'scaleX(-1)'
+                                    }}
+                                />
+                                <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-                        {/* Face guide overlay */}
-                        <div style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: 200,
-                            height: 260,
-                            border: '3px dashed rgba(255,255,255,0.5)',
-                            borderRadius: '50%',
-                            pointerEvents: 'none'
-                        }} />
+                                {/* Face guide overlay */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    width: 200,
+                                    height: 260,
+                                    border: '3px dashed rgba(255,255,255,0.5)',
+                                    borderRadius: '50%',
+                                    pointerEvents: 'none'
+                                }} />
+                            </>
+                        )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
-                        <button
-                            className="btn btn-primary btn-lg"
-                            onClick={handleCapture}
-                            disabled={processing || !modelsLoaded}
-                        >
-                            {processing ? (
-                                <>
-                                    <span className="loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
-                                    Memproses...
-                                </>
-                            ) : (
-                                '📸 Ambil Foto & Daftarkan'
-                            )}
-                        </button>
-                    </div>
+                    {!useFallback && (
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+                            <button
+                                className="btn btn-primary btn-lg"
+                                onClick={handleCapture}
+                                disabled={processing || !modelsLoaded}
+                            >
+                                {processing ? (
+                                    <>
+                                        <span className="loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                                        Memproses...
+                                    </>
+                                ) : (
+                                    '📸 Ambil Foto & Daftarkan'
+                                )}
+                            </button>
+                        </div>
+                    )}
 
                     <p className="text-muted text-center mt-2" style={{ fontSize: '0.85rem' }}>
                         Posisikan wajah karyawan di dalam lingkaran, pastikan pencahayaan cukup

@@ -30,6 +30,7 @@ import Overtime from './pages/Overtime';
 import AdminDriverActivities from './pages/AdminDriverActivities';
 import DriverTracking from './pages/DriverTracking';
 import AdminDriverTracking from './pages/AdminDriverTracking';
+import LicenseSettings from './pages/LicenseSettings';
 
 function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false }) {
     const { user, loading } = useAuth();
@@ -253,6 +254,17 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminSettings />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/license"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <LicenseSettings />
                         </AppLayout>
                     </ProtectedRoute>
                 }

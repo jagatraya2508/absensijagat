@@ -585,6 +585,16 @@ export const customersAPI = {
     delete: (id) => request(`/customers/${id}`, { method: 'DELETE' }),
 };
 
+// License API
+export const licenseAPI = {
+    activate: (licenseKey) => request('/license/activate', {
+        method: 'POST',
+        body: JSON.stringify({ license_key: licenseKey }),
+    }),
+    getInfo: () => request('/license/info'),
+    getStatus: () => request('/license/status'),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -604,5 +614,6 @@ export default {
     positionsAPI,
     driverActivitiesAPI,
     driverTrackingAPI,
-    customersAPI
+    customersAPI,
+    licenseAPI
 };

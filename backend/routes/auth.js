@@ -14,6 +14,17 @@ function logError(error) {
     fs.appendFileSync(logPath, logMessage);
 }
 
+// Helper to check user limit
+async function checkUserLimit() {
+    const result = await pool.query('SELECT * FROM license_info ORDER BY activated_at DESC LIMIT 1');
+    const license = result.rows[0];
+    const maxUsers = (license && new Date(license.expires_at) > new Date()) ? license.max_users : 5;
+    
+    const userCountQuery = await pool.query('SELECT COUNT(*) FROM users');
+    const currentUsers = parseInt(userCountQuery.rows[0].count);
+    
+    return { allowed: currentUsers < maxUsers, current: currentUsers, max: maxUsers, active: !!license };
+}
 
 // Login
 router.post('/login', async (req, res) => {
@@ -100,6 +111,16 @@ router.post('/register', authenticateToken, isAdmin, async (req, res) => {
         if (!employee_id || !name || !password) {
             return res.status(400).json({ error: 'Employee ID, nama, dan password harus diisi' });
         }
+
+        const limitCheck = await checkUserLimit();
+        if (!limitCheck.allowed) {
+            return res.status(403).json({ 
+                error: limitCheck.active 
+                    ? `Batas pengguna pada license tercapai (${limitCheck.max} pengguna). Silakan upgrade license.` 
+                    : 'Tidak ada license aktif. Mode trial dibatasi 5 pengguna.' 
+            });
+        }
+
 
         const hashedPassword = await bcrypt.hash(password, 10);
 

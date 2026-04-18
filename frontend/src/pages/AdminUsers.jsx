@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { authAPI } from '../utils/api';
+import { authAPI, licenseAPI } from '../utils/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -22,9 +22,24 @@ export default function AdminUsers() {
     const [search, setSearch] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
 
+    // License state
+    const [licenseInfo, setLicenseInfo] = useState(null);
+
     useEffect(() => {
         fetchUsers();
+        fetchLicenseInfo();
     }, []);
+
+    async function fetchLicenseInfo() {
+        try {
+            const data = await licenseAPI.getInfo();
+            if (data.active) {
+                setLicenseInfo(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch license info:', error);
+        }
+    }
 
     async function fetchUsers() {
         try {
@@ -38,6 +53,11 @@ export default function AdminUsers() {
     }
 
     function openAddModal() {
+        if (licenseInfo && users.length >= licenseInfo.max_users) {
+            alert(`Tidak dapat menambah pengguna. Batas lisensi (${licenseInfo.max_users} pengguna) telah tercapai.`);
+            return;
+        }
+
         setEditingUser(null);
         setFormData({
             employee_id: '',
@@ -262,6 +282,17 @@ export default function AdminUsers() {
                 </div>
             )}
 
+            {licenseInfo && (
+                <div className={`alert mb-3 ${users.length >= licenseInfo.max_users ? 'alert-danger' : users.length >= licenseInfo.max_users * 0.9 ? 'alert-warning' : 'alert-info'}`}>
+                    <span className="alert-icon">ℹ️</span>
+                    <div>
+                        <strong>Info Lisensi: </strong>
+                        Pengguna terdaftar: {users.length} / {licenseInfo.max_users} 
+                        {users.length >= licenseInfo.max_users ? ' (Batas Tercapai)' : ''}
+                    </div>
+                </div>
+            )}
+
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
                     <h2 className="card-title">Daftar User</h2>
@@ -302,7 +333,11 @@ export default function AdminUsers() {
                         >
                             📊 Excel
                         </button>
-                        <button className="btn btn-primary" onClick={openAddModal}>
+                        <button 
+                            className="btn btn-primary" 
+                            onClick={openAddModal}
+                            disabled={licenseInfo && users.length >= licenseInfo.max_users}
+                        >
                             + Tambah User
                         </button>
                     </div>

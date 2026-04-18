@@ -7,10 +7,17 @@ export default function Camera({ onCapture, onReset }) {
     const [photo, setPhoto] = useState(null);
     const [error, setError] = useState(null);
     const [facingMode, setFacingMode] = useState('user'); // 'user' for front camera
+    const [useFallback, setUseFallback] = useState(false);
 
     const startCamera = useCallback(async () => {
         try {
             setError(null);
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.warn('getUserMedia is not supported, switching to fallback');
+                setUseFallback(true);
+                return;
+            }
 
             // Stop existing stream
             if (stream) {
@@ -26,19 +33,15 @@ export default function Camera({ onCapture, onReset }) {
             });
 
             setStream(mediaStream);
+            setUseFallback(false);
 
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
         } catch (err) {
             console.error('Camera error:', err);
-            if (err.name === 'NotAllowedError') {
-                setError('Izin kamera ditolak. Mohon izinkan akses kamera di browser.');
-            } else if (err.name === 'NotFoundError') {
-                setError('Kamera tidak ditemukan. Pastikan perangkat memiliki kamera.');
-            } else {
-                setError('Gagal mengakses kamera: ' + err.message);
-            }
+            // Switch to fallback automatically
+            setUseFallback(true);
         }
     }, [facingMode, stream]);
 
@@ -94,6 +97,130 @@ export default function Camera({ onCapture, onReset }) {
         setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
         startCamera();
     }, [startCamera]);
+
+    const handleFallbackCapture = useCallback(async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            if (window.createImageBitmap) {
+                const bmp = await createImageBitmap(file);
+                const canvas = document.createElement('canvas');
+                let width = bmp.width;
+                let height = bmp.height;
+                const MAX_WIDTH = 640;
+                const MAX_HEIGHT = 640;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height = Math.round(height * (MAX_WIDTH / width));
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width = Math.round(width * (MAX_HEIGHT / height));
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(bmp, 0, 0, width, height);
+
+                const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                setPhoto(resizedDataUrl);
+
+                canvas.toBlob((blob) => {
+                    if (onCapture) onCapture(blob, resizedDataUrl);
+                }, 'image/jpeg', 0.8);
+                return;
+            }
+        } catch (error) {
+            console.warn('ImageBitmap API failed or not supported, using standard fallback');
+        }
+
+        // Fallback for older browsers
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const dataUrl = event.target.result;
+            
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                const MAX_WIDTH = 640;
+                const MAX_HEIGHT = 640;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height = Math.round(height * (MAX_WIDTH / width));
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width = Math.round(width * (MAX_HEIGHT / height));
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                setPhoto(resizedDataUrl);
+
+                canvas.toBlob((blob) => {
+                    if (onCapture) {
+                        onCapture(blob, resizedDataUrl);
+                    }
+                }, 'image/jpeg', 0.8);
+            };
+            img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+    }, [onCapture]);
+
+    if (useFallback && !photo) {
+        return (
+            <div className="camera-container">
+                <div style={{
+                    width: '100%',
+                    minHeight: 250,
+                    background: 'var(--gray-800)',
+                    borderRadius: 'var(--radius-lg)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px dashed var(--gray-600)',
+                    padding: '2rem',
+                    color: 'white',
+                    textAlign: 'center'
+                }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
+                    <p style={{ marginBottom: '1rem' }}>
+                        Koneksi tidak terenkripsi (Local IP). Tekan tombol di bawah untuk membuka kamera sistem.
+                    </p>
+                    <label className="btn btn-primary">
+                        📸 Buka Kamera
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            capture="user" 
+                            onChange={handleFallbackCapture} 
+                            style={{ display: 'none' }}
+                        />
+                    </label>
+                </div>
+            </div>
+        );
+    }
 
     if (error) {
         return (

@@ -14,6 +14,7 @@ const leavesRoutes = require('./routes/leaves');
 const faceRoutes = require('./routes/face');
 const announcementsRoutes = require('./routes/announcements');
 const settingsRoutes = require('./routes/settings');
+const licenseRoutes = require('./routes/license');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,6 +42,7 @@ app.use('/api/leaves', leavesRoutes);
 app.use('/api/face', faceRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/license', licenseRoutes);
 app.use('/api/departments', require('./routes/departments'));
 app.use('/api/positions', require('./routes/positions'));
 app.use('/api/schedule', require('./routes/schedule'));
