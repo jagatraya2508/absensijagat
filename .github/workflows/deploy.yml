@@ -30,4 +30,4 @@ jobs:
           npm install
           npm run build
           
-          echo "✅ Deployment CI/CD (Git Pull Mode) BERHASIL 100%!"
+          echo "🎉 Deployment V2 (Nginx + Self-Hosted Runner) BERUNTUN SUKSES!"
