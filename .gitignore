@@ -29,3 +29,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Custom frontend logos
+frontend/public/logo.png
+frontend/public/lagocoba.png

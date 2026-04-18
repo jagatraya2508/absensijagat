@@ -1,0 +1,32 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code Terbaru dari Github
+        uses: actions/checkout@v4
+
+      - name: Sinkronisasi file ke folder production (/srv/docker/absensi)
+        run: |
+          echo "Menyalin file terbaru ke direktori production..."
+          rsync -avz --exclude='.git/' --exclude='node_modules/' --exclude='frontend/dist/' ./ /srv/docker/absensi/
+
+      - name: Build & Install di Host Server
+        run: |
+          echo "Instalasi dependensi backend..."
+          cd /srv/docker/absensi/backend
+          npm install
+          
+          echo "Instalasi dependensi dan compile frontend..."
+          cd /srv/docker/absensi/frontend
+          npm install
+          npm run build
+          
+          echo "✅ Deployment CI/CD Sukses via Self-Hosted Runner!"
