@@ -57,7 +57,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 router.post('/', authenticateToken, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
-        const { name, type, shift_count, department, is_default, shifts, overtime_rule } = req.body;
+        const { name, type, shift_count, department, position, is_default, shifts, overtime_rule } = req.body;
 
         if (!name || !type) {
             return res.status(400).json({ error: 'Nama dan tipe jadwal harus diisi' });
@@ -75,9 +75,9 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 
         // Create schedule type
         const schedResult = await client.query(`
-            INSERT INTO work_schedule_types (name, type, shift_count, department, is_default)
-            VALUES ($1, $2, $3, $4, $5) RETURNING *
-        `, [name, type, shift_count || 1, department || null, is_default || false]);
+            INSERT INTO work_schedule_types (name, type, shift_count, department, position, is_default)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [name, type, shift_count || 1, department || null, position || null, is_default || false]);
         const scheduleType = schedResult.rows[0];
 
         // Create shifts
@@ -155,7 +155,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
-        const { name, type, shift_count, department, is_default, is_active, shifts, overtime_rule } = req.body;
+        const { name, type, shift_count, department, position, is_default, is_active, shifts, overtime_rule } = req.body;
 
         await client.query('BEGIN');
 
@@ -170,10 +170,10 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         // Update schedule type
         await client.query(`
             UPDATE work_schedule_types 
-            SET name = $1, type = $2, shift_count = $3, department = $4, 
-                is_default = $5, is_active = $6, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $7
-        `, [name, type, shift_count || 1, department || null, is_default || false, is_active !== false, id]);
+            SET name = $1, type = $2, shift_count = $3, department = $4, position = $5,
+                is_default = $6, is_active = $7, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $8
+        `, [name, type, shift_count || 1, department || null, position || null, is_default || false, is_active !== false, id]);
 
         // Replace shifts: delete old, insert new
         await client.query('DELETE FROM work_shifts WHERE schedule_type_id = $1', [id]);
@@ -314,7 +314,7 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 router.get('/shifts/all', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT ws.*, wst.name as schedule_name, wst.department
+            SELECT ws.*, wst.name as schedule_name, wst.department, wst.position
             FROM work_shifts ws
             JOIN work_schedule_types wst ON wst.id = ws.schedule_type_id
             WHERE wst.is_active = TRUE

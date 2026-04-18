@@ -109,6 +109,7 @@ export default function AdminWorkSchedule() {
     // Schedule data
     const [schedules, setSchedules] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [positions, setPositions] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [allShifts, setAllShifts] = useState([]);
 
@@ -121,7 +122,7 @@ export default function AdminWorkSchedule() {
 
     // Schedule form
     const [scheduleForm, setScheduleForm] = useState({
-        id: null, name: '', type: 'normal', shift_count: 1, department: '', is_default: false,
+        id: null, name: '', type: 'normal', shift_count: 1, department: '', position: '', is_default: false,
         shifts: [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
         overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
     });
@@ -145,6 +146,14 @@ export default function AdminWorkSchedule() {
             const res = await fetch(`${API}/work-schedules`, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
             if (res.ok) setSchedules(data);
+        } catch (e) { console.error(e); }
+    }, [token]);
+
+    const fetchPositions = useCallback(async () => {
+        try {
+            const res = await fetch(`${API}/positions`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            if (res.ok) setPositions(data.map(p => p.name));
         } catch (e) { console.error(e); }
     }, [token]);
 
@@ -203,9 +212,10 @@ export default function AdminWorkSchedule() {
     useEffect(() => {
         fetchSchedules();
         fetchDepartments();
+        fetchPositions();
         fetchEmployees();
         fetchAllShifts();
-    }, [fetchSchedules, fetchDepartments, fetchEmployees, fetchAllShifts]);
+    }, [fetchSchedules, fetchDepartments, fetchPositions, fetchEmployees, fetchAllShifts]);
 
     useEffect(() => {
         if (activeTab === 'assignments') fetchAssignments();
@@ -222,7 +232,7 @@ export default function AdminWorkSchedule() {
     // ============================================
     function openNewSchedule() {
         setScheduleForm({
-            id: null, name: '', type: 'normal', shift_count: 1, department: '', is_default: false,
+            id: null, name: '', type: 'normal', shift_count: 1, department: '', position: '', is_default: false,
             shifts: [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
             overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
         });
@@ -236,6 +246,7 @@ export default function AdminWorkSchedule() {
             type: sched.type,
             shift_count: sched.shift_count,
             department: sched.department || '',
+            position: sched.position || '',
             is_default: sched.is_default,
             shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts : [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? sched.overtime_rule : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
@@ -520,8 +531,8 @@ export default function AdminWorkSchedule() {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>Master Jadwal Kerja</h2>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>Kelola tipe jadwal (Normal/Shift) beserta aturan lembur</p>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-800)' }}>Master Jadwal Kerja</h2>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Kelola tipe jadwal (Normal/Shift) beserta aturan lembur</p>
                     </div>
                     <button className="btn btn-primary" onClick={openNewSchedule}>+ Tambah Jadwal</button>
                 </div>
@@ -529,7 +540,7 @@ export default function AdminWorkSchedule() {
                 {schedules.length === 0 ? (
                     <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🕐</div>
-                        <p style={{ color: 'var(--gray-400)' }}>Belum ada jadwal kerja. Klik "Tambah Jadwal" untuk membuat.</p>
+                        <p style={{ color: 'var(--gray-600)' }}>Belum ada jadwal kerja. Klik "Tambah Jadwal" untuk membuat.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
@@ -538,14 +549,17 @@ export default function AdminWorkSchedule() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>{sched.name}</h3>
+                                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-800)' }}>{sched.name}</h3>
                                             <span className={`badge badge-${sched.type === 'normal' ? 'primary' : 'warning'}`}>
                                                 {sched.type === 'normal' ? 'Normal' : `${sched.shift_count} Shift`}
                                             </span>
                                             {sched.is_default && <span className="badge badge-success">Default</span>}
                                         </div>
                                         {sched.department && (
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>🏢 {sched.department}</span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>🏢 {sched.department}</span>
+                                        )}
+                                        {sched.position && (
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginLeft: '0.5rem' }}>👔 {sched.position}</span>
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -557,12 +571,12 @@ export default function AdminWorkSchedule() {
                                 {/* Shifts list */}
                                 <div style={{ marginBottom: '1rem' }}>
                                     {sched.shifts && sched.shifts.map((s, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                                             <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: s.color || SHIFT_COLORS[i], flexShrink: 0 }} />
                                             <div style={{ flex: 1 }}>
-                                                <span style={{ fontWeight: 600, color: 'white', fontSize: '0.9rem' }}>{s.name}</span>
+                                                <span style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.9rem' }}>{s.name}</span>
                                             </div>
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--gray-300)', fontFamily: 'monospace' }}>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--gray-700)', fontFamily: 'monospace' }}>
                                                 {formatTime(s.start_time)} - {formatTime(s.end_time)}
                                             </span>
                                             {s.is_overnight && <span style={{ fontSize: '0.7rem', color: 'var(--warning-500)' }}>🌙</span>}
@@ -596,8 +610,8 @@ export default function AdminWorkSchedule() {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>Penugasan Shift Karyawan</h2>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>Atur shift per karyawan per hari, mingguan, atau bulanan</p>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-800)' }}>Penugasan Shift Karyawan</h2>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Atur shift per karyawan per hari, mingguan, atau bulanan</p>
                     </div>
                     <button className="btn btn-primary" onClick={() => {
                         setAssignForm({ user_ids: [], shift_id: '', dates: [], assign_mode: 'daily', start_date: '', end_date: '' });
@@ -646,13 +660,13 @@ export default function AdminWorkSchedule() {
                             </thead>
                             <tbody>
                                 {assignments.length === 0 ? (
-                                    <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--gray-400)', padding: '2rem' }}>Tidak ada data. Gunakan filter atau assign shift baru.</td></tr>
+                                    <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--gray-600)', padding: '2rem' }}>Tidak ada data. Gunakan filter atau assign shift baru.</td></tr>
                                 ) : assignments.map(a => (
                                     <tr key={a.id}>
                                         <td>{formatDate(a.assignment_date)}</td>
                                         <td>
-                                            <div style={{ fontWeight: 600, color: 'white' }}>{a.user_name}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{a.employee_id}</div>
+                                            <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{a.user_name}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>{a.employee_id}</div>
                                         </td>
                                         <td>{a.department || '-'}</td>
                                         <td>
@@ -692,8 +706,8 @@ export default function AdminWorkSchedule() {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>Surat Perintah Lembur (SPL)</h2>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>Kelola pengajuan lembur beserta approval</p>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-800)' }}>Surat Perintah Lembur (SPL)</h2>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Kelola pengajuan lembur beserta approval</p>
                     </div>
                     <button className="btn btn-primary" onClick={() => {
                         setOtForm({ date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '', employee_ids: [] });
@@ -737,7 +751,7 @@ export default function AdminWorkSchedule() {
                 {overtimeRequests.length === 0 ? (
                     <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
-                        <p style={{ color: 'var(--gray-400)' }}>Belum ada pengajuan lembur untuk periode ini.</p>
+                        <p style={{ color: 'var(--gray-600)' }}>Belum ada pengajuan lembur untuk periode ini.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -750,7 +764,7 @@ export default function AdminWorkSchedule() {
                                             <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-400)', fontSize: '0.9rem' }}>{ot.spl_number}</span>
                                             <span className={`badge badge-${statusColors[ot.status]}`}>{statusLabels[ot.status]}</span>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--gray-300)', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--gray-700)', flexWrap: 'wrap' }}>
                                             <span>📅 {formatDate(ot.date)}</span>
                                             <span>⏰ {formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)}</span>
                                             <span>⏱️ {ot.estimated_hours} jam</span>
@@ -758,11 +772,11 @@ export default function AdminWorkSchedule() {
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>Karyawan</div>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{ot.employees?.length || 0}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Karyawan</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--gray-800)' }}>{ot.employees?.length || 0}</div>
                                     </div>
                                 </div>
-                                <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--gray-400)' }}>
+                                <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
                                     📝 {ot.reason?.substring(0, 100)}{ot.reason?.length > 100 ? '...' : ''}
                                 </div>
                             </div>
@@ -789,7 +803,7 @@ export default function AdminWorkSchedule() {
                     </div>
 
                     <div style={{ padding: '1.5rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '1rem' }}>
                             <div className="form-group">
                                 <label className="form-label">Nama Jadwal *</label>
                                 <input className="form-input" value={scheduleForm.name}
@@ -802,6 +816,14 @@ export default function AdminWorkSchedule() {
                                     onChange={e => setScheduleForm(f => ({ ...f, department: e.target.value }))}>
                                     <option value="">Semua Departemen</option>
                                     {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Jabatan (Opsional)</label>
+                                <select className="form-input form-select" value={scheduleForm.position}
+                                    onChange={e => setScheduleForm(f => ({ ...f, position: e.target.value }))}>
+                                    <option value="">Semua Jabatan</option>
+                                    {positions.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -827,7 +849,7 @@ export default function AdminWorkSchedule() {
                                 </div>
                             )}
                             <div className="form-group" style={{ display: 'flex', alignItems: 'center', paddingTop: '1.5rem' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--gray-300)', fontSize: '0.9rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--gray-700)', fontSize: '0.9rem' }}>
                                     <input type="checkbox" checked={scheduleForm.is_default}
                                         onChange={e => setScheduleForm(f => ({ ...f, is_default: e.target.checked }))} />
                                     Jadikan Default
@@ -837,7 +859,7 @@ export default function AdminWorkSchedule() {
 
                         {/* Shifts detail */}
                         <div style={{ margin: '1.5rem 0' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'white', marginBottom: '1rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '1rem' }}>
                                 📋 Detail {scheduleForm.type === 'normal' ? 'Jam Kerja' : 'Shift'}
                             </h3>
                             {scheduleForm.shifts.map((shift, idx) => (
@@ -886,7 +908,7 @@ export default function AdminWorkSchedule() {
                                             </div>
                                         </div>
                                     </div>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', cursor: 'pointer', color: 'var(--gray-300)', fontSize: '0.8rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', cursor: 'pointer', color: 'var(--gray-700)', fontSize: '0.8rem' }}>
                                         <input type="checkbox" checked={shift.is_overnight || false}
                                             onChange={e => updateShift(idx, 'is_overnight', e.target.checked)} />
                                         🌙 Shift melewati tengah malam (overnight)
@@ -1059,7 +1081,7 @@ export default function AdminWorkSchedule() {
                                         <input type="checkbox" checked={assignForm.user_ids.includes(emp.id)}
                                             onChange={() => toggleEmployeeSelection(emp.id, assignForm.user_ids, setAssignForm, 'user_ids')} />
                                         <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{emp.employee_id}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>{emp.employee_id}</span>
                                         {emp.department && <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginLeft: 'auto' }}>{emp.department}</span>}
                                     </label>
                                 ))}
@@ -1175,7 +1197,7 @@ export default function AdminWorkSchedule() {
                                         <input type="checkbox" checked={otForm.employee_ids.includes(emp.id)}
                                             onChange={() => toggleEmployeeSelection(emp.id, otForm.employee_ids, setOtForm, 'employee_ids')} />
                                         <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{emp.employee_id}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>{emp.employee_id}</span>
                                     </label>
                                 ))}
                             </div>
@@ -1212,7 +1234,7 @@ export default function AdminWorkSchedule() {
                     <div style={{ padding: '1.5rem' }}>
                         {/* SPL Header */}
                         <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-lg)' }}>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.25rem' }}>SURAT PERINTAH LEMBUR</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.25rem' }}>SURAT PERINTAH LEMBUR</div>
                             <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary-400)', fontFamily: 'monospace' }}>{ot.spl_number}</div>
                             <span className={`badge badge-${statusColors[ot.status]}`} style={{ marginTop: '0.5rem' }}>
                                 {statusLabels[ot.status]}
@@ -1222,36 +1244,36 @@ export default function AdminWorkSchedule() {
                         {/* Info Grid */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                             <div>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Tanggal</span>
-                                <div style={{ fontWeight: 600, color: 'white' }}>{formatDate(ot.date)}</div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>Tanggal</span>
+                                <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{formatDate(ot.date)}</div>
                             </div>
                             <div>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Jam Lembur</span>
-                                <div style={{ fontWeight: 600, color: 'white', fontFamily: 'monospace' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>Jam Lembur</span>
+                                <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontFamily: 'monospace' }}>
                                     {formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)} ({ot.estimated_hours} jam)
                                 </div>
                             </div>
                             {ot.department && (
                                 <div>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Departemen</span>
-                                    <div style={{ fontWeight: 600, color: 'white' }}>{ot.department}</div>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>Departemen</span>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{ot.department}</div>
                                 </div>
                             )}
                             <div>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Diajukan Oleh</span>
-                                <div style={{ fontWeight: 600, color: 'white' }}>{ot.requested_by_name || '-'}</div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>Diajukan Oleh</span>
+                                <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{ot.requested_by_name || '-'}</div>
                             </div>
                             {ot.approved_by_name && (
                                 <div>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Disetujui Oleh</span>
-                                    <div style={{ fontWeight: 600, color: 'white' }}>{ot.approved_by_name}</div>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>Disetujui Oleh</span>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{ot.approved_by_name}</div>
                                 </div>
                             )}
                         </div>
 
                         {/* Reason */}
                         <div style={{ marginBottom: '1.5rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Alasan</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>Alasan</span>
                             <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', color: 'var(--gray-200)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
                                 {ot.reason}
                             </div>
@@ -1259,7 +1281,7 @@ export default function AdminWorkSchedule() {
 
                         {/* Employees */}
                         <div style={{ marginBottom: '1.5rem' }}>
-                            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', marginBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '0.75rem' }}>
                                 👥 Karyawan ({ot.employees?.length || 0})
                             </h3>
                             <div className="table-container">
@@ -1274,7 +1296,7 @@ export default function AdminWorkSchedule() {
                                     <tbody>
                                         {ot.employees?.map((emp, i) => (
                                             <tr key={i}>
-                                                <td style={{ fontWeight: 600, color: 'white' }}>{emp.user_name}</td>
+                                                <td style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{emp.user_name}</td>
                                                 <td>{emp.employee_id}</td>
                                                 <td>{emp.actual_hours ? `${emp.actual_hours} jam` : '-'}</td>
                                             </tr>
@@ -1393,7 +1415,7 @@ export default function AdminWorkSchedule() {
             {/* Tabs */}
             <div style={{
                 display: 'flex', gap: '0.25rem', marginBottom: '1.5rem',
-                background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-lg)',
+                background: 'rgba(0,0,0,0.05)', borderRadius: 'var(--radius-lg)',
                 padding: '0.35rem'
             }}>
                 {TAB_ITEMS.map(tab => (

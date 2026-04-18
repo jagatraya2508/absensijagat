@@ -531,6 +531,11 @@ body {
   margin-bottom: 0.5rem;
 }
 
+/* Ensure labels inside modal are explicitly white */
+.modal .form-label, .modal-content .form-label {
+  color: white !important;
+}
+
 .form-input {
   width: 100%;
   padding: 0.875rem 1rem;
@@ -544,7 +549,7 @@ body {
 }
 
 .form-input::placeholder {
-  color: var(--gray-500);
+  color: var(--gray-900); font-weight: 600;
 }
 
 .form-input:focus {
@@ -955,14 +960,25 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   animation: fadeIn var(--transition-fast);
 }
 
-.modal {
-  background: var(--gray-800);
+.modal, .modal-content {
+  background: #6D0000; /* Blood red theme for modal */
   border-radius: var(--radius-xl);
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   animation: slideUp var(--transition);
+}
+
+/* Ensure outline buttons inside modal are visible on dark background */
+.modal .btn-outline, .modal-content .btn-outline {
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.modal .btn-outline:hover:not(:disabled), .modal-content .btn-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: white !important;
 }
 
 .modal-header {
@@ -1730,7 +1746,7 @@ body {
 }
 
 .btn-attendance-compact.disabled .sub-label {
-  color: var(--gray-500);
+  color: var(--gray-900); font-weight: 600;
 }
 
 .btn-attendance-compact.disabled .icon-wrapper {
@@ -2045,7 +2061,7 @@ body {
 .shift-timeline-labels span {
   position: absolute;
   font-size: 0.6rem;
-  color: var(--gray-500);
+  color: var(--gray-900); font-weight: 600;
   transform: translateX(-50%);
   font-family: monospace;
 }

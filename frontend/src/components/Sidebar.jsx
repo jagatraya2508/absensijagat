@@ -45,6 +45,7 @@ export default function Sidebar() {
         { path: '/admin/announcements', icon: '📢', label: 'Kelola Pengumuman' },
         { path: '/admin/driver-activities', icon: '🚛', label: 'Aktivitas Driver' },
         { path: '/admin/driver-tracking', icon: '📍', label: 'Tracking Kunjungan' },
+        { path: '/admin/assets', icon: '📦', label: 'Manajemen Aset' },
         { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin' },
         { path: '/admin/loans', icon: '💰', label: 'Pinjaman' },
         { path: '/admin/payroll', icon: '💵', label: 'Payroll' },
