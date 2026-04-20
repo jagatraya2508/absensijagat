@@ -290,8 +290,8 @@ export default function Attendance() {
 
             {/* Progress Steps */}
             {!isRegistering && (
-                <div className="card mb-4" style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem' }}>
+                <div className="card mb-4" style={{ padding: '1rem 0.5rem', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <div style={{
                                 width: 32,
@@ -308,7 +308,7 @@ export default function Attendance() {
                             <span style={{ color: step >= 1 ? 'white' : 'var(--gray-500)' }}>Foto</span>
                         </div>
                         <div style={{
-                            width: 30,
+                            width: 20,
                             height: 2,
                             background: step >= 2 ? 'var(--primary-500)' : 'var(--gray-700)',
                             alignSelf: 'center'
@@ -331,7 +331,7 @@ export default function Attendance() {
                                     <span style={{ color: step >= 2 ? 'white' : 'var(--gray-500)' }}>Verifikasi</span>
                                 </div>
                                 <div style={{
-                                    width: 30,
+                                    width: 20,
                                     height: 2,
                                     background: step >= 3 ? 'var(--primary-500)' : 'var(--gray-700)',
                                     alignSelf: 'center'

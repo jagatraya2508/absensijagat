@@ -199,25 +199,26 @@ export default function Camera({ onCapture, onReset }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     border: '2px dashed var(--gray-600)',
-                    padding: '2rem',
+                    padding: '1.5rem 1rem',
                     color: 'white',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    boxSizing: 'border-box'
                 }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
-                    <p style={{ marginBottom: '1rem' }}>
+                    <p style={{ marginBottom: '1.25rem', fontSize: '0.85rem', lineHeight: '1.4' }}>
                         Koneksi tidak terenkripsi (Local IP). Tekan tombol di bawah untuk membuka kamera sistem.
                     </p>
-                    <label className="btn btn-primary">
-                        📸 Buka Kamera
+                    <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+                        <button type="button" className="btn btn-primary" style={{ pointerEvents: 'none' }}>
+                            📸 Buka Kamera
+                        </button>
                         <input 
                             type="file" 
                             accept="image/*" 
-                            capture="user" 
                             onChange={handleFallbackCapture} 
-                            style={{ display: 'none' }}
+                            style={{ position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 10 }}
                         />
-                    </label>
-                </div>
+                    </div>                </div>
             </div>
         );
     }
