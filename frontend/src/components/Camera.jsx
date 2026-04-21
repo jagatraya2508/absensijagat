@@ -206,15 +206,16 @@ export default function Camera({ onCapture, onReset }) {
                 }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
                     <p style={{ marginBottom: '1.25rem', fontSize: '0.85rem', lineHeight: '1.4' }}>
-                        Koneksi tidak terenkripsi (Local IP). Tekan tombol di bawah untuk membuka kamera sistem.
+                        Tekan tombol di bawah untuk membuka kamera selfie.
                     </p>
                     <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
                         <button type="button" className="btn btn-primary" style={{ pointerEvents: 'none' }}>
-                            📸 Buka Kamera
+                            📸 Buka Kamera Selfie
                         </button>
                         <input 
                             type="file" 
                             accept="image/*" 
+                            capture="user"
                             onChange={handleFallbackCapture} 
                             style={{ position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 10 }}
                         />

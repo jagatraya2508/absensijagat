@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { driverActivitiesAPI } from '../utils/api';
 
 const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export default function AdminDriverActivities() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const now = new Date();
     const [month, setMonth] = useState(now.getMonth() + 1);
     const [year, setYear] = useState(now.getFullYear());
@@ -68,6 +71,7 @@ export default function AdminDriverActivities() {
     }
 
     function openAddModal(date) {
+        if (!isAdmin) return alert('Hanya admin yang dapat menambah data.');
         setEditData(null);
         setFormData({
             user_id: selectedDriver || (drivers[0]?.id || ''),
@@ -80,6 +84,7 @@ export default function AdminDriverActivities() {
     }
 
     function openEditModal(act) {
+        if (!isAdmin) return alert('Hanya admin yang dapat mengedit data.');
         setEditData(act);
         setFormData({
             user_id: act.user_id,
@@ -118,7 +123,8 @@ export default function AdminDriverActivities() {
     }
 
     async function handleDelete(id) {
-        if (!confirm('Yakin hapus data ini?')) return;
+        if (!isAdmin) return alert('Hanya admin yang dapat menghapus data.');
+        if (!window.confirm('Yakin hapus data ini?')) return;
         try {
             await driverActivitiesAPI.delete(id);
             setSuccess('Data berhasil dihapus');
@@ -128,6 +134,26 @@ export default function AdminDriverActivities() {
         } catch (e) {
             alert('Gagal menghapus: ' + e.message);
         }
+    }
+
+    async function handleExportPDF() {
+        try {
+            await driverActivitiesAPI.exportSummaryPDF(month, year);
+        } catch (e) {
+            alert('Gagal export PDF: ' + e.message);
+        }
+    }
+
+    async function handleExportExcel() {
+        try {
+            await driverActivitiesAPI.exportSummaryExcel(month, year);
+        } catch (e) {
+            alert('Gagal export Excel: ' + e.message);
+        }
+    }
+
+    function handlePrint() {
+        window.print();
     }
 
     function formatCurrency(val) {
@@ -194,6 +220,21 @@ export default function AdminDriverActivities() {
                             <option value="">Semua Driver</option>
                             {drivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.employee_id})</option>)}
                         </select>
+                        
+                        <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }} className="hide-on-print">
+                            <button onClick={handlePrint} className="btn btn-outline btn-sm" title="Print Data"
+                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
+                                🖨️ Print
+                            </button>
+                            <button onClick={handleExportPDF} className="btn btn-outline btn-sm" title="Export PDF"
+                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }}>
+                                📄 PDF
+                            </button>
+                            <button onClick={handleExportExcel} className="btn btn-outline btn-sm" title="Export Excel"
+                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', color: '#10b981', borderColor: '#10b981' }}>
+                                📊 Excel
+                            </button>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => setActiveView('calendar')}
@@ -202,17 +243,25 @@ export default function AdminDriverActivities() {
                                 background: activeView === 'calendar' ? 'linear-gradient(135deg, #6366f1, #818cf8)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
                             }}>📅 Kalender</button>
+                        <button onClick={() => setActiveView('list')}
+                            style={{
+                                padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
+                                background: activeView === 'list' ? 'linear-gradient(135deg, #3b82f6, #60a5fa)' : 'var(--gray-700)',
+                                color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
+                            }}>📝 Daftar</button>
                         <button onClick={() => setActiveView('summary')}
                             style={{
                                 padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
                                 background: activeView === 'summary' ? 'linear-gradient(135deg, #10b981, #34d399)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
                             }}>📊 Rekap</button>
-                        <button onClick={() => openAddModal('')}
-                            style={{
-                                padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
-                                background: 'linear-gradient(135deg, #a855f7, #7c3aed)', color: '#fff', cursor: 'pointer'
-                            }}>+ Tambah</button>
+                        {isAdmin && (
+                            <button onClick={() => openAddModal('')}
+                                style={{
+                                    padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
+                                    background: 'linear-gradient(135deg, #a855f7, #7c3aed)', color: '#fff', cursor: 'pointer'
+                                }}>+ Tambah</button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -387,6 +436,74 @@ export default function AdminDriverActivities() {
                 </div>
             )}
 
+            {/* List View */}
+            {activeView === 'list' && (
+                <div className="card">
+                    <div className="card-header">
+                        <h2 className="card-title">📝 Daftar Aktivitas — {MONTHS[month]} {year}</h2>
+                    </div>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            <div className="loading-spinner" style={{ margin: '0 auto' }} />
+                        </div>
+                    ) : activities.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">🚛</div>
+                            <p className="empty-state-text">Belum ada data aktivitas driver bulan ini</p>
+                        </div>
+                    ) : (
+                        <div className="table-container">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>Driver</th>
+                                        <th style={{ textAlign: 'center' }}>Subuh</th>
+                                        <th style={{ textAlign: 'center' }}>RIT</th>
+                                        <th style={{ textAlign: 'center' }}>Ritase Tambahan</th>
+                                        <th style={{ textAlign: 'center' }}>Menginap</th>
+                                        <th>Catatan Rute</th>
+                                        {isAdmin && <th style={{ textAlign: 'right' }}>Aksi</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {activities.sort((a, b) => new Date(a.activity_date) - new Date(b.activity_date)).map(act => (
+                                        <tr key={act.id}>
+                                            <td>{new Date(act.activity_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</td>
+                                            <td>
+                                                <div style={{ fontWeight: 600 }}>{act.user_name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{act.employee_id}</div>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {act.is_subuh ? <span style={{ color: '#6366f1' }}>🌙 Ya {act.departure_time && `(${act.departure_time})`}</span> : '-'}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className="badge badge-warning">{act.rit_count}</span>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {act.rit_count > 1 ? <span className="badge" style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{act.rit_count - 1}</span> : '-'}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {act.is_overnight ? <span style={{ color: '#ef4444' }}>🏨 Ya</span> : '-'}
+                                            </td>
+                                            <td>{act.rit_notes || '-'}</td>
+                                            {isAdmin && (
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                        <button onClick={() => openEditModal(act)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem' }}>✏️ Edit</button>
+                                                        <button onClick={() => handleDelete(act.id)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>🗑️ Hapus</button>
+                                                    </div>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Add/Edit Modal */}
             {showModal && (
                 <div className="modal-overlay">
@@ -518,7 +635,7 @@ export default function AdminDriverActivities() {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                {editData && (
+                                {editData && isAdmin && (
                                     <button type="button" className="btn" onClick={() => { setShowModal(false); handleDelete(editData.id); }}
                                         style={{ marginRight: 'auto', background: 'rgba(239,68,68,0.2)', color: '#f87171', border: 'none', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
                                         🗑️ Hapus

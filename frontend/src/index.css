@@ -2276,3 +2276,9 @@ body {
   margin-top: 0.25rem;
   font-size: 0.85rem;
 }
+
+@media print {
+  .hide-on-print { display: none !important; }
+  .sidebar, .mobile-nav, .page-header { display: none !important; }
+  .main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
+}

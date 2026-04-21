@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+const PDFDocument = require('pdfkit');
+const ExcelJS = require('exceljs');
 
 // Get driver activities (with filters)
 router.get('/', authenticateToken, isAdmin, async (req, res) => {
@@ -240,6 +242,252 @@ router.post('/bulk', authenticateToken, isAdmin, async (req, res) => {
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     } finally {
         client.release();
+    }
+});
+
+// ============================================
+// EXPORT ENDPOINTS
+// ============================================
+
+// Helper function to format currency
+function formatCurrency(val) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
+}
+
+// Export Summary as PDF
+router.get('/export/summary/pdf', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (!month || !year) {
+            return res.status(400).json({ error: 'Month and year are required' });
+        }
+
+        const targetMonth = parseInt(month);
+        const targetYear = parseInt(year);
+        const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+        const result = await pool.query(`
+            SELECT da.user_id, u.name as user_name, u.employee_id,
+                   COUNT(*) as total_days,
+                   SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
+                   SUM(da.rit_count) as total_rit,
+                   SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
+                   SUM(GREATEST(da.rit_count - 1, 0)) as extra_rit,
+                   COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
+                   COALESCE(ed.driver_rit_allowance, 0) as tarif_rit,
+                   COALESCE(ed.driver_inap_allowance, 0) as tarif_inap,
+                   COALESCE(ed.driver_ritase_allowance, 0) as tarif_ritase
+            FROM driver_activities da
+            JOIN users u ON da.user_id = u.id
+            LEFT JOIN employee_details ed ON da.user_id = ed.user_id
+            WHERE EXTRACT(MONTH FROM da.activity_date) = $1
+              AND EXTRACT(YEAR FROM da.activity_date) = $2
+            GROUP BY da.user_id, u.name, u.employee_id, 
+                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_allowance
+            ORDER BY u.name ASC
+        `, [targetMonth, targetYear]);
+
+        const summary = result.rows.map(row => {
+            const subuhAmt = parseInt(row.total_subuh) * parseFloat(row.tarif_subuh);
+            const ritAmt = parseInt(row.total_rit) * parseFloat(row.tarif_rit);
+            const overnightAmt = parseInt(row.total_overnight) * parseFloat(row.tarif_inap);
+            const ritaseAmt = parseInt(row.extra_rit) * parseFloat(row.tarif_ritase);
+            return {
+                ...row,
+                total_subuh_amount: subuhAmt,
+                total_rit_amount: ritAmt,
+                total_overnight_amount: overnightAmt,
+                total_ritase_amount: ritaseAmt,
+                grand_total: subuhAmt + ritAmt + overnightAmt + ritaseAmt
+            };
+        });
+
+        const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=rekap-driver-${targetYear}-${targetMonth}.pdf`);
+
+        doc.pipe(res);
+
+        // Title
+        doc.fontSize(18).text('REKAP AKTIVITAS DRIVER', { align: 'center' });
+        doc.fontSize(12).text(`Periode: ${monthNames[targetMonth]} ${targetYear}`, { align: 'center' });
+        doc.moveDown(2);
+
+        // Table Header
+        const tableTop = doc.y;
+        const colDriver = 40, colHari = 160, colSubuh = 230, colRit = 340, colInap = 450, colTotal = 560;
+
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text('Driver', colDriver, tableTop);
+        doc.text('Hari Kerja', colHari, tableTop);
+        doc.text('Subuh (Hari & Pph)', colSubuh, tableTop);
+        doc.text('RIT (Trip & Pph)', colRit, tableTop);
+        doc.text('Menginap (Hari & Pph)', colInap, tableTop);
+        doc.text('Grand Total', colTotal, tableTop, { width: 100, align: 'right' });
+
+        doc.moveTo(40, tableTop + 15).lineTo(760, tableTop + 15).stroke();
+
+        // Table Rows
+        doc.font('Helvetica').fontSize(9);
+        let yPosition = tableTop + 25;
+        let totalAllSubuh = 0, totalAllRit = 0, totalAllInap = 0, grandTotalAll = 0;
+
+        summary.forEach((row) => {
+            if (yPosition > 500) {
+                doc.addPage({ layout: 'landscape' });
+                yPosition = 50;
+            }
+
+            totalAllSubuh += parseInt(row.total_subuh);
+            totalAllRit += parseInt(row.total_rit);
+            totalAllInap += parseInt(row.total_overnight);
+            grandTotalAll += row.grand_total;
+
+            doc.text(row.user_name || '-', colDriver, yPosition);
+            doc.text(String(row.total_days), colHari, yPosition);
+            doc.text(`${row.total_subuh} (${formatCurrency(row.total_subuh_amount)})`, colSubuh, yPosition);
+            doc.text(`${row.total_rit} (${formatCurrency(row.total_rit_amount)})`, colRit, yPosition);
+            doc.text(`${row.total_overnight} (${formatCurrency(row.total_overnight_amount)})`, colInap, yPosition);
+            doc.text(formatCurrency(row.grand_total), colTotal, yPosition, { width: 100, align: 'right' });
+
+            yPosition += 20;
+        });
+
+        doc.moveTo(40, yPosition).lineTo(760, yPosition).stroke();
+        yPosition += 10;
+        
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text('TOTAL', colDriver, yPosition);
+        doc.text(`${totalAllSubuh} Hari`, colSubuh, yPosition);
+        doc.text(`${totalAllRit} Trip`, colRit, yPosition);
+        doc.text(`${totalAllInap} Hari`, colInap, yPosition);
+        doc.text(formatCurrency(grandTotalAll), colTotal, yPosition, { width: 100, align: 'right' });
+
+        // Footer
+        doc.fontSize(8).font('Helvetica').text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 40, 550);
+
+        doc.end();
+    } catch (error) {
+        console.error('Export Summary PDF error:', error);
+        res.status(500).json({ error: 'Gagal membuat PDF' });
+    }
+});
+
+// Export Summary as Excel
+router.get('/export/summary/excel', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (!month || !year) {
+            return res.status(400).json({ error: 'Month and year are required' });
+        }
+
+        const targetMonth = parseInt(month);
+        const targetYear = parseInt(year);
+        const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+        const result = await pool.query(`
+            SELECT da.user_id, u.name as user_name, u.employee_id,
+                   COUNT(*) as total_days,
+                   SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
+                   SUM(da.rit_count) as total_rit,
+                   SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
+                   SUM(GREATEST(da.rit_count - 1, 0)) as extra_rit,
+                   COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
+                   COALESCE(ed.driver_rit_allowance, 0) as tarif_rit,
+                   COALESCE(ed.driver_inap_allowance, 0) as tarif_inap,
+                   COALESCE(ed.driver_ritase_allowance, 0) as tarif_ritase
+            FROM driver_activities da
+            JOIN users u ON da.user_id = u.id
+            LEFT JOIN employee_details ed ON da.user_id = ed.user_id
+            WHERE EXTRACT(MONTH FROM da.activity_date) = $1
+              AND EXTRACT(YEAR FROM da.activity_date) = $2
+            GROUP BY da.user_id, u.name, u.employee_id, 
+                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_allowance
+            ORDER BY u.name ASC
+        `, [targetMonth, targetYear]);
+
+        const summary = result.rows.map(row => {
+            const subuhAmt = parseInt(row.total_subuh) * parseFloat(row.tarif_subuh);
+            const ritAmt = parseInt(row.total_rit) * parseFloat(row.tarif_rit);
+            const overnightAmt = parseInt(row.total_overnight) * parseFloat(row.tarif_inap);
+            const ritaseAmt = parseInt(row.extra_rit) * parseFloat(row.tarif_ritase);
+            return {
+                ...row,
+                total_subuh_amount: subuhAmt,
+                total_rit_amount: ritAmt,
+                total_overnight_amount: overnightAmt,
+                total_ritase_amount: ritaseAmt,
+                grand_total: subuhAmt + ritAmt + overnightAmt + ritaseAmt
+            };
+        });
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Rekap Driver');
+
+        // Title
+        worksheet.mergeCells('A1:K1');
+        worksheet.getCell('A1').value = 'REKAP AKTIVITAS DRIVER';
+        worksheet.getCell('A1').font = { bold: true, size: 14 };
+        worksheet.getCell('A1').alignment = { horizontal: 'center' };
+
+        worksheet.mergeCells('A2:K2');
+        worksheet.getCell('A2').value = `Periode: ${monthNames[targetMonth]} ${targetYear}`;
+        worksheet.getCell('A2').alignment = { horizontal: 'center' };
+
+        // Header
+        worksheet.getRow(4).values = [
+            'No', 'ID Karyawan', 'Nama', 'Hari Kerja', 
+            'Total Subuh', 'Uang Subuh', 
+            'Total RIT', 'Uang RIT', 
+            'Total Menginap', 'Uang Menginap', 
+            'Total'
+        ];
+        worksheet.getRow(4).font = { bold: true };
+        worksheet.getRow(4).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF1E3A8A' }
+        };
+        worksheet.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+        // Data rows
+        summary.forEach((row, index) => {
+            worksheet.addRow([
+                index + 1,
+                row.employee_id || '-',
+                row.user_name || '-',
+                parseInt(row.total_days),
+                parseInt(row.total_subuh),
+                row.total_subuh_amount,
+                parseInt(row.total_rit),
+                row.total_rit_amount,
+                parseInt(row.total_overnight),
+                row.total_overnight_amount,
+                row.grand_total
+            ]);
+        });
+
+        // Column formatting
+        worksheet.columns = [
+            { width: 5 }, { width: 15 }, { width: 25 }, { width: 12 },
+            { width: 12 }, { width: 15 }, { width: 12 }, { width: 15 },
+            { width: 15 }, { width: 18 }, { width: 20 }
+        ];
+
+        // Ensure amount columns are formatted as numbers
+        [6, 8, 10, 11].forEach(colIndex => {
+            worksheet.getColumn(colIndex).numFmt = '#,##0';
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=rekap-driver-${targetYear}-${targetMonth}.xlsx`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Export Summary Excel error:', error);
+        res.status(500).json({ error: 'Gagal membuat Excel' });
     }
 });
 

@@ -542,6 +542,30 @@ export const driverActivitiesAPI = {
         method: 'POST',
         body: JSON.stringify({ activities }),
     }),
+    exportSummaryPDF: (month, year) => {
+        const token = localStorage.getItem('token');
+        const url = `${API_BASE}/driver-activities/export/summary/pdf?month=${month}&year=${year}`;
+        return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.blob())
+            .then(blob => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `rekap-driver-${year}-${month}.pdf`;
+                link.click();
+            });
+    },
+    exportSummaryExcel: (month, year) => {
+        const token = localStorage.getItem('token');
+        const url = `${API_BASE}/driver-activities/export/summary/excel?month=${month}&year=${year}`;
+        return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.blob())
+            .then(blob => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `rekap-driver-${year}-${month}.xlsx`;
+                link.click();
+            });
+    },
 };
 
 // Driver Tracking API
