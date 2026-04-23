@@ -41,6 +41,15 @@ CREATE TABLE IF NOT EXISTS positions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabel Vehicle Types (Master Jenis Kendaraan)
+CREATE TABLE IF NOT EXISTS vehicle_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(150) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tabel Attendance Records (Rekam Absensi)
 CREATE TABLE IF NOT EXISTS attendance_records (
     id SERIAL PRIMARY KEY,
@@ -158,6 +167,7 @@ CREATE TABLE IF NOT EXISTS employee_details (
     tax_status VARCHAR(10) DEFAULT 'TK/0',
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
+    vehicle_type_id INTEGER REFERENCES vehicle_types(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

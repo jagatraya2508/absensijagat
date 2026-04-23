@@ -25,6 +25,7 @@ import AdminRecruitment from './pages/AdminRecruitment';
 import AdminWorkSchedule from './pages/AdminWorkSchedule';
 import AdminDepartments from './pages/AdminDepartments';
 import AdminPositions from './pages/AdminPositions';
+import AdminVehicleTypes from './pages/AdminVehicleTypes';
 import ManagerApprovals from './pages/ManagerApprovals';
 import Overtime from './pages/Overtime';
 import AdminDriverActivities from './pages/AdminDriverActivities';
@@ -356,6 +357,17 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminPositions />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/vehicle-types"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminVehicleTypes />
                         </AppLayout>
                     </ProtectedRoute>
                 }

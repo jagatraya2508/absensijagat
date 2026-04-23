@@ -58,6 +58,7 @@ app.use('/api/driver-activities', require('./routes/driverActivities'));
 app.use('/api/driver-tracking', require('./routes/driverTracking'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/assets', require('./routes/assets'));
+app.use('/api/vehicle-types', require('./routes/vehicleTypes'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

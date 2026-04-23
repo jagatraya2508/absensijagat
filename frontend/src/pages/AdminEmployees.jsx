@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI } from '../utils/api';
+import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI } from '../utils/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -32,6 +32,7 @@ export default function AdminEmployees() {
     const [masterDepartments, setMasterDepartments] = useState([]);
     const [masterPositions, setMasterPositions] = useState([]);
     const [masterLocations, setMasterLocations] = useState([]);
+    const [masterVehicleTypes, setMasterVehicleTypes] = useState([]);
     const [bpjsDefaults, setBpjsDefaults] = useState({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -54,7 +55,7 @@ export default function AdminEmployees() {
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
         is_driver: false, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
-        tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
+        vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
         bpjs_kes_enrolled: true, bpjs_jht_enrolled: true, bpjs_jp_enrolled: true,
         bpjs_jkk_enrolled: true, bpjs_jkm_enrolled: true, pph21_enabled: true,
@@ -74,9 +75,11 @@ export default function AdminEmployees() {
             const depts = await departmentsAPI.getAll();
             const pos = await positionsAPI.getAll();
             const loc = await locationsAPI.getAll();
+            const vts = await vehicleTypesAPI.getAll();
             setMasterDepartments(depts);
             setMasterPositions(pos);
             setMasterLocations(loc.filter(l => l.is_active));
+            setMasterVehicleTypes(vts);
         } catch (err) {
             console.error('Failed to fetch masters:', err);
         }
@@ -128,6 +131,7 @@ export default function AdminEmployees() {
                 driver_rit_allowance: d.driver_rit_allowance || 0,
                 driver_inap_allowance: d.driver_inap_allowance || 0,
                 driver_ritase_allowance: d.driver_ritase_allowance || 0,
+                vehicle_type_id: d.vehicle_type_id || '',
                 tax_status: d.tax_status || 'TK/0',
                 emergency_contact_name: d.emergency_contact_name || '',
                 emergency_contact_phone: d.emergency_contact_phone || '',
@@ -171,6 +175,9 @@ export default function AdminEmployees() {
             // Convert percentage rates to decimal before sending
             const rateFields = ['bpjs_kes_employee_rate', 'bpjs_kes_company_rate', 'bpjs_jht_employee_rate', 'bpjs_jht_company_rate', 'bpjs_jp_employee_rate', 'bpjs_jp_company_rate', 'bpjs_jkk_rate', 'bpjs_jkm_rate'];
             const payload = { ...formData };
+            if (!payload.vehicle_type_id) {
+                payload.vehicle_type_id = null;
+            }
             rateFields.forEach(f => {
                 if (payload[f] !== '' && payload[f] != null) {
                     payload[f] = parseFloat(payload[f]) / 100;
@@ -803,6 +810,18 @@ export default function AdminEmployees() {
                                                     <div className="form-group" style={{ margin: 0 }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}>🚚 Uang Ritase / RIT Tambahan (Rp)</label>
                                                         <input className="form-input" type="number" value={formData.driver_ritase_allowance} onChange={e => updateField('driver_ritase_allowance', parseFloat(e.target.value) || 0)} />
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', marginTop: 4, lineHeight: 1.2 }}>
+                                                            *Otomatis dihitung mulai dari perjalanan (RIT) ke-2 dan seterusnya
+                                                        </div>
+                                                    </div>
+                                                    <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚙 Jenis Kendaraan</label>
+                                                        <select className="form-input form-select" value={formData.vehicle_type_id} onChange={e => updateField('vehicle_type_id', e.target.value)}>
+                                                            <option value="">Pilih Jenis Kendaraan...</option>
+                                                            {masterVehicleTypes.map(vt => (
+                                                                <option key={vt.id} value={vt.id}>{vt.name}</option>
+                                                            ))}
+                                                        </select>
                                                     </div>
                                                 </div>
                                             )}

@@ -34,6 +34,7 @@ export default function Sidebar() {
         { path: '/admin/locations', icon: '📍', label: 'Kelola Lokasi' },
         { path: '/admin/departments', icon: '🏢', label: 'Master Departemen' },
         { path: '/admin/positions', icon: '🏅', label: 'Master Jabatan' },
+        { path: '/admin/vehicle-types', icon: '🚚', label: 'Master Kendaraan' },
         { path: '/admin/employees', icon: '👤', label: 'Data Karyawan' },
         { path: '/admin/face-registration', icon: '🔐', label: 'Registrasi Wajah' },
         { path: '/admin/work-schedule', icon: '🕐', label: 'Jadwal Kerja' },

@@ -619,6 +619,20 @@ export const licenseAPI = {
     getStatus: () => request('/license/status'),
 };
 
+// Vehicle Types API
+export const vehicleTypesAPI = {
+    getAll: () => request('/vehicle-types'),
+    create: (data) => request('/vehicle-types', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/vehicle-types/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/vehicle-types/${id}`, { method: 'DELETE' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -639,5 +653,6 @@ export default {
     driverActivitiesAPI,
     driverTrackingAPI,
     customersAPI,
-    licenseAPI
+    licenseAPI,
+    vehicleTypesAPI
 };
