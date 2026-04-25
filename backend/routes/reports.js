@@ -867,6 +867,8 @@ router.get('/history', authenticateToken, isAdmin, async (req, res) => {
                 co.recorded_at as check_out_time,
                 co.is_valid as check_out_valid,
                 al.name as location_name,
+                lr.type as leave_type,
+                lr.reason as leave_reason,
                 CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
@@ -877,10 +879,13 @@ router.get('/history', authenticateToken, isAdmin, async (req, res) => {
                 AND co.type = 'check_out' 
                 AND DATE(co.recorded_at) = d.date::date
             LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
+            LEFT JOIN leave_requests lr ON u.id = lr.user_id
+                AND lr.status = 'approved'
+                AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
             WHERE u.role = 'employee' ${userFilter}
-                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL)
+                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
         );
@@ -927,6 +932,8 @@ router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) =
                 ci.is_valid as check_in_valid,
                 co.recorded_at as check_out_time,
                 al.name as location_name,
+                lr.type as leave_type,
+                lr.reason as leave_reason,
                 CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
@@ -937,10 +944,13 @@ router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) =
                 AND co.type = 'check_out' 
                 AND DATE(co.recorded_at) = d.date::date
             LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
+            LEFT JOIN leave_requests lr ON u.id = lr.user_id
+                AND lr.status = 'approved'
+                AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
             WHERE u.role = 'employee' ${userFilter}
-                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL)
+                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
         );
@@ -961,8 +971,9 @@ router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) =
         const totalRecords = result.rows.length;
         const totalPresent = result.rows.filter(r => r.check_in_time).length;
         const totalOff = result.rows.filter(r => r.is_off_day).length;
+        const totalLeave = result.rows.filter(r => r.leave_type).length;
         doc.fontSize(10);
-        doc.text(`Total Record: ${totalRecords}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}`);
+        doc.text(`Total Record: ${totalRecords}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}  |  Izin/Cuti: ${totalLeave}`);
         doc.moveDown(1);
 
         // Table Header
@@ -994,6 +1005,16 @@ router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) =
             let status = 'Tidak Hadir';
             if (row.is_off_day) {
                 status = 'OFF';
+            } else if (row.leave_type) {
+                status = row.leave_type === 'late'
+                    ? 'Izin Terlambat'
+                    : row.leave_type === 'sick'
+                        ? 'Izin Sakit'
+                        : row.leave_type === 'leave'
+                            ? 'Cuti'
+                            : row.leave_type === 'change_off'
+                                ? 'Tukar Libur'
+                                : 'Izin';
             } else if (row.check_in_time && row.check_out_time) {
                 status = row.check_in_valid ? 'Lengkap' : 'Diluar Radius';
             } else if (row.check_in_time) {
@@ -1049,6 +1070,8 @@ router.get('/export/history/excel', authenticateToken, isAdmin, async (req, res)
                 ci.distance_meters as check_in_distance,
                 co.recorded_at as check_out_time,
                 al.name as location_name,
+                lr.type as leave_type,
+                lr.reason as leave_reason,
                 CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
@@ -1059,10 +1082,13 @@ router.get('/export/history/excel', authenticateToken, isAdmin, async (req, res)
                 AND co.type = 'check_out' 
                 AND DATE(co.recorded_at) = d.date::date
             LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
+            LEFT JOIN leave_requests lr ON u.id = lr.user_id
+                AND lr.status = 'approved'
+                AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
             WHERE u.role = 'employee' ${userFilter}
-                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL)
+                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
         );
@@ -1094,6 +1120,16 @@ router.get('/export/history/excel', authenticateToken, isAdmin, async (req, res)
             let status = 'Tidak Hadir';
             if (row.is_off_day) {
                 status = 'OFF';
+            } else if (row.leave_type) {
+                status = row.leave_type === 'late'
+                    ? 'Izin Terlambat'
+                    : row.leave_type === 'sick'
+                        ? 'Izin Sakit'
+                        : row.leave_type === 'leave'
+                            ? 'Cuti'
+                            : row.leave_type === 'change_off'
+                                ? 'Tukar Libur'
+                                : 'Izin';
             } else if (row.check_in_time && row.check_out_time) {
                 status = row.check_in_valid ? 'Lengkap' : 'Diluar Radius';
             } else if (row.check_in_time) {
@@ -1128,7 +1164,8 @@ router.get('/export/history/excel', authenticateToken, isAdmin, async (req, res)
         const summaryRow = worksheet.rowCount + 2;
         const totalPresent = result.rows.filter(r => r.check_in_time).length;
         const totalOff = result.rows.filter(r => r.is_off_day).length;
-        worksheet.getCell(`A${summaryRow}`).value = `Total Record: ${result.rows.length}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}`;
+        const totalLeave = result.rows.filter(r => r.leave_type).length;
+        worksheet.getCell(`A${summaryRow}`).value = `Total Record: ${result.rows.length}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}  |  Izin/Cuti: ${totalLeave}`;
         worksheet.getCell(`A${summaryRow}`).font = { bold: true };
 
         // Footer

@@ -75,7 +75,7 @@ export default function useFaceApi() {
         const distance = faceapi.euclideanDistance(d1, d2);
 
         // Threshold for face match (lower is better)
-        const MATCH_THRESHOLD = 0.6;
+        const MATCH_THRESHOLD = 0.4; // Minimal kemiripan 60%
 
         return {
             match: distance < MATCH_THRESHOLD,

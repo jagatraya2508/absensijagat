@@ -87,6 +87,26 @@ export default function History() {
         return acc;
     }, {}) : {};
 
+    function getLeaveLabel(leaveType) {
+        switch (leaveType) {
+            case 'late': return '⏰ Izin Terlambat';
+            case 'sick': return '🏥 Izin Sakit';
+            case 'leave': return '🏖️ Cuti';
+            case 'change_off': return '🔁 Tukar Libur';
+            default: return '📝 Izin';
+        }
+    }
+
+    function getLeaveBadgeClass(leaveType) {
+        switch (leaveType) {
+            case 'late': return 'badge-warning';
+            case 'sick': return 'badge-danger';
+            case 'leave': return 'badge-primary';
+            case 'change_off': return 'badge-secondary';
+            default: return 'badge-secondary';
+        }
+    }
+
     return (
         <div>
             <div className="page-header">
@@ -281,6 +301,52 @@ export default function History() {
                                                 </div>
                                                 <span className="badge badge-primary" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
                                                     OFF
+                                                </span>
+                                            </div>
+                                        ) : record.type === 'leave' ? (
+                                            <div
+                                                key={record.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    gap: '1rem',
+                                                    alignItems: 'center',
+                                                    padding: '1rem',
+                                                    background: 'rgba(16, 185, 129, 0.08)',
+                                                    borderRadius: 'var(--radius-lg)',
+                                                    border: '1px solid rgba(16, 185, 129, 0.25)'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: 50, height: 50,
+                                                    borderRadius: 'var(--radius)',
+                                                    background: 'rgba(16, 185, 129, 0.18)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '1.5rem', flexShrink: 0
+                                                }}>
+                                                    📝
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    {isAdmin && record.user_name && (
+                                                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                                            {record.user_name}
+                                                            <span style={{ color: 'var(--gray-400)', fontWeight: 400, marginLeft: '0.5rem' }}>
+                                                                ({record.employee_id})
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`}>
+                                                            {getLeaveLabel(record.leave_type)}
+                                                        </span>
+                                                    </div>
+                                                    {record.notes && (
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.35rem' }}>
+                                                            💬 {record.notes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`} style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
+                                                    IZIN
                                                 </span>
                                             </div>
                                         ) : (

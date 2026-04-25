@@ -309,6 +309,15 @@ export default function AdminReports() {
                             <p>{report.records.filter(r => r.is_off_day).length}</p>
                         </div>
                     </div>
+                    {report.records.some(r => r.leave_type) && (
+                        <div className="card status-card">
+                            <div className="status-card-icon secondary">📝</div>
+                            <div className="status-card-content">
+                                <h3>Izin/Cuti</h3>
+                                <p>{report.records.filter(r => r.leave_type).length}</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -562,6 +571,8 @@ export default function AdminReports() {
                                                         <td>
                                                             {record.is_off_day ? (
                                                                 <span className="text-muted">OFF</span>
+                                                            ) : record.leave_type ? (
+                                                                <span className="text-muted">IZIN</span>
                                                             ) : record.check_in_time ? (
                                                                 <div>
                                                                     <span>{formatTime(record.check_in_time)}</span>
@@ -578,6 +589,8 @@ export default function AdminReports() {
                                                         <td>
                                                             {record.is_off_day ? (
                                                                 <span className="text-muted">OFF</span>
+                                                            ) : record.leave_type ? (
+                                                                <span className="text-muted">IZIN</span>
                                                             ) : record.check_out_time ? (
                                                                 <span>{formatTime(record.check_out_time)}</span>
                                                             ) : (
@@ -588,6 +601,16 @@ export default function AdminReports() {
                                                         <td>
                                                             {record.is_off_day ? (
                                                                 <span className="badge badge-primary">🏖️ OFF</span>
+                                                            ) : record.leave_type === 'late' ? (
+                                                                <span className="badge badge-warning">⏰ Izin Terlambat</span>
+                                                            ) : record.leave_type === 'sick' ? (
+                                                                <span className="badge badge-danger">🏥 Izin Sakit</span>
+                                                            ) : record.leave_type === 'leave' ? (
+                                                                <span className="badge badge-primary">🏖️ Cuti</span>
+                                                            ) : record.leave_type === 'change_off' ? (
+                                                                <span className="badge badge-secondary">🔁 Tukar Libur</span>
+                                                            ) : record.leave_type ? (
+                                                                <span className="badge badge-secondary">📝 Izin</span>
                                                             ) : record.check_in_time && record.check_out_time ? (
                                                                 <span className="badge badge-success">✅ Lengkap</span>
                                                             ) : record.check_in_time ? (

@@ -380,10 +380,68 @@ router.get('/history', authenticateToken, async (req, res) => {
 
         const result = await pool.query(query, params);
 
+        // Also fetch APPROVED leave requests (late/sick/leave/change_off) per day within range
+        // We'll materialize per-day rows using generate_series so they show up in history timeline.
+        const targetUserId = !isAdmin ? req.user.id : (user_id && user_id !== 'all' ? user_id : null);
+
+        const leaveParams = [];
+        let leaveQuery = `
+              SELECT 
+                u.id as user_id,
+                u.name as user_name,
+                u.employee_id,
+                d.date::date as leave_date,
+                lr.id as leave_id,
+                lr.type as leave_type,
+                lr.reason as leave_reason
+              FROM leave_requests lr
+              JOIN users u ON lr.user_id = u.id
+              CROSS JOIN LATERAL generate_series(lr.start_date, lr.end_date, '1 day') AS d(date)
+              WHERE lr.status = 'approved'
+            `;
+
+        const leaveConditions = [];
+        if (targetUserId) {
+            leaveParams.push(targetUserId);
+            leaveConditions.push(`lr.user_id = $${leaveParams.length}`);
+        }
+        if (start_date) {
+            leaveParams.push(start_date);
+            leaveConditions.push(`d.date::date >= $${leaveParams.length}::date`);
+        }
+        if (end_date) {
+            leaveParams.push(end_date);
+            leaveConditions.push(`d.date::date <= $${leaveParams.length}::date`);
+        }
+
+        if (leaveConditions.length > 0) {
+            leaveQuery += ` AND ${leaveConditions.join(' AND ')}`;
+        }
+        leaveQuery += ` ORDER BY d.date DESC, u.name ASC`;
+
+        const leaveResult = await pool.query(leaveQuery, leaveParams);
+        const leaveRecords = leaveResult.rows.map(row => ({
+            id: `leave_${row.user_id}_${row.leave_id}_${row.leave_date}`,
+            user_id: row.user_id,
+            type: 'leave',
+            leave_type: row.leave_type,
+            leave_id: row.leave_id,
+            recorded_at: row.leave_date,
+            user_name: row.user_name,
+            employee_id: row.employee_id,
+            is_off_day: false,
+            photo_path: null,
+            location_name: null,
+            latitude: null,
+            longitude: null,
+            distance_meters: null,
+            is_valid: null,
+            notes: row.leave_reason || null
+        }));
+
         // Also fetch off days for the relevant user(s) and date range
         // If targetUserId is set (specific user), fetch for that user
         // If targetUserId is null (Admin viewing all), fetch for ALL users within range
-        const targetUserId = !isAdmin ? req.user.id : (user_id && user_id !== 'all' ? user_id : null);
         let offDayRecords = [];
 
         const offParams = [];
@@ -438,8 +496,8 @@ router.get('/history', authenticateToken, async (req, res) => {
             notes: 'Hari Libur'
         }));
 
-        // Merge attendance records with off day records
-        const allRecords = [...result.rows, ...offDayRecords];
+        // Merge attendance records with off day records + leave records
+        const allRecords = [...result.rows, ...offDayRecords, ...leaveRecords];
         // Sort by date descending
         allRecords.sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
 
