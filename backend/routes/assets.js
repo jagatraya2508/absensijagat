@@ -61,6 +61,46 @@ router.post('/categories', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+router.put('/categories/:id', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description } = req.body;
+        if (!name) return res.status(400).json({ error: 'Nama kategori wajib diisi' });
+
+        const result = await pool.query(
+            'UPDATE asset_categories SET name = $1, description = $2 WHERE id = $3 RETURNING *',
+            [name, description, id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Kategori tidak ditemukan' });
+        
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating category:', err);
+        if (err.code === '23505') return res.status(400).json({ error: 'Kategori sudah ada' });
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+router.delete('/categories/:id', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if category is used by any asset
+        const check = await pool.query('SELECT COUNT(*) FROM assets WHERE category_id = $1', [id]);
+        if (parseInt(check.rows[0].count) > 0) {
+            return res.status(400).json({ error: 'Kategori tidak dapat dihapus karena masih digunakan oleh aset' });
+        }
+
+        const result = await pool.query('DELETE FROM asset_categories WHERE id = $1 RETURNING *', [id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Kategori tidak ditemukan' });
+        
+        res.json({ message: 'Kategori berhasil dihapus' });
+    } catch (err) {
+        console.error('Error deleting category:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ==========================================
 // ASET UTAMA
 // ==========================================
@@ -123,16 +163,17 @@ router.put('/:id', authenticateToken, isAdmin, upload.single('photo'), async (re
         `;
         let values = [
             asset_code, name, category_id || null, brand, purchase_date || null, 
-            price ? parseFloat(price) : null, description, status, id
+            price ? parseFloat(price) : null, description, status
         ];
 
         let valCount = 9;
         if (req.file) {
             query += `, photo_path = $${valCount++}`;
-            values.splice(valCount - 2, 0, `/uploads/assets/${req.file.filename}`);
+            values.push(`/uploads/assets/${req.file.filename}`);
         }
 
-        query += ` WHERE id = $${valCount - 1} RETURNING *`;
+        query += ` WHERE id = $${valCount} RETURNING *`;
+        values.push(id);
 
         const result = await pool.query(query, values);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Aset tidak ditemukan' });

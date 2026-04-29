@@ -35,7 +35,7 @@ export default function AdminAssets() {
     const [photoFile, setPhotoFile] = useState(null);
     const [previewPhoto, setPreviewPhoto] = useState(null);
 
-    const [catForm, setCatForm] = useState({ name: '', description: '' });
+    const [catForm, setCatForm] = useState({ id: null, name: '', description: '' });
     const [assignForm, setAssignForm] = useState({ asset_id: null, user_id: '', notes: '' });
     const [returnForm, setReturnForm] = useState({ asset_id: null, condition: 'available', notes: '' });
     
@@ -164,21 +164,59 @@ export default function AdminAssets() {
     }
 
     // ================== CATEGORY CRUD ==================
+    function openEditCategory(c) {
+        setCatForm({ id: c.id, name: c.name, description: c.description || '' });
+        setShowCatModal(true);
+    }
+
+    async function handleDeleteCategory(id) {
+        if (!window.confirm('Yakin ingin menghapus kategori ini?')) return;
+        try {
+            setLoading(true);
+            const res = await fetch(`${API}/assets/categories/${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Gagal menghapus kategori');
+            showMsg('success', 'Kategori dihapus');
+            fetchCategories();
+        } catch (err) {
+            showMsg('error', err.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
     async function handleSaveCategory(e) {
         e.preventDefault();
         try {
-            const res = await fetch(`${API}/assets/categories`, {
-                method: 'POST',
+            const method = catForm.id ? 'PUT' : 'POST';
+            const url = catForm.id ? `${API}/assets/categories/${catForm.id}` : `${API}/assets/categories`;
+            
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify(catForm)
             });
-            const data = await res.json();
-            if(!res.ok) throw new Error(data.error);
-            showMsg('success', 'Kategori ditambahkan');
-            setCatForm({ name: '', description: '' });
+            
+            let data;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error('Server mengembalikan respons tidak valid: ' + text.substring(0, 50));
+            }
+
+            if(!res.ok) throw new Error(data.error || 'Gagal menyimpan kategori');
+            
+            showMsg('success', catForm.id ? 'Kategori diperbarui' : 'Kategori ditambahkan');
+            setCatForm({ id: null, name: '', description: '' });
             setShowCatModal(false);
             fetchCategories();
         } catch (err) {
+            console.error('Error saving category:', err);
             showMsg('error', err.message);
         }
     }
@@ -355,24 +393,31 @@ export default function AdminAssets() {
                         <div>
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--gray-900)' }}>Kategori Aset</h2>
                         </div>
-                        <button className="btn btn-primary" onClick={() => setShowCatModal(true)}>+ Kategori</button>
+                        <button className="btn btn-primary" onClick={() => { setCatForm({ id: null, name: '', description: '' }); setShowCatModal(true); }}>+ Kategori</button>
                     </div>
-                    <div className="card">
-                        <table className="data-table">
+                    <div className="card" style={{ padding: '1rem' }}>
+                        <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr>
-                                    <th>Nama</th>
-                                    <th>Deskripsi</th>
+                                <tr style={{ borderBottom: '2px solid var(--gray-200)' }}>
+                                    <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--gray-700)' }}>Nama</th>
+                                    <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--gray-700)' }}>Deskripsi</th>
+                                    <th style={{ padding: '1rem', width: '120px', textAlign: 'center', color: 'var(--gray-700)' }}>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {categories.map(c => (
-                                    <tr key={c.id}>
-                                        <td style={{ fontWeight: 600 }}>{c.name}</td>
-                                        <td>{c.description || '-'}</td>
+                                    <tr key={c.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                                        <td style={{ fontWeight: 600, padding: '1rem' }}>{c.name}</td>
+                                        <td style={{ padding: '1rem' }}>{c.description || '-'}</td>
+                                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                <button className="btn btn-outline" style={{ padding: '0.35rem 0.6rem' }} onClick={() => openEditCategory(c)} title="Edit">✏️</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.35rem 0.6rem' }} onClick={() => handleDeleteCategory(c.id)} title="Hapus">🗑️</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
-                                {categories.length === 0 && <tr><td colSpan="2" style={{textAlign:'center'}}>Belum ada kategori</td></tr>}
+                                {categories.length === 0 && <tr><td colSpan="3" style={{textAlign:'center', padding: '1.5rem'}}>Belum ada kategori</td></tr>}
                             </tbody>
                         </table>
                     </div>
@@ -468,7 +513,7 @@ export default function AdminAssets() {
                 <div className="modal">
                      <div className="modal-content" style={{ maxWidth: '400px', background: 'var(--bg-card)' }}>
                         <div className="modal-header" style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', padding: '1rem 1.5rem' }}>
-                            <h2 style={{ fontSize: '1.1rem', color: '#ffffff', fontWeight: 700 }}>Tambah Kategori</h2>
+                            <h2 style={{ fontSize: '1.1rem', color: '#ffffff', fontWeight: 700 }}>{catForm.id ? 'Edit' : 'Tambah'} Kategori</h2>
                             <button className="modal-close" onClick={() => setShowCatModal(false)} style={{ color: '#ffffff' }}>&times;</button>
                         </div>
                         <form onSubmit={handleSaveCategory} style={{ padding: '1.5rem' }}>

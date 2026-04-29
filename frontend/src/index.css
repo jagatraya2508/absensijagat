@@ -89,7 +89,7 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background: #fdf2f2; /* Merah keputihan */
+  background: #fff8f8; /* Merah keputihan lebih cerah/putih */
   min-height: 100vh;
   color: var(--gray-900);
   line-height: 1.6;
@@ -2134,7 +2134,7 @@ body {
 }
 
 .global-logo {
-  height: 40px;
+  height: 24px;
   width: auto;
   object-fit: contain;
 }
@@ -2145,7 +2145,7 @@ body {
     right: 1rem;
   }
   .global-logo {
-    height: 28px;
+    height: 18px;
   }
 }
 
