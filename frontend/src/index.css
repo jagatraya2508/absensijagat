@@ -2464,4 +2464,21 @@ body {
   .hide-on-print { display: none !important; }
   .sidebar, .mobile-nav, .page-header { display: none !important; }
   .main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
+  
+  .print-spl-only {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: white;
+    z-index: 9999;
+  }
+  .hide-when-printing-spl {
+    display: none !important;
+  }
+}
+
+.print-spl-only {
+  display: none;
 }

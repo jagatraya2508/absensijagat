@@ -11,6 +11,7 @@ export default function Overtime() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [printData, setPrintData] = useState(null);
 
     const [otForm, setOtForm] = useState({
         date: '',
@@ -82,6 +83,11 @@ export default function Overtime() {
         fetchAllShifts();
         fetchDepartments();
         fetchEmployees();
+
+        // Listen for afterprint event to reset print mode
+        const afterPrint = () => setPrintData(null);
+        window.addEventListener('afterprint', afterPrint);
+        return () => window.removeEventListener('afterprint', afterPrint);
     }, [fetchRequests, fetchAllShifts, fetchDepartments, fetchEmployees]);
 
     function openModal() {
@@ -145,6 +151,13 @@ export default function Overtime() {
         }
     }
 
+    function handlePrint(req) {
+        setPrintData(req);
+        setTimeout(() => {
+            window.print();
+        }, 100);
+    }
+
     function showMsg(type, text) {
         setMessage({ type, text });
         setTimeout(() => setMessage({ type: '', text: '' }), 4000);
@@ -174,7 +187,7 @@ export default function Overtime() {
     });
 
     return (
-        <div className="fade-in">
+        <div className={`fade-in ${printData ? 'hide-when-printing-spl' : ''}`}>
             <div className="page-header">
                 <h1 className="page-title">⏰ Pengajuan Lembur (SPL)</h1>
                 <p className="page-subtitle">Ajukan dan pantau status surat perintah lembur Anda</p>
@@ -239,10 +252,14 @@ export default function Overtime() {
                                             </span>
                                         </td>
                                         <td>
-                                            {req.status === 'pending' && (
-                                                <button className="btn btn-outline" style={{ color: 'var(--danger-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }} 
-                                                    onClick={() => deleteRequest(req.id)}>Batalkan</button>
-                                            )}
+                                            <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                                {req.status === 'pending' && (
+                                                    <button className="btn btn-outline" style={{ color: 'var(--danger-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }} 
+                                                        onClick={() => deleteRequest(req.id)}>Batalkan</button>
+                                                )}
+                                                <button className="btn btn-outline" style={{ color: 'var(--primary-color)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }} 
+                                                    onClick={() => handlePrint(req)}>Cetak</button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -356,6 +373,78 @@ export default function Overtime() {
                                     {loading ? 'Menyimpan...' : 'Ajukan Lembur'}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PRINT LAYOUT */}
+            {printData && (
+                <div className="print-spl-only" style={{ padding: '2rem', fontFamily: 'serif', color: 'black' }}>
+                    <div style={{ textAlign: 'center', borderBottom: '2px solid black', paddingBottom: '1rem', marginBottom: '2rem' }}>
+                        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0' }}>SURAT PERINTAH LEMBUR (SPL)</h1>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '1rem' }}>No: {printData.spl_number}</p>
+                    </div>
+
+                    <div style={{ marginBottom: '2rem' }}>
+                        <p>Yang bertanda tangan di bawah ini menugaskan kepada karyawan berikut:</p>
+                    </div>
+
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}>
+                        <thead>
+                            <tr>
+                                <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>No</th>
+                                <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Nama Karyawan</th>
+                                <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>ID Karyawan</th>
+                                <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Keterangan / Tugas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {printData.employees?.map((emp, idx) => (
+                                <tr key={emp.id}>
+                                    <td style={{ border: '1px solid black', padding: '0.5rem' }}>{idx + 1}</td>
+                                    <td style={{ border: '1px solid black', padding: '0.5rem' }}>{emp.user_name}</td>
+                                    <td style={{ border: '1px solid black', padding: '0.5rem' }}>{emp.employee_id}</td>
+                                    <td style={{ border: '1px solid black', padding: '0.5rem' }}>{printData.reason}</td>
+                                </tr>
+                            ))}
+                            {(!printData.employees || printData.employees.length === 0) && (
+                                <tr>
+                                    <td colSpan={4} style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>
+                                        {printData.requested_by_name}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
+                        <table style={{ width: '100%' }}>
+                            <tbody>
+                                <tr>
+                                    <td style={{ width: '120px', padding: '0.25rem 0' }}><strong>Hari / Tanggal</strong></td>
+                                    <td style={{ padding: '0.25rem 0' }}>: {new Date(printData.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '0.25rem 0' }}><strong>Waktu Lembur</strong></td>
+                                    <td style={{ padding: '0.25rem 0' }}>: {formatTime(printData.overtime_start)} s/d {formatTime(printData.overtime_end)} ({printData.estimated_hours} jam)</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '0.25rem 0' }}><strong>Departemen</strong></td>
+                                    <td style={{ padding: '0.25rem 0' }}>: {printData.department || '-'}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style={{ marginTop: '4rem', display: 'flex', justifyContent: 'space-between', textAlign: 'center' }}>
+                        <div style={{ width: '200px' }}>
+                            <p style={{ marginBottom: '5rem' }}>Pemohon,</p>
+                            <p style={{ textDecoration: 'underline', fontWeight: 'bold' }}>{printData.requested_by_name}</p>
+                        </div>
+                        <div style={{ width: '200px' }}>
+                            <p style={{ marginBottom: '5rem' }}>Menyetujui,</p>
+                            <p style={{ textDecoration: 'underline', fontWeight: 'bold' }}>{printData.approved_by_name || '( ................................... )'}</p>
                         </div>
                     </div>
                 </div>
