@@ -90,13 +90,17 @@ export default function Sidebar() {
                             <div style={{
                                 margin: '1.25rem 0 0.5rem 0',
                                 padding: '0 1rem',
-                                fontSize: '0.85rem',
+                                fontSize: '0.65rem',
                                 fontWeight: '700',
-                                color: 'white',
+                                color: 'rgba(255, 255, 255, 0.4)',
                                 textTransform: 'uppercase',
-                                letterSpacing: '0.05em'
+                                letterSpacing: '0.1em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem'
                             }}>
-                                Task Pimpinan
+                                <span>Task Pimpinan</span>
+                                <span style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
                             </div>
                             <NavLink to="/approvals" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
                                 <span className="sidebar-link-icon">✅</span>
@@ -110,13 +114,17 @@ export default function Sidebar() {
                             <div style={{
                                 margin: '1.25rem 0 0.5rem 0',
                                 padding: '0 1rem',
-                                fontSize: '0.85rem',
+                                fontSize: '0.65rem',
                                 fontWeight: '700',
-                                color: 'white',
+                                color: 'rgba(255, 255, 255, 0.4)',
                                 textTransform: 'uppercase',
-                                letterSpacing: '0.05em'
+                                letterSpacing: '0.1em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem'
                             }}>
-                                Admin
+                                <span>Admin</span>
+                                <span style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
                             </div>
 
                             {/* Master Submenu */}
@@ -124,11 +132,12 @@ export default function Sidebar() {
                                 onClick={() => toggleMenu('master')}
                                 style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    padding: '0.65rem 1rem', margin: '0 0.5rem', borderRadius: 'var(--radius-md)',
-                                    cursor: 'pointer', transition: 'all 0.2s',
-                                    background: isMasterActive ? 'rgba(99,102,241,0.1)' : 'transparent',
-                                    color: isMasterActive ? 'white' : 'rgba(255, 255, 255, 0.9)',
+                                    padding: '0.6rem 1rem', margin: '0.15rem 0', borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer', transition: 'all 0.25s ease',
+                                    background: isMasterActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                    color: isMasterActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
                                     fontWeight: 600, fontSize: '0.85rem',
+                                    borderLeft: isMasterActive ? '3px solid #ff6b6b' : '3px solid transparent',
                                 }}
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -136,18 +145,26 @@ export default function Sidebar() {
                                     Master
                                 </div>
                                 <span style={{
-                                    fontSize: '0.65rem', transition: 'transform 0.2s',
-                                    transform: openMenus.master ? 'rotate(180deg)' : 'rotate(0deg)'
+                                    fontSize: '0.6rem', transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    transform: openMenus.master ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    opacity: 0.5
                                 }}>▼</span>
                             </div>
 
                             <div style={{
-                                display: openMenus.master ? 'block' : 'none',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                flexShrink: 0,
+                                overflow: 'hidden',
+                                maxHeight: openMenus.master ? '600px' : '0px',
+                                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                                opacity: openMenus.master ? 1 : 0,
                                 paddingLeft: '0.75rem',
-                                borderLeft: '2px solid rgba(99,102,241,0.3)',
+                                borderLeft: '2px solid rgba(255,107,107,0.2)',
                                 marginLeft: '1.5rem',
-                                marginTop: '0.25rem',
-                                marginBottom: '0.25rem'
+                                marginTop: openMenus.master ? '0.25rem' : '0',
+                                marginBottom: openMenus.master ? '0.25rem' : '0',
+                                gap: '0.25rem'
                             }}>
                                 {masterItems.map((item) => (
                                     <NavLink
@@ -156,7 +173,7 @@ export default function Sidebar() {
                                         className={({ isActive }) =>
                                             `sidebar-link ${isActive ? 'active' : ''}`
                                         }
-                                        style={{ fontSize: '0.82rem', padding: '0.5rem 0.75rem' }}
+                                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem' }}
                                     >
                                         <span className="sidebar-link-icon">{item.icon}</span>
                                         {item.label}
