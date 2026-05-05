@@ -218,7 +218,7 @@ body {
 
 .sidebar-logo span {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -257,7 +257,7 @@ body {
   gap: 0.75rem;
   padding: 0.7rem 1rem;
   border-radius: var(--radius-md);
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.95);
   text-decoration: none;
   font-weight: 500;
   font-size: 0.9rem;
@@ -342,7 +342,7 @@ body {
 
 .sidebar-user-role {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.75);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -1427,6 +1427,7 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
 .page-header {
   margin-bottom: 2rem;
   position: relative;
+  padding-right: 80px; /* Reserve space for global logo */
 }
 
 .page-title {

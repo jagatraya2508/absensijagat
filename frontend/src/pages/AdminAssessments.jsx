@@ -208,12 +208,12 @@ export default function AdminAssessments() {
 
     return (
         <div>
-            <div className="card-header" style={{ marginBottom: '1.5rem' }}>
+            <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 className="card-title" style={{ fontSize: '1.5rem' }}>📋 Penilaian Kedisiplinan</h1>
-                    <p className="card-subtitle">Evaluasi kedisiplinan pegawai berdasarkan kehadiran</p>
+                    <h1 className="page-title">📋 Penilaian Kedisiplinan</h1>
+                    <p className="page-subtitle">Evaluasi kedisiplinan pegawai berdasarkan kehadiran</p>
                 </div>
-                <button className="btn btn-primary" onClick={openNew}>+ Buat Penilaian</button>
+                <button className="btn btn-primary" onClick={openNew} style={{ marginTop: '0.25rem' }}>+ Buat Penilaian</button>
             </div>
 
             {/* Summary Cards */}
