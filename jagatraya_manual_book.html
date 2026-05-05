@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Manual Book Jagatraya</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+        .container {
+            background: #fff;
+            padding: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-radius: 8px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #eaeaea;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #6D0000;
+        }
+        h1 {
+            border-bottom: 2px solid #6D0000;
+            padding-bottom: 10px;
+        }
+        h2 {
+            border-bottom: 1px solid #eee;
+            margin-top: 40px;
+            padding-bottom: 5px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #d14;
+        }
+        @media print {
+            body { padding: 0; background: #fff; max-width: 100%; }
+            .container { padding: 0; box-shadow: none; }
+            h2 { page-break-before: always; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Buku Panduan Aplikasi Absensi Jagatraya</h1>
+<p>Buku panduan ini menjelaskan cara penggunaan aplikasi Absensi Jagatraya khusus untuk fitur-fitur yang berkaitan dengan kehadiran (kehadiran, cuti, lembur, dan jadwal kerja). Panduan ini dibagi untuk tiga peran pengguna: Administrator, Manajer, dan Karyawan (User).</p>
+<hr>
+<h2>1. Panduan Administrator</h2>
+<p>Administrator memiliki akses penuh ke seluruh fitur pengaturan sistem absensi, master data, dan laporan kehadiran.</p>
+<h3>1.1. Login dan Pengaturan Awal</h3>
+<p><img src="manual_images/login.png" alt="Halaman Login"></p>
+<ul>
+<li><strong>Login</strong>: Masukkan username dan password administrator pada halaman login.</li>
+<li><strong>Pengaturan Aplikasi (Settings)</strong>: Masuk ke menu <strong>Pengaturan Aplikasi</strong>. Di sini, Anda wajib mengatur:<ul>
+<li><strong>Radius Absensi (dalam meter)</strong>: Menentukan jarak maksimal karyawan dari titik lokasi kantor agar bisa melakukan absen.</li>
+<li><strong>Toleransi Keterlambatan</strong>: Batas waktu (dalam menit) sebelum karyawan dianggap terlambat setelah jam masuk.</li>
+<li><strong>Zona Waktu</strong>: Pastikan zona waktu sesuai dengan lokasi perusahaan.</li>
+</ul>
+</li>
+</ul>
+<h3>1.2. Master Data (Data Utama)</h3>
+<p>Sebelum karyawan dapat menggunakan sistem absensi, Administrator harus melengkapi Master Data secara berurutan:</p>
+<ol>
+<li><strong>Departemen</strong>: Tambahkan daftar departemen atau divisi di perusahaan.</li>
+<li><strong>Jabatan (Posisi)</strong>: Tambahkan daftar jabatan yang ada di tiap departemen.</li>
+<li><strong>Lokasi Absensi</strong>: Tentukan titik koordinat (latitude, longitude) kantor atau lokasi proyek di mana karyawan diizinkan melakukan absensi. Anda bisa mendaftarkan banyak lokasi jika perusahaan memiliki banyak cabang.</li>
+</ol>
+<h3>1.3. Manajemen Karyawan dan Pengguna</h3>
+<p><img src="manual_images/admin_dashboard.png" alt="Dashboard Admin"></p>
+<ul>
+<li><strong>Data Karyawan</strong>: Buka menu <strong>Karyawan</strong>. Tambahkan data karyawan baru, isi informasi personal, serta pilih departemen dan jabatannya. Pastikan untuk mengisi sisa kuota cuti tahunan karyawan.</li>
+<li><strong>Akun Pengguna (Users)</strong>: Menu <strong>Pengguna</strong> digunakan untuk membuat kredensial login (username dan password) bagi karyawan yang sudah terdaftar. Jangan lupa memberikan peran (role) yang sesuai: <code>admin</code>, <code>manager</code>, atau <code>employee</code>.</li>
+<li><strong>Pendaftaran Wajah (Face Registration)</strong>: Untuk memvalidasi kehadiran, karyawan harus melakukan <em>Face Recognition</em>. Admin dapat membantu mendaftarkan wajah karyawan, atau karyawan dapat melakukannya sendiri. Pastikan pencahayaan terang dan wajah terlihat jelas saat pengambilan foto.</li>
+</ul>
+<h3>1.4. Manajemen Kehadiran dan Jadwal</h3>
+<ul>
+<li><strong>Jadwal Kerja (Work Schedule)</strong>: Atur jadwal kerja/shift karyawan. Tentukan jam masuk dan jam pulang untuk setiap jadwal kerja. Karyawan dapat di-assign ke jadwal yang berbeda-beda.</li>
+<li><strong>Hari Libur (Off Days)</strong>: Masukkan tanggal merah atau hari libur nasional pada menu ini agar sistem tidak menganggap karyawan mangkir pada hari tersebut.</li>
+<li><strong>Persetujuan Cuti/Izin (Leaves)</strong>: Administrator memiliki wewenang penuh untuk meninjau, menyetujui, atau menolak pengajuan cuti, sakit, dan izin dari karyawan.</li>
+<li><strong>Lembur (Overtime)</strong>: Administrator dapat memvalidasi dan menyetujui pengajuan lembur karyawan.</li>
+</ul>
+<h3>1.5. Laporan Absensi</h3>
+<ul>
+<li><strong>Laporan (Reports)</strong>: Menu <strong>Laporan</strong> menyajikan data rekapitulasi kehadiran seluruh karyawan. Anda dapat melihat jam masuk, pulang, durasi kerja aktual, total jam keterlambatan, dan jam lembur. Laporan ini dapat difilter berdasarkan bulan dan dapat diekspor ke Excel/PDF untuk keperluan lebih lanjut.</li>
+</ul>
+<hr>
+<h2>2. Panduan Manajer</h2>
+<p>Manajer (Manager) memiliki hak akses untuk memantau tim/departemennya, serta memiliki otoritas tingkat pertama untuk menyetujui pengajuan absen dari bawahannya.</p>
+<h3>2.1. Persetujuan (Approvals)</h3>
+<ul>
+<li><strong>Cuti, Izin &amp; Lembur</strong>: Masuk ke menu <strong>Persetujuan Manajer (Manager Approvals)</strong>. Jika ada anggota tim di departemennya yang mengajukan cuti, sakit, izin, atau lembur, pengajuan tersebut akan muncul di halaman ini.</li>
+<li><strong>Aksi Persetujuan</strong>: Manajer dapat meninjau alasan pengajuan, memeriksa sisa kuota cuti karyawan yang bersangkutan (jika cuti), dan memberikan keputusan <strong>Setujui (Approve)</strong> atau <strong>Tolak (Reject)</strong>.</li>
+</ul>
+<h3>2.2. Pemantauan Tim</h3>
+<ul>
+<li>Manajer dapat memantau riwayat dan statistik kehadiran (jam kedatangan dan kepulangan) dari anggota tim bawahannya secara langsung melalui <em>Dashboard</em> Manajer.</li>
+</ul>
+<hr>
+<h2>3. Panduan Karyawan (User)</h2>
+<p>Karyawan menggunakan aplikasi ini untuk keperluan absensi mandiri, mengajukan perizinan/cuti, dan memantau riwayat kehadiran mereka sendiri.</p>
+<h3>3.1. Login dan Dashboard</h3>
+<ul>
+<li>Gunakan <em>username</em> dan <em>password</em> yang telah diberikan oleh HR/Admin.</li>
+<li>Di <strong>Dashboard</strong>, karyawan dapat melihat:<ul>
+<li>Ringkasan sisa jatah cuti tahunan.</li>
+<li>Jadwal kerja (jam masuk &amp; jam pulang) untuk hari ini.</li>
+<li>Status kehadiran hari ini (apakah sudah absen masuk/pulang).</li>
+<li>Statistik kehadiran di bulan berjalan.</li>
+</ul>
+</li>
+</ul>
+<h3>3.2. Absensi Harian (Check-In &amp; Check-Out)</h3>
+<p><img src="manual_images/attendance.png" alt="Halaman Absensi Karyawan"></p>
+<ul>
+<li>Buka menu <strong>Absensi (Attendance)</strong>.</li>
+<li><strong>Langkah-langkah Absensi</strong>:<ol>
+<li>Pastikan <strong>GPS (Location Services)</strong> di HP atau Laptop Anda menyala. Anda harus berada di dalam radius lokasi kantor yang diizinkan.</li>
+<li>Sistem akan meminta izin akses ke kamera, pilih <strong>Allow / Izinkan</strong>.</li>
+<li>Arahkan wajah Anda ke dalam bingkai kamera yang muncul di layar. Sistem akan melakukan pencocokan wajah secara otomatis (<em>Face Recognition</em>).</li>
+<li>Jika wajah cocok dan lokasi sesuai, tekan tombol <strong>Check-In</strong> untuk melakukan absen masuk (di awal shift).</li>
+<li>Setelah selesai jam kerja, ulangi langkah yang sama lalu tekan <strong>Check-Out</strong> untuk absen pulang.</li>
+</ol>
+</li>
+</ul>
+<h3>3.3. Mengajukan Cuti, Sakit, dan Izin</h3>
+<ul>
+<li>Masuk ke menu <strong>Cuti / Izin (Leaves)</strong>.</li>
+<li>Klik tombol <strong>Ajukan Cuti/Izin Baru</strong>.</li>
+<li>Pilih tipe pengajuan:<ul>
+<li><strong>Cuti Tahunan</strong>: Akan memotong sisa kuota cuti Anda.</li>
+<li><strong>Sakit</strong>: Membutuhkan alasan, sangat disarankan untuk melampirkan foto/scan Surat Keterangan Dokter.</li>
+<li><strong>Izin Lainnya</strong>: Untuk keperluan mendesak di hari kerja.</li>
+</ul>
+</li>
+<li>Tentukan tanggal mulai dan selesai, serta isi alasannya dengan jelas.</li>
+<li>Kirim pengajuan dan statusnya akan menjadi <em>Pending</em> hingga disetujui oleh Manajer atau Admin.</li>
+</ul>
+<h3>3.4. Mengajukan Lembur (Overtime)</h3>
+<ul>
+<li>Jika Anda diminta untuk bekerja lembur, buka menu <strong>Lembur (Overtime)</strong>.</li>
+<li>Tambahkan pengajuan baru dan isi:<ul>
+<li>Tanggal pelaksanaan lembur.</li>
+<li>Jam mulai dan jam selesai lembur.</li>
+<li>Deskripsi/catatan tentang tugas yang dikerjakan selama lembur.</li>
+</ul>
+</li>
+<li>Pengajuan Anda akan masuk ke antrean persetujuan (approval) atasan.</li>
+</ul>
+<h3>3.5. Melihat Riwayat Kehadiran</h3>
+<ul>
+<li>Masuk ke menu <strong>Riwayat (History)</strong>.</li>
+<li>Di sini Anda dapat melihat secara lengkap catatan kehadiran Anda pada bulan-bulan sebelumnya.</li>
+<li>Rincian yang ditampilkan meliputi: jam Anda absen masuk dan absen pulang, total jam kerja di hari tersebut, catatan keterlambatan, dan riwayat status cuti/izin/sakit.</li>
+</ul>
+
+    </div>
+</body>
+</html>

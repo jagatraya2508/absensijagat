@@ -23,6 +23,7 @@ import AdminPayroll from './pages/AdminPayroll';
 import AdminAssessments from './pages/AdminAssessments';
 import AdminRecruitment from './pages/AdminRecruitment';
 import AdminWorkSchedule from './pages/AdminWorkSchedule';
+import EmployeeSchedule from './pages/EmployeeSchedule';
 import AdminDepartments from './pages/AdminDepartments';
 import AdminPositions from './pages/AdminPositions';
 import AdminVehicleTypes from './pages/AdminVehicleTypes';
@@ -212,6 +213,17 @@ function AppRoutes() {
                     <ProtectedRoute>
                         <AppLayout>
                             <Overtime />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/schedule"
+                element={
+                    <ProtectedRoute>
+                        <AppLayout>
+                            <EmployeeSchedule />
                         </AppLayout>
                     </ProtectedRoute>
                 }

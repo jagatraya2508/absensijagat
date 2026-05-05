@@ -1,0 +1,79 @@
+.company-calendar-container {
+    background-color: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    margin-top: 20px;
+}
+
+/* Custom styling for the react-big-calendar to match Jagatraya */
+.rbc-calendar {
+    font-family: 'Inter', sans-serif;
+}
+
+.rbc-toolbar button {
+    color: #4b5563;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    padding: 6px 14px;
+    font-weight: 500;
+}
+
+.rbc-toolbar button:hover {
+    background-color: #f3f4f6;
+}
+
+.rbc-toolbar button.rbc-active {
+    background-color: #6D0000;
+    color: white;
+    border-color: #6D0000;
+    box-shadow: none;
+}
+
+.rbc-toolbar button.rbc-active:hover {
+    background-color: #520000;
+}
+
+.rbc-header {
+    padding: 10px 0;
+    font-weight: 600;
+    color: #374151;
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.rbc-today {
+    background-color: #fff8f8; /* Very light red matching brand */
+}
+
+.rbc-event {
+    padding: 2px 5px;
+    font-size: 12px;
+}
+
+/* Legend */
+.calendar-legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #4b5563;
+    font-weight: 500;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    display: inline-block;
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import CompanyCalendar from '../components/CompanyCalendar';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -8,6 +9,7 @@ const SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#e
 const TAB_ITEMS = [
     { key: 'schedules', icon: '🕐', label: 'Jadwal Kerja' },
     { key: 'assignments', icon: '📅', label: 'Penugasan Shift' },
+    { key: 'calendar', icon: '🗓️', label: 'Kalender' },
 ];
 
 function formatTime(t) {
@@ -138,6 +140,10 @@ export default function AdminWorkSchedule() {
     const [otFilter, setOtFilter] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), department: '', status: '' });
     const [otForm, setOtForm] = useState({ date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '', employee_ids: [] });
 
+    // Calendar
+    const [calendarEvents, setCalendarEvents] = useState([]);
+    const [calendarFilter, setCalendarFilter] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), user_id: '' });
+
     // ============================================
     // FETCHERS
     // ============================================
@@ -209,6 +215,19 @@ export default function AdminWorkSchedule() {
         } catch (e) { console.error(e); }
     }, [token, otFilter]);
 
+    const fetchCalendarEvents = useCallback(async () => {
+        try {
+            const params = new URLSearchParams();
+            if (calendarFilter.month) params.append('month', calendarFilter.month);
+            if (calendarFilter.year) params.append('year', calendarFilter.year);
+            if (calendarFilter.user_id) params.append('user_id', calendarFilter.user_id);
+            
+            const res = await fetch(`${API}/calendar?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            if (res.ok) setCalendarEvents(data);
+        } catch (e) { console.error(e); }
+    }, [token, calendarFilter]);
+
     useEffect(() => {
         fetchSchedules();
         fetchDepartments();
@@ -220,7 +239,8 @@ export default function AdminWorkSchedule() {
     useEffect(() => {
         if (activeTab === 'assignments') fetchAssignments();
         if (activeTab === 'overtime') fetchOvertimeRequests();
-    }, [activeTab, fetchAssignments, fetchOvertimeRequests]);
+        if (activeTab === 'calendar') fetchCalendarEvents();
+    }, [activeTab, fetchAssignments, fetchOvertimeRequests, fetchCalendarEvents]);
 
     function showMsg(type, text) {
         setMessage({ type, text });
@@ -783,6 +803,53 @@ export default function AdminWorkSchedule() {
                         ))}
                     </div>
                 )}
+            </div>
+        );
+    }
+
+    // --- TAB 4: CALENDAR ---
+    function renderCalendarTab() {
+        return (
+            <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-800)' }}>Kalender Perusahaan</h2>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Visualisasi jadwal kerja, shift, libur, cuti, dan lembur</p>
+                    </div>
+                </div>
+                
+                <div className="card" style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Bulan</label>
+                            <select className="form-input form-select" value={calendarFilter.month}
+                                onChange={e => setCalendarFilter(f => ({ ...f, month: e.target.value }))}>
+                                {Array.from({ length: 12 }, (_, i) => (
+                                    <option key={i + 1} value={i + 1}>{new Date(2024, i).toLocaleDateString('id-ID', { month: 'long' })}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Tahun</label>
+                            <input type="number" className="form-input" value={calendarFilter.year}
+                                onChange={e => setCalendarFilter(f => ({ ...f, year: e.target.value }))} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Karyawan</label>
+                            <select className="form-input form-select" value={calendarFilter.user_id}
+                                onChange={e => setCalendarFilter(f => ({ ...f, user_id: e.target.value }))}>
+                                <option value="">Semua Karyawan</option>
+                                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                            </select>
+                        </div>
+                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchCalendarEvents}>🔍 Filter</button>
+                    </div>
+                </div>
+
+                <CompanyCalendar 
+                    events={calendarEvents} 
+                    onSelectEvent={(event) => alert(`${event.title}\n${event.start.toLocaleString()} - ${event.end.toLocaleString()}`)}
+                />
             </div>
         );
     }
@@ -1442,6 +1509,7 @@ export default function AdminWorkSchedule() {
             {activeTab === 'schedules' && renderSchedulesTab()}
             {activeTab === 'assignments' && renderAssignmentsTab()}
             {activeTab === 'overtime' && renderOvertimeTab()}
+            {activeTab === 'calendar' && renderCalendarTab()}
 
             {/* Modals */}
             {renderScheduleModal()}

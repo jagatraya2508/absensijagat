@@ -23,6 +23,7 @@ export default function Sidebar() {
         { path: '/', icon: '🏠', label: 'Dashboard' },
         { path: '/attendance', icon: '📸', label: 'Absensi' },
         { path: '/history', icon: '📋', label: 'Riwayat' },
+        { path: '/schedule', icon: '🗓️', label: 'Kalender' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
         { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
         ...(user?.use_tracking ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
