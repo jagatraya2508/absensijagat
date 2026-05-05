@@ -68,7 +68,11 @@ export default function EmployeeSchedule() {
 
             <CompanyCalendar 
                 events={calendarEvents} 
+                date={new Date(calendarFilter.year, calendarFilter.month - 1, 1)}
                 onSelectEvent={(event) => alert(`${event.title}\n${event.start.toLocaleString()} - ${event.end.toLocaleString()}`)}
+                onNavigate={(date) => {
+                    setCalendarFilter(f => ({ ...f, month: date.getMonth() + 1, year: date.getFullYear() }));
+                }}
             />
         </div>
     );

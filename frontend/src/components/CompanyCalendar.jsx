@@ -20,7 +20,7 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-function CompanyCalendar({ events, onSelectEvent }) {
+function CompanyCalendar({ events, onSelectEvent, onNavigate, date }) {
   // Convert event string dates to Date objects if needed
   const formattedEvents = events.map(event => ({
     ...event,
@@ -33,7 +33,7 @@ function CompanyCalendar({ events, onSelectEvent }) {
     
     if (event.type === 'leave') {
       backgroundColor = '#f59e0b'; // Amber/Yellow
-    } else if (event.type === 'off_day') {
+    } else if (event.type === 'off_day' || event.type === 'national_holiday') {
       backgroundColor = '#ef4444'; // Red
     } else if (event.type === 'overtime') {
       backgroundColor = '#8b5cf6'; // Purple
@@ -56,12 +56,37 @@ function CompanyCalendar({ events, onSelectEvent }) {
       <Calendar
         localizer={localizer}
         events={formattedEvents}
+        date={date}
         startAccessor="start"
         endAccessor="end"
         style={{ height: 600 }}
         culture="id"
         eventPropGetter={eventStyleGetter}
         onSelectEvent={onSelectEvent}
+        onNavigate={onNavigate}
+        components={{
+          month: {
+            dateHeader: ({ date, label }) => {
+              const day = date.getDay();
+              const isHoliday = formattedEvents.some(e => 
+                (e.type === 'off_day' || e.type === 'national_holiday') && 
+                e.start.getDate() === date.getDate() && 
+                e.start.getMonth() === date.getMonth() && 
+                e.start.getFullYear() === date.getFullYear()
+              );
+              
+              let color = 'inherit';
+              if (day === 0 || isHoliday) color = '#ef4444'; // Red
+              else if (day === 6) color = '#3b82f6'; // Blue
+              
+              return (
+                <button type="button" className="rbc-button-link" style={{ color, fontWeight: 600 }}>
+                  {label}
+                </button>
+              );
+            }
+          }
+        }}
         popup
         messages={{
           next: "Selanjutnya",

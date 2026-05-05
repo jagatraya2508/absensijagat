@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
+const Holidays = require('date-holidays');
+const hd = new Holidays('ID');
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
@@ -176,6 +178,29 @@ router.get('/', authenticateToken, async (req, res) => {
                 type: 'overtime',
                 user_name: ot.user_name
             });
+        });
+
+        // 5. Fetch National Holidays
+        const reqYear = year ? parseInt(year) : new Date().getFullYear();
+        const reqMonth = month ? parseInt(month) : null;
+        
+        const nationalHolidays = hd.getHolidays(reqYear);
+        nationalHolidays.forEach(h => {
+            if (h.type === 'public') {
+                // "date" property in date-holidays is something like "2026-01-01 00:00:00"
+                const hDate = new Date(h.start || h.date);
+                if (!reqMonth || hDate.getMonth() + 1 === reqMonth) {
+                    events.push({
+                        id: `nat_${hDate.getTime()}`,
+                        title: `Libur Nasional: ${h.name}`,
+                        start: hDate,
+                        end: hDate,
+                        allDay: true,
+                        type: 'national_holiday',
+                        user_name: 'Perusahaan'
+                    });
+                }
+            }
         });
 
         res.json(events);
