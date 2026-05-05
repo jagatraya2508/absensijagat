@@ -79,4 +79,44 @@ router.post('/logo', authenticateToken, isAdmin, upload.single('logo'), async (r
     }
 });
 
+// Update theme colors (Admin only)
+router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { primary_color, bg_color } = req.body;
+
+        if (!primary_color || !bg_color) {
+            return res.status(400).json({ error: 'primary_color dan bg_color wajib diisi' });
+        }
+
+        // Validate hex color format
+        const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+        if (!hexRegex.test(primary_color) || !hexRegex.test(bg_color)) {
+            return res.status(400).json({ error: 'Format warna harus hex (contoh: #6D0000)' });
+        }
+
+        // Upsert theme_primary_color
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('theme_primary_color', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [primary_color]
+        );
+
+        // Upsert theme_bg_color
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('theme_bg_color', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [bg_color]
+        );
+
+        res.json({
+            message: 'Tema berhasil diperbarui',
+            theme_primary_color: primary_color,
+            theme_bg_color: bg_color
+        });
+    } catch (error) {
+        console.error('Update theme error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 module.exports = router;

@@ -137,7 +137,7 @@ export default function Sidebar() {
                                     background: isMasterActive ? 'rgba(255,255,255,0.1)' : 'transparent',
                                     color: isMasterActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
                                     fontWeight: 600, fontSize: '0.85rem',
-                                    borderLeft: isMasterActive ? '3px solid #ff6b6b' : '3px solid transparent',
+                                    borderLeft: isMasterActive ? '3px solid var(--theme-primary-light)' : '3px solid transparent',
                                 }}
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -160,7 +160,7 @@ export default function Sidebar() {
                                 transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                                 opacity: openMenus.master ? 1 : 0,
                                 paddingLeft: '0.75rem',
-                                borderLeft: '2px solid rgba(255,107,107,0.2)',
+                                borderLeft: '2px solid rgba(var(--theme-primary-rgb, 109, 0, 0), 0.3)',
                                 marginLeft: '1.5rem',
                                 marginTop: openMenus.master ? '0.25rem' : '0',
                                 marginBottom: openMenus.master ? '0.25rem' : '0',

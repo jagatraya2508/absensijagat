@@ -383,7 +383,6 @@ export const announcementsAPI = {
     delete: (id) => request(`/announcements/${id}`, { method: 'DELETE' }),
 };
 
-// Settings API
 export const settingsAPI = {
     getAll: () => request('/settings'),
     updateLogo: (formData) => request('/settings/logo', {
@@ -391,6 +390,10 @@ export const settingsAPI = {
         body: formData, // FormData for file upload
     }),
     getBpjs: () => request('/settings/bpjs'),
+    updateTheme: (colors) => request('/settings/theme', {
+        method: 'PUT',
+        body: JSON.stringify(colors),
+    }),
 };
 
 // Schedule API

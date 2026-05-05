@@ -75,7 +75,7 @@ export default function Dashboard() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title" style={{ color: '#6D0000' }}>Selamat Datang, {user?.name?.split(' ')[0]}! 👋</h1>
+                <h1 className="page-title" style={{ color: 'var(--theme-primary)' }}>Selamat Datang, {user?.name?.split(' ')[0]}! 👋</h1>
                 <p className="page-subtitle" style={{ color: 'var(--gray-600)' }}>{today}</p>
             </div>
 
@@ -124,7 +124,7 @@ export default function Dashboard() {
                         >
                             <span style={{ fontSize: '1.8rem' }}>🏖️</span>
                             <div>
-                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#6D0000' }}>Hari Ini Libur</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--theme-primary)' }}>Hari Ini Libur</div>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--gray-700)' }}>Absensi tidak diperlukan hari ini</div>
                             </div>
                         </div>
@@ -297,7 +297,7 @@ export default function Dashboard() {
             {announcements.length > 0 && (
                 <div className="mb-4">
                     <div style={{ marginBottom: '0.75rem' }}>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#6D0000', margin: 0 }}>📢 Pengumuman</h2>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)', margin: 0 }}>📢 Pengumuman</h2>
                     </div>
                     {announcements.map(item => (
                         <div key={item.id} className="card-glass mb-3" style={{
@@ -325,7 +325,7 @@ export default function Dashboard() {
                                     📢
                                 </div>
                                 <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#6D0000' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)' }}>
                                         {item.title}
                                     </h3>
                                     <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
