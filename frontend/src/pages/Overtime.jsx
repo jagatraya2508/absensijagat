@@ -187,6 +187,7 @@ export default function Overtime() {
     });
 
     return (
+        <>
         <div className={`fade-in ${printData ? 'hide-when-printing-spl' : ''}`}>
             <div className="page-header">
                 <h1 className="page-title">⏰ Pengajuan Lembur (SPL)</h1>
@@ -377,6 +378,7 @@ export default function Overtime() {
                     </div>
                 </div>
             )}
+        </div>
 
             {/* PRINT LAYOUT */}
             {printData && (
@@ -449,6 +451,6 @@ export default function Overtime() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

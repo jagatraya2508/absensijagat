@@ -74,6 +74,9 @@ export default function DriverTracking() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [searchTimeout, setSearchTimeout] = useState(null);
     const dropdownRef = useRef(null);
+    const [customerMode, setCustomerMode] = useState('existing'); // 'existing' | 'new'
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [customerSearch, setCustomerSearch] = useState('');
 
     useEffect(() => {
         fetchToday();
@@ -188,6 +191,8 @@ export default function DriverTracking() {
     function selectCustomer(customer) {
         setCustomerName(customer.name);
         setAddress(customer.address || '');
+        setSelectedCustomer(customer);
+        setCustomerSearch(customer.name);
         setShowDropdown(false);
     }
 
@@ -537,42 +542,135 @@ export default function DriverTracking() {
                     {/* Check-in Form */}
                     <div className="card mb-4">
                         <div className="card-header">
-                            <h2 className="card-title">📥 Check-in Customer Baru</h2>
+                            <h2 className="card-title">📥 Check-in Customer</h2>
                         </div>
                         <div style={{ padding: '1.25rem' }}>
-                            <div className="form-group" ref={dropdownRef} style={{ position: 'relative' }}>
-                                <label className="form-label">Nama Customer / Tujuan *</label>
-                                <input type="text" className="form-input" placeholder="Ketik untuk cari customer..."
-                                    value={customerName}
-                                    onChange={e => handleCustomerSearch(e.target.value)}
-                                    onFocus={() => { if (customerName.length >= 1) setShowDropdown(true); }}
-                                />
-                                {showDropdown && customers.length > 0 && (
-                                    <div style={{
-                                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-                                        background: 'var(--gray-800)', border: '1px solid var(--gray-600)',
-                                        borderRadius: '0 0 var(--radius-md) var(--radius-md)',
-                                        maxHeight: 200, overflowY: 'auto',
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
-                                    }}>
-                                        {customers.filter(c => c.name.toLowerCase().includes(customerName.toLowerCase())).map(c => (
-                                            <div key={c.id}
-                                                onClick={() => selectCustomer(c)}
-                                                style={{
-                                                    padding: '0.65rem 1rem', cursor: 'pointer',
-                                                    borderBottom: '1px solid var(--gray-700)',
-                                                    transition: 'background 0.15s'
-                                                }}
-                                                onMouseEnter={e => e.target.style.background = 'var(--gray-700)'}
-                                                onMouseLeave={e => e.target.style.background = 'transparent'}
-                                            >
-                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>🏪 {c.name}</div>
-                                                {c.address && <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: '0.15rem' }}>📍 {c.address}</div>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                            {/* Mode Toggle */}
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                                <button
+                                    className={`btn ${customerMode === 'existing' ? 'btn-primary' : 'btn-outline'}`}
+                                    style={{ flex: 1, fontSize: '0.85rem' }}
+                                    onClick={() => {
+                                        setCustomerMode('existing');
+                                        setCustomerName('');
+                                        setAddress('');
+                                        setSelectedCustomer(null);
+                                        setCustomerSearch('');
+                                    }}
+                                >
+                                    📋 Pilih Customer Lama
+                                </button>
+                                <button
+                                    className={`btn ${customerMode === 'new' ? 'btn-primary' : 'btn-outline'}`}
+                                    style={{ flex: 1, fontSize: '0.85rem' }}
+                                    onClick={() => {
+                                        setCustomerMode('new');
+                                        setCustomerName('');
+                                        setAddress('');
+                                        setSelectedCustomer(null);
+                                        setCustomerSearch('');
+                                    }}
+                                >
+                                    ✏️ Customer Baru
+                                </button>
                             </div>
+
+                            {/* MODE: Pilih Customer Lama */}
+                            {customerMode === 'existing' && (
+                                <div className="form-group" ref={dropdownRef} style={{ position: 'relative' }}>
+                                    <label className="form-label">Cari & Pilih Customer *</label>
+                                    <input type="text" className="form-input"
+                                        placeholder="🔍 Ketik nama atau kode customer..."
+                                        value={customerSearch}
+                                        onChange={e => {
+                                            setCustomerSearch(e.target.value);
+                                            setSelectedCustomer(null);
+                                            setCustomerName('');
+                                            handleCustomerSearch(e.target.value);
+                                        }}
+                                        onFocus={() => { if (customerSearch.length >= 1) setShowDropdown(true); }}
+                                    />
+                                    {showDropdown && customers.length > 0 && (
+                                        <div style={{
+                                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                                            background: 'white', border: '1px solid rgba(0,0,0,0.1)',
+                                            borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+                                            maxHeight: 220, overflowY: 'auto',
+                                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
+                                        }}>
+                                            {customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || (c.customer_code && c.customer_code.toLowerCase().includes(customerSearch.toLowerCase()))).map(c => (
+                                                <div key={c.id}
+                                                    onClick={() => selectCustomer(c)}
+                                                    style={{
+                                                        padding: '0.7rem 1rem', cursor: 'pointer',
+                                                        borderBottom: '1px solid rgba(0,0,0,0.05)',
+                                                        transition: 'background 0.15s',
+                                                        display: 'flex', alignItems: 'center', gap: '0.75rem'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--theme-primary-rgb), 0.05)'}
+                                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                                >
+                                                    <div style={{
+                                                        width: 36, height: 36, borderRadius: '50%',
+                                                        background: 'rgba(var(--theme-primary-rgb), 0.1)',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '1rem', flexShrink: 0
+                                                    }}>🏪</div>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>
+                                                            {c.name}
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.1rem' }}>
+                                                            {c.customer_code && <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--primary-500)', fontWeight: 600 }}>{c.customer_code}</span>}
+                                                            {c.address && <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {c.address}</span>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Selected customer badge */}
+                                    {selectedCustomer && (
+                                        <div style={{
+                                            marginTop: '0.5rem', padding: '0.6rem 0.75rem',
+                                            background: 'rgba(16, 185, 129, 0.08)',
+                                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                                            borderRadius: 'var(--radius-md)',
+                                            display: 'flex', alignItems: 'center', gap: '0.5rem'
+                                        }}>
+                                            <span>✅</span>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedCustomer.name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
+                                                    {selectedCustomer.customer_code && <span style={{ fontFamily: 'monospace', marginRight: 8 }}>{selectedCustomer.customer_code}</span>}
+                                                    {selectedCustomer.address && <span>📍 {selectedCustomer.address}</span>}
+                                                </div>
+                                            </div>
+                                            <button className="btn btn-outline" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                                                onClick={() => { setSelectedCustomer(null); setCustomerName(''); setCustomerSearch(''); setAddress(''); }}>
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* MODE: Customer Baru */}
+                            {customerMode === 'new' && (
+                                <div className="form-group">
+                                    <label className="form-label">Nama Customer Baru *</label>
+                                    <input type="text" className="form-input"
+                                        placeholder="Ketik nama customer / toko / tujuan baru..."
+                                        value={customerName}
+                                        onChange={e => setCustomerName(e.target.value)}
+                                    />
+                                    <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>
+                                        💡 Customer baru akan otomatis tersimpan di Master Customer dengan kode otomatis
+                                    </small>
+                                </div>
+                            )}
+
                             <div className="form-group">
                                 <label className="form-label">Alamat (Opsional)</label>
                                 <input type="text" className="form-input" placeholder="Alamat lokasi customer..."

@@ -34,6 +34,7 @@ import DriverTracking from './pages/DriverTracking';
 import AdminDriverTracking from './pages/AdminDriverTracking';
 import LicenseSettings from './pages/LicenseSettings';
 import AdminAssets from './pages/AdminAssets';
+import AdminCustomers from './pages/AdminCustomers';
 
 function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false }) {
     const { user, loading } = useAuth();
@@ -424,6 +425,17 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminAssets />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/customers"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminCustomers />
                         </AppLayout>
                     </ProtectedRoute>
                 }

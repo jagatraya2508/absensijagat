@@ -601,6 +601,11 @@ export const driverTrackingAPI = {
 export const customersAPI = {
     search: (q = '') => request(`/customers/search?q=${encodeURIComponent(q)}`),
     getAll: () => request('/customers'),
+    getCodeSettings: () => request('/customers/code-settings'),
+    updateCodeSettings: (data) => request('/customers/code-settings', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
     create: (data) => request('/customers', {
         method: 'POST',
         body: JSON.stringify(data),

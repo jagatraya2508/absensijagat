@@ -39,6 +39,7 @@ export default function Sidebar() {
         { path: '/admin/employees', icon: '👤', label: 'Data Karyawan' },
         { path: '/admin/face-registration', icon: '🔐', label: 'Registrasi Wajah' },
         { path: '/admin/work-schedule', icon: '🕐', label: 'Jadwal Kerja' },
+        { path: '/admin/customers', icon: '🏪', label: 'Master Customer' },
     ];
 
     // Other admin items (flat)

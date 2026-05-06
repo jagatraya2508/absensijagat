@@ -123,11 +123,36 @@ router.post('/checkin', authenticateToken, isTrackingUser, upload.single('photo'
 
         const photoPath = req.file ? `/uploads/tracking/${req.file.filename}` : null;
 
-        // Auto-save customer to master table
-        await pool.query(
-            `INSERT INTO customers (name, address) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET address = COALESCE(EXCLUDED.address, customers.address), updated_at = NOW()`,
-            [customer_name, address || null]
-        );
+        // Auto-save customer to master table (with auto-code for new ones)
+        try {
+            const existingCust = await pool.query(`SELECT id FROM customers WHERE LOWER(name) = LOWER($1)`, [customer_name]);
+            if (existingCust.rows.length === 0) {
+                // Generate auto-code
+                let code = null;
+                try {
+                    const prefixRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'customer_code_prefix'`);
+                    const digitsRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'customer_code_digits'`);
+                    const nextRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'customer_code_next'`);
+                    const prefix = prefixRes.rows[0]?.value || 'CUST';
+                    const digits = parseInt(digitsRes.rows[0]?.value || '4');
+                    const next = parseInt(nextRes.rows[0]?.value || '1');
+                    code = prefix + String(next).padStart(digits, '0');
+                    await pool.query(`UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'customer_code_next'`, [String(next + 1)]);
+                } catch (codeErr) {
+                    console.warn('Could not generate customer code:', codeErr.message);
+                }
+                await pool.query(
+                    `INSERT INTO customers (customer_code, name, address) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET address = COALESCE(EXCLUDED.address, customers.address), updated_at = NOW()`,
+                    [code, customer_name, address || null]
+                );
+            } else {
+                if (address) {
+                    await pool.query(`UPDATE customers SET address = COALESCE($1, address), updated_at = NOW() WHERE LOWER(name) = LOWER($2)`, [address, customer_name]);
+                }
+            }
+        } catch (custErr) {
+            console.warn('Auto-save customer warning (non-fatal):', custErr.message);
+        }
 
         const result = await pool.query(
             `INSERT INTO driver_tracking 
