@@ -551,15 +551,15 @@ export default function AdminEmployees() {
                         </div>
 
                         {/* Tab Navigation */}
-                        <div style={{ display: 'flex', gap: '0.25rem', padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ display: 'flex', gap: '0.25rem', padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#000000' }}>
                             {TABS.map(tab => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     style={{
                                         padding: '0.75rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
-                                        color: activeTab === tab.id ? 'var(--primary-400)' : 'var(--gray-400)',
-                                        borderBottom: activeTab === tab.id ? '2px solid var(--primary-400)' : '2px solid transparent',
+                                        color: activeTab === tab.id ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
+                                        borderBottom: activeTab === tab.id ? '2px solid #ffffff' : '2px solid transparent',
                                         fontWeight: activeTab === tab.id ? 600 : 400, fontSize: '0.85rem',
                                         transition: 'all 0.2s'
                                     }}
