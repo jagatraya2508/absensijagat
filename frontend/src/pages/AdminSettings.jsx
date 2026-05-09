@@ -24,6 +24,17 @@ export default function AdminSettings() {
     const [themeMessage, setThemeMessage] = useState({ type: '', text: '' });
     const [activePreset, setActivePreset] = useState(null);
 
+    // Leave Settings state
+    const [leaveSettings, setLeaveSettings] = useState({
+        annual_leave_quota: 12,
+        late_deducts_leave: false,
+        sick_deducts_leave: false,
+        permission_deducts_leave: false
+    });
+    const [bigLeaveRules, setBigLeaveRules] = useState([]);
+    const [leaveLoading, setLeaveLoading] = useState(false);
+    const [leaveMessage, setLeaveMessage] = useState({ type: '', text: '' });
+
     // Sync when themeColors change (e.g. after save)
     useEffect(() => {
         setSelectedPrimary(themeColors.primary);
@@ -34,6 +45,30 @@ export default function AdminSettings() {
         );
         setActivePreset(match >= 0 ? match : null);
     }, [themeColors]);
+
+    useEffect(() => {
+        fetchLeaveSettings();
+    }, []);
+
+    const fetchLeaveSettings = async () => {
+        try {
+            const { settingsAPI } = await import('../utils/api');
+            const data = await settingsAPI.getLeave();
+            if (data.settings) {
+                setLeaveSettings({
+                    annual_leave_quota: data.settings.annual_leave_quota,
+                    late_deducts_leave: data.settings.late_deducts_leave,
+                    sick_deducts_leave: data.settings.sick_deducts_leave,
+                    permission_deducts_leave: data.settings.permission_deducts_leave
+                });
+            }
+            if (data.big_leave_rules) {
+                setBigLeaveRules(data.big_leave_rules);
+            }
+        } catch (error) {
+            console.error('Failed to load leave settings:', error);
+        }
+    };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -115,6 +150,41 @@ export default function AdminSettings() {
         setSelectedBg(DEFAULT_THEME.bg);
         setActivePreset(0);
         previewTheme({ primary: DEFAULT_THEME.primary, bg: DEFAULT_THEME.bg });
+    };
+
+    // Leave Settings Handlers
+    const handleLeaveSave = async (e) => {
+        e.preventDefault();
+        setLeaveLoading(true);
+        setLeaveMessage({ type: '', text: '' });
+        try {
+            const { settingsAPI } = await import('../utils/api');
+            await settingsAPI.updateLeave({
+                ...leaveSettings,
+                big_leave_rules: bigLeaveRules
+            });
+            setLeaveMessage({ type: 'success', text: 'Pengaturan cuti berhasil disimpan!' });
+        } catch (error) {
+            setLeaveMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan cuti' });
+        } finally {
+            setLeaveLoading(false);
+        }
+    };
+
+    const addBigLeaveRule = () => {
+        setBigLeaveRules([...bigLeaveRules, { min_years: 0, leave_days: 0, is_active: true }]);
+    };
+
+    const removeBigLeaveRule = (index) => {
+        const newRules = [...bigLeaveRules];
+        newRules.splice(index, 1);
+        setBigLeaveRules(newRules);
+    };
+
+    const updateBigLeaveRule = (index, field, value) => {
+        const newRules = [...bigLeaveRules];
+        newRules[index][field] = value;
+        setBigLeaveRules(newRules);
     };
 
     return (
@@ -501,6 +571,190 @@ export default function AdminSettings() {
                                     </>
                                 ) : (
                                     'Simpan Perubahan Logo'
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {/* ============ LEAVE SETTINGS SECTION ============ */}
+                <div className="card">
+                    <div className="card-header">
+                        <h2 className="card-title">🏖️ Pengaturan Cuti & Izin</h2>
+                    </div>
+
+                    <div style={{ padding: '1.5rem 0' }}>
+                        {leaveMessage.text && (
+                            <div className={`alert alert-${leaveMessage.type}`} style={{ marginBottom: '1.5rem' }}>
+                                <span className="alert-icon">{leaveMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                {leaveMessage.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleLeaveSave}>
+                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                <label className="form-label">Kuota Cuti Tahunan Standar (Hari)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={leaveSettings.annual_leave_quota}
+                                    onChange={(e) => setLeaveSettings({ ...leaveSettings, annual_leave_quota: parseInt(e.target.value) || 0 })}
+                                    min="0"
+                                    required
+                                />
+                                <small style={{ color: 'var(--gray-500)', marginTop: '0.25rem', display: 'block' }}>
+                                    Jumlah hari cuti yang didapatkan setiap tahun.
+                                </small>
+                            </div>
+
+                            <div style={{
+                                padding: '1.25rem',
+                                background: 'var(--gray-50)',
+                                borderRadius: 'var(--radius-lg)',
+                                border: '1px solid var(--gray-200)',
+                                marginBottom: '2rem'
+                            }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--gray-800)' }}>Aturan Potong Cuti</h3>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+                                    Aktifkan toggle di bawah jika pengajuan izin berikut akan mengurangi sisa kuota cuti karyawan.
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={leaveSettings.sick_deducts_leave}
+                                            onChange={(e) => setLeaveSettings({ ...leaveSettings, sick_deducts_leave: e.target.checked })}
+                                            style={{ width: '18px', height: '18px' }}
+                                        />
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>Izin Sakit Memotong Cuti</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pengajuan izin sakit akan mengurangi kuota cuti tahunan</div>
+                                        </div>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={leaveSettings.permission_deducts_leave}
+                                            onChange={(e) => setLeaveSettings({ ...leaveSettings, permission_deducts_leave: e.target.checked })}
+                                            style={{ width: '18px', height: '18px' }}
+                                        />
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>Izin Tidak Masuk Memotong Cuti</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pengajuan izin seharian (keperluan lain) akan mengurangi cuti</div>
+                                        </div>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={leaveSettings.late_deducts_leave}
+                                            onChange={(e) => setLeaveSettings({ ...leaveSettings, late_deducts_leave: e.target.checked })}
+                                            style={{ width: '18px', height: '18px' }}
+                                        />
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>Izin Terlambat Memotong Cuti</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pengajuan izin datang terlambat akan mengurangi cuti</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <div>
+                                        <h3 style={{ fontSize: '1rem', color: 'var(--gray-800)' }}>Bonus Cuti Besar</h3>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>Tambahan kuota cuti di tahun tertentu berdasarkan masa kerja.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        onClick={addBigLeaveRule}
+                                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                                    >
+                                        + Tambah Aturan
+                                    </button>
+                                </div>
+
+                                {bigLeaveRules.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '1.5rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', border: '1px dashed var(--gray-300)' }}>
+                                        <p style={{ color: 'var(--gray-500)', fontSize: '0.9rem', margin: 0 }}>Belum ada aturan cuti besar.</p>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                        {bigLeaveRules.map((rule, index) => (
+                                            <div key={index} style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '1fr 1fr auto auto',
+                                                gap: '1rem',
+                                                alignItems: 'end',
+                                                padding: '1rem',
+                                                background: 'white',
+                                                border: '1px solid var(--gray-200)',
+                                                borderRadius: 'var(--radius-md)',
+                                                boxShadow: 'var(--shadow-sm)'
+                                            }}>
+                                                <div>
+                                                    <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.25rem' }}>Masa Kerja (Tahun)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        value={rule.min_years}
+                                                        onChange={(e) => updateBigLeaveRule(index, 'min_years', parseInt(e.target.value) || 0)}
+                                                        min="1"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', display: 'block', marginBottom: '0.25rem' }}>Bonus Kuota (Hari)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        value={rule.leave_days}
+                                                        onChange={(e) => updateBigLeaveRule(index, 'leave_days', parseInt(e.target.value) || 0)}
+                                                        min="1"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', height: '42px' }}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={rule.is_active}
+                                                            onChange={(e) => updateBigLeaveRule(index, 'is_active', e.target.checked)}
+                                                        />
+                                                        <span style={{ fontSize: '0.85rem' }}>Aktif</span>
+                                                    </label>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-danger"
+                                                    onClick={() => removeBigLeaveRule(index)}
+                                                    style={{ height: '42px', padding: '0 1rem' }}
+                                                    title="Hapus"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                style={{ width: '100%' }}
+                                disabled={leaveLoading}
+                            >
+                                {leaveLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    'Simpan Pengaturan Cuti'
                                 )}
                             </button>
                         </form>

@@ -394,6 +394,11 @@ export const settingsAPI = {
         method: 'PUT',
         body: JSON.stringify(colors),
     }),
+    getLeave: () => request('/settings/leave'),
+    updateLeave: (data) => request('/settings/leave', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
 };
 
 // Schedule API

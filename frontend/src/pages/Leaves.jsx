@@ -20,6 +20,7 @@ export default function Leaves() {
     const leaveTypes = {
         late: { label: 'Izin Terlambat', icon: '⏰', color: 'warning' },
         sick: { label: 'Izin Sakit', icon: '🏥', color: 'danger' },
+        permission: { label: 'Izin Tidak Masuk', icon: '📝', color: 'secondary' },
         leave: { label: 'Cuti', icon: '🏖️', color: 'primary' },
         change_off: { label: 'Tukar Libur', icon: '🔄', color: 'info' }
     };
@@ -153,6 +154,17 @@ export default function Leaves() {
                     <div className="status-card-content">
                         <h3>Izin Sakit</h3>
                         <p style={{ fontSize: '0.85rem' }}>Tidak masuk karena sakit</p>
+                    </div>
+                </button>
+                <button
+                    className="card status-card"
+                    onClick={() => { setType('permission'); setShowForm(true); }}
+                    style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
+                >
+                    <div className="status-card-icon secondary">📝</div>
+                    <div className="status-card-content">
+                        <h3>Izin Tidak Masuk</h3>
+                        <p style={{ fontSize: '0.85rem' }}>Izin absen seharian penuh</p>
                     </div>
                 </button>
                 <button

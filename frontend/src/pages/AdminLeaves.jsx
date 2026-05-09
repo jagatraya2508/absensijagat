@@ -12,7 +12,9 @@ export default function AdminLeaves() {
     const leaveTypes = {
         late: { label: 'Izin Terlambat', icon: '⏰', color: 'warning' },
         sick: { label: 'Izin Sakit', icon: '🏥', color: 'danger' },
-        leave: { label: 'Cuti', icon: '🏖️', color: 'primary' }
+        permission: { label: 'Izin Tidak Masuk', icon: '📝', color: 'secondary' },
+        leave: { label: 'Cuti', icon: '🏖️', color: 'primary' },
+        change_off: { label: 'Tukar Libur', icon: '🔄', color: 'info' }
     };
 
     const statusLabels = {

@@ -425,7 +425,7 @@ export default function AdminEmployees() {
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
                     <h2 className="card-title">Daftar Karyawan</h2>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <input
                             type="text"
                             className="form-input"
@@ -434,48 +434,50 @@ export default function AdminEmployees() {
                             onChange={e => setSearch(e.target.value)}
                             style={{ maxWidth: 240 }}
                         />
-                        <button
-                            className="btn"
-                            onClick={handlePrint}
-                            title="Print Data Karyawan"
-                            style={{
-                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
-                                background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff',
-                                border: 'none', borderRadius: 'var(--radius-md)',
-                                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                transition: 'all 0.2s', cursor: 'pointer'
-                            }}
-                        >
-                            🖨️ Print
-                        </button>
-                        <button
-                            className="btn"
-                            onClick={handleExportPDF}
-                            title="Ekspor ke PDF"
-                            style={{
-                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
-                                background: 'linear-gradient(135deg, #ef4444, #f87171)', color: '#fff',
-                                border: 'none', borderRadius: 'var(--radius-md)',
-                                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                transition: 'all 0.2s', cursor: 'pointer'
-                            }}
-                        >
-                            📄 PDF
-                        </button>
-                        <button
-                            className="btn"
-                            onClick={handleExportExcel}
-                            title="Ekspor ke Excel"
-                            style={{
-                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
-                                background: 'linear-gradient(135deg, #22c55e, #4ade80)', color: '#fff',
-                                border: 'none', borderRadius: 'var(--radius-md)',
-                                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                transition: 'all 0.2s', cursor: 'pointer'
-                            }}
-                        >
-                            📊 Excel
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                className="btn"
+                                onClick={handlePrint}
+                                title="Print Data Karyawan"
+                                style={{
+                                    padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff',
+                                    border: 'none', borderRadius: 'var(--radius-md)',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    transition: 'all 0.2s', cursor: 'pointer'
+                                }}
+                            >
+                                🖨️ Print
+                            </button>
+                            <button
+                                className="btn"
+                                onClick={handleExportPDF}
+                                title="Ekspor ke PDF"
+                                style={{
+                                    padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #ef4444, #f87171)', color: '#fff',
+                                    border: 'none', borderRadius: 'var(--radius-md)',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    transition: 'all 0.2s', cursor: 'pointer'
+                                }}
+                            >
+                                📄 PDF
+                            </button>
+                            <button
+                                className="btn"
+                                onClick={handleExportExcel}
+                                title="Ekspor ke Excel"
+                                style={{
+                                    padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #22c55e, #4ade80)', color: '#fff',
+                                    border: 'none', borderRadius: 'var(--radius-md)',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    transition: 'all 0.2s', cursor: 'pointer'
+                                }}
+                            >
+                                📊 Excel
+                            </button>
+                        </div>
                     </div>
                 </div>
 

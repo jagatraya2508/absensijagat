@@ -39,11 +39,9 @@ const leaveTypes = {
     late: 'Izin Terlambat',
     sick: 'Izin Sakit',
     leave: 'Cuti',
-    change_off: 'Tukar Libur'
+    change_off: 'Tukar Libur',
+    permission: 'Izin Tidak Masuk'
 };
-
-// Annual leave quota (days per year)
-const ANNUAL_LEAVE_QUOTA = 12;
 
 // Helper function to calculate days between two dates
 function calculateDays(startDate, endDate) {
@@ -54,12 +52,17 @@ function calculateDays(startDate, endDate) {
 }
 
 // Helper function to get used leave days for a user in current year
-async function getUsedLeaveDays(userId, year) {
+async function getUsedLeaveDays(userId, year, settings) {
+    let types = ["'leave'"];
+    if (settings && settings.late_deducts_leave) types.push("'late'");
+    if (settings && settings.sick_deducts_leave) types.push("'sick'");
+    if (settings && settings.permission_deducts_leave) types.push("'permission'");
+
     const result = await pool.query(
         `SELECT start_date, end_date 
          FROM leave_requests 
          WHERE user_id = $1 
-           AND type = 'leave' 
+           AND type IN (${types.join(',')}) 
            AND status IN ('approved', 'pending')
            AND EXTRACT(YEAR FROM start_date) = $2`,
         [userId, year]
@@ -72,6 +75,30 @@ async function getUsedLeaveDays(userId, year) {
     return totalDays;
 }
 
+// Helper function to get quota
+async function getUserLeaveQuota(userId, year) {
+    const setRes = await pool.query('SELECT * FROM leave_settings LIMIT 1');
+    const settings = setRes.rows[0] || { annual_leave_quota: 12 };
+    
+    let quota = settings.annual_leave_quota;
+    
+    // Check big leave bonus
+    const empRes = await pool.query('SELECT join_date FROM employee_details WHERE user_id = $1', [userId]);
+    if (empRes.rows.length > 0 && empRes.rows[0].join_date) {
+        const joinYear = new Date(empRes.rows[0].join_date).getFullYear();
+        const yearsWorked = year - joinYear;
+        
+        if (yearsWorked > 0) {
+            const rulesRes = await pool.query('SELECT leave_days FROM big_leave_rules WHERE min_years = $1 AND is_active = true', [yearsWorked]);
+            if (rulesRes.rows.length > 0) {
+                quota += rulesRes.rows[0].leave_days;
+            }
+        }
+    }
+    
+    return { quota, settings };
+}
+
 // Create new leave request (Employee)
 router.post('/', authenticateToken, upload.single('attachment'), async (req, res) => {
     try {
@@ -79,7 +106,7 @@ router.post('/', authenticateToken, upload.single('attachment'), async (req, res
         const userId = req.user.id;
 
         // Validate type
-        if (!['late', 'sick', 'leave', 'change_off'].includes(type)) {
+        if (!['late', 'sick', 'leave', 'change_off', 'permission'].includes(type)) {
             return res.status(400).json({ error: 'Jenis izin tidak valid' });
         }
 
@@ -102,16 +129,24 @@ router.post('/', authenticateToken, upload.single('attachment'), async (req, res
             return res.status(400).json({ error: 'Alasan harus diisi minimal 10 karakter' });
         }
 
-        // Check annual leave quota for 'leave' type
-        if (type === 'leave') {
+        // Check quota based on settings
+        const year = new Date(start_date).getFullYear();
+        const { quota, settings } = await getUserLeaveQuota(userId, year);
+        
+        let deductsLeave = false;
+        if (type === 'leave') deductsLeave = true;
+        if (type === 'late' && settings.late_deducts_leave) deductsLeave = true;
+        if (type === 'sick' && settings.sick_deducts_leave) deductsLeave = true;
+        if (type === 'permission' && settings.permission_deducts_leave) deductsLeave = true;
+
+        if (deductsLeave) {
             const requestedDays = calculateDays(start_date, end_date);
-            const year = new Date(start_date).getFullYear();
-            const usedDays = await getUsedLeaveDays(userId, year);
-            const remainingDays = ANNUAL_LEAVE_QUOTA - usedDays;
+            const usedDays = await getUsedLeaveDays(userId, year, settings);
+            const remainingDays = quota - usedDays;
 
             if (requestedDays > remainingDays) {
                 return res.status(400).json({
-                    error: `Sisa cuti Anda tahun ${year} adalah ${remainingDays} hari. Anda mengajukan ${requestedDays} hari.`,
+                    error: `Sisa cuti Anda tahun ${year} adalah ${remainingDays} hari. Anda mengajukan ${requestedDays} hari. (Dipotong oleh pengajuan ini)`,
                     remaining_days: remainingDays,
                     requested_days: requestedDays
                 });
@@ -171,13 +206,15 @@ router.get('/my-quota', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const year = new Date().getFullYear();
-        const usedDays = await getUsedLeaveDays(userId, year);
+        const { quota, settings } = await getUserLeaveQuota(userId, year);
+        const usedDays = await getUsedLeaveDays(userId, year, settings);
 
         res.json({
             year,
-            quota: ANNUAL_LEAVE_QUOTA,
+            quota: quota,
             used: usedDays,
-            remaining: ANNUAL_LEAVE_QUOTA - usedDays
+            remaining: quota - usedDays,
+            settings
         });
     } catch (error) {
         console.error('Get quota error:', error);

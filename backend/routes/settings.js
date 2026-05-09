@@ -119,4 +119,79 @@ router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+// Get leave settings
+router.get('/leave', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const settingsResult = await pool.query('SELECT * FROM leave_settings LIMIT 1');
+        const rulesResult = await pool.query('SELECT * FROM big_leave_rules ORDER BY min_years ASC');
+        
+        res.json({
+            settings: settingsResult.rows[0] || null,
+            big_leave_rules: rulesResult.rows
+        });
+    } catch (error) {
+        console.error('Get leave settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Update leave settings
+router.put('/leave', authenticateToken, isAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { annual_leave_quota, late_deducts_leave, sick_deducts_leave, permission_deducts_leave, big_leave_rules } = req.body;
+        
+        await client.query('BEGIN');
+        
+        // Update general settings
+        const settingsResult = await client.query(
+            `UPDATE leave_settings 
+             SET annual_leave_quota = $1, 
+                 late_deducts_leave = $2, 
+                 sick_deducts_leave = $3, 
+                 permission_deducts_leave = $4,
+                 updated_at = CURRENT_TIMESTAMP
+             RETURNING *`,
+            [
+                annual_leave_quota || 12, 
+                !!late_deducts_leave, 
+                !!sick_deducts_leave, 
+                !!permission_deducts_leave
+            ]
+        );
+
+        // Update big leave rules
+        // For simplicity, we can delete all existing and re-insert
+        await client.query('DELETE FROM big_leave_rules');
+        
+        const insertedRules = [];
+        if (Array.isArray(big_leave_rules) && big_leave_rules.length > 0) {
+            for (const rule of big_leave_rules) {
+                if (rule.min_years && rule.leave_days) {
+                    const r = await client.query(
+                        `INSERT INTO big_leave_rules (min_years, leave_days, is_active) 
+                         VALUES ($1, $2, $3) RETURNING *`,
+                        [rule.min_years, rule.leave_days, rule.is_active !== false]
+                    );
+                    insertedRules.push(r.rows[0]);
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+        
+        res.json({
+            message: 'Pengaturan cuti berhasil diperbarui',
+            settings: settingsResult.rows[0],
+            big_leave_rules: insertedRules
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Update leave settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;

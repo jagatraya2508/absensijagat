@@ -24,6 +24,8 @@ npm run install:all
 echo "[2b] Running Database Migrations..."
 echo "Running migration: migrate_ritase_split.js"
 node migrate_ritase_split.js
+echo "Running migration: migrate_leave_settings.js"
+node migrate_leave_settings.js
 cd backend
 echo "Running migration: migrate_off_day.js"
 node migrate_off_day.js
