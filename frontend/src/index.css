@@ -19,6 +19,8 @@
   --theme-primary-lighter: #ff9e9e;
   --theme-bg: #fff8f8;
   --theme-bg-rgb: 255, 248, 248;
+  --theme-card-bg: #ffffff;
+  --theme-card-bg-rgb: 255, 255, 255;
 
   /* Colors */
   --primary-50: #eff6ff;
@@ -414,7 +416,7 @@ body {
 ======================================== */
 
 .card {
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(var(--theme-card-bg-rgb), 0.82);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.9);
@@ -673,13 +675,13 @@ body {
 ======================================== */
 
 input:not(.login-card *), textarea:not(.login-card *), select:not(.login-card *) {
-  background-color: #f8fafc !important;
+  background-color: var(--theme-card-bg) !important;
   color: var(--gray-900) !important;
 }
 
 /* Make the form container itself solid white (except login) */
 form:not(.login-card form), .card:has(form), form:not(.login-card form) .card, .modal-content:has(form) {
-  background-color: #ffffff !important;
+  background-color: var(--theme-card-bg) !important;
 }
 
 .form-group {
@@ -704,7 +706,7 @@ form:not(.login-card form), .card:has(form), form:not(.login-card form) .card, .
 .form-input {
   width: 100%;
   padding: 0.8rem 1rem;
-  background-color: #f8fafc !important;
+  background-color: var(--theme-card-bg) !important;
   border: 1.5px solid var(--gray-200);
   border-radius: var(--radius-md);
   color: var(--gray-900) !important;
@@ -745,12 +747,12 @@ form:not(.login-card form), .card:has(form), form:not(.login-card form) .card, .
   background-position: right 1rem center;
   background-size: 1rem;
   padding-right: 2.5rem;
-  background-color: #f8fafc !important;
+  background-color: var(--theme-card-bg) !important;
   color: var(--gray-900) !important;
 }
 
 .form-select option {
-  background-color: #f8fafc !important;
+  background-color: var(--theme-card-bg) !important;
   color: var(--gray-900) !important;
 }
 

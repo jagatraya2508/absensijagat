@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { sendInterviewEmail } = require('../utils/email');
 
 // Configure multer for candidate uploads
 const storage = multer.diskStorage({
@@ -36,7 +37,61 @@ const upload = multer({
 });
 
 // ==========================================
-// JOB POSITIONS
+// PUBLIC ENDPOINTS
+// ==========================================
+
+// Get all OPEN job positions (Public)
+router.get('/public/positions', async (req, res) => {
+    try {
+        const query = `
+            SELECT id, title, department, description, requirements, salary_range_min, salary_range_max, employment_type, created_at
+            FROM job_positions
+            WHERE status = 'open'
+            ORDER BY created_at DESC
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get public positions error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Submit application (Public)
+router.post('/public/candidates', upload.fields([
+    { name: 'resume', maxCount: 5 },
+    { name: 'photo', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        const { full_name, email, phone, address, education, experience_years, applied_position_id, source } = req.body;
+
+        if (!full_name) {
+            return res.status(400).json({ error: 'Nama kandidat harus diisi' });
+        }
+
+        const resumePath = req.files?.resume 
+            ? req.files.resume.map(f => `/uploads/recruitment/${f.filename}`).join(',') 
+            : null;
+        const photoPath = req.files?.photo ? `/uploads/recruitment/${req.files.photo[0].filename}` : null;
+
+        const result = await pool.query(
+            `INSERT INTO candidates (full_name, email, phone, address, education, experience_years, 
+             applied_position_id, resume_path, photo_path, source, notes, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'applied') RETURNING *`,
+            [full_name, email || null, phone || null, address || null, education || null,
+                experience_years || 0, applied_position_id || null, resumePath, photoPath,
+                source || 'website', 'Pelamar via Public Page']
+        );
+
+        res.status(201).json({ success: true, message: 'Lamaran berhasil dikirim', data: result.rows[0] });
+    } catch (error) {
+        console.error('Public create candidate error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// ==========================================
+// JOB POSITIONS (ADMIN)
 // ==========================================
 
 // Get all job positions
@@ -174,7 +229,7 @@ router.get('/candidates', authenticateToken, isAdmin, async (req, res) => {
 
 // Create candidate
 router.post('/candidates', authenticateToken, isAdmin, upload.fields([
-    { name: 'resume', maxCount: 1 },
+    { name: 'resume', maxCount: 5 },
     { name: 'photo', maxCount: 1 }
 ]), async (req, res) => {
     try {
@@ -184,7 +239,9 @@ router.post('/candidates', authenticateToken, isAdmin, upload.fields([
             return res.status(400).json({ error: 'Nama kandidat harus diisi' });
         }
 
-        const resumePath = req.files?.resume ? `/uploads/recruitment/${req.files.resume[0].filename}` : null;
+        const resumePath = req.files?.resume 
+            ? req.files.resume.map(f => `/uploads/recruitment/${f.filename}`).join(',') 
+            : null;
         const photoPath = req.files?.photo ? `/uploads/recruitment/${req.files.photo[0].filename}` : null;
 
         const result = await pool.query(
@@ -456,6 +513,42 @@ router.delete('/interviews/:id', authenticateToken, isAdmin, async (req, res) =>
         res.json({ message: 'Interview berhasil dihapus' });
     } catch (error) {
         console.error('Delete interview error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Send interview email
+router.post('/interviews/:id/send-email', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Fetch interview details
+        const interviewRes = await pool.query(`SELECT * FROM interviews WHERE id = $1`, [id]);
+        if (interviewRes.rows.length === 0) return res.status(404).json({ error: 'Interview tidak ditemukan' });
+        const interview = interviewRes.rows[0];
+
+        // Fetch candidate
+        const candidateRes = await pool.query(`SELECT * FROM candidates WHERE id = $1`, [interview.candidate_id]);
+        if (candidateRes.rows.length === 0) return res.status(404).json({ error: 'Kandidat tidak ditemukan' });
+        const candidate = candidateRes.rows[0];
+
+        if (!candidate.email) return res.status(400).json({ error: 'Kandidat tidak memiliki alamat email' });
+
+        // Fetch position
+        const positionRes = await pool.query(`SELECT * FROM job_positions WHERE id = $1`, [candidate.applied_position_id]);
+        const position = positionRes.rows.length > 0 ? positionRes.rows[0] : { title: 'Posisi tidak diketahui' };
+
+        // Send Email
+        const emailResult = await sendInterviewEmail(candidate, interview, position);
+
+        if (!emailResult.success) {
+            return res.status(500).json({ error: emailResult.message || emailResult.error || 'Gagal mengirim email' });
+        }
+
+        res.json({ success: true, message: 'Email undangan berhasil dikirim' });
+
+    } catch (error) {
+        console.error('Send interview email error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });

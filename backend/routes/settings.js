@@ -67,11 +67,27 @@ router.post('/logo', authenticateToken, isAdmin, upload.single('logo'), async (r
         if (!req.file) {
             return res.status(400).json({ error: 'Tidak ada file yang diunggah' });
         }
+        
+        const logoType = req.body.type || 'app_logo'; // app_logo, login_logo, favicon_logo
+        // Validate logoType
+        const allowedTypes = ['app_logo', 'login_logo', 'favicon_logo'];
+        if (!allowedTypes.includes(logoType)) {
+             return res.status(400).json({ error: 'Tipe logo tidak valid' });
+        }
+
         const logoPath = `/uploads/logo/${req.file.filename}`;
-        await pool.query('UPDATE settings SET value = $1 WHERE key = $2', [logoPath, 'app_logo']);
+        
+        // Use UPSERT so new settings like login_logo and favicon_logo can be created if they don't exist
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ($1, $2)
+             ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+            [logoType, logoPath]
+        );
+        
         res.json({
             message: 'Logo berhasil diperbarui',
-            logoPath: logoPath
+            logoPath: logoPath,
+            type: logoType
         });
     } catch (error) {
         console.error('Update logo error:', error);
@@ -82,7 +98,7 @@ router.post('/logo', authenticateToken, isAdmin, upload.single('logo'), async (r
 // Update theme colors (Admin only)
 router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const { primary_color, bg_color } = req.body;
+        const { primary_color, bg_color, card_bg_color } = req.body;
 
         if (!primary_color || !bg_color) {
             return res.status(400).json({ error: 'primary_color dan bg_color wajib diisi' });
@@ -90,7 +106,7 @@ router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
 
         // Validate hex color format
         const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-        if (!hexRegex.test(primary_color) || !hexRegex.test(bg_color)) {
+        if (!hexRegex.test(primary_color) || !hexRegex.test(bg_color) || (card_bg_color && !hexRegex.test(card_bg_color))) {
             return res.status(400).json({ error: 'Format warna harus hex (contoh: #6D0000)' });
         }
 
@@ -107,11 +123,21 @@ router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
              ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
             [bg_color]
         );
+        
+        // Upsert theme_card_bg_color if provided
+        if (card_bg_color) {
+            await pool.query(
+                `INSERT INTO settings (key, value) VALUES ('theme_card_bg_color', $1)
+                 ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+                [card_bg_color]
+            );
+        }
 
         res.json({
             message: 'Tema berhasil diperbarui',
             theme_primary_color: primary_color,
-            theme_bg_color: bg_color
+            theme_bg_color: bg_color,
+            theme_card_bg_color: card_bg_color
         });
     } catch (error) {
         console.error('Update theme error:', error);

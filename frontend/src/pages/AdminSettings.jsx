@@ -2,24 +2,140 @@ import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 
 const THEME_PRESETS = [
-    { name: 'Merah Marun', icon: '🔴', primary: '#6D0000', bg: '#fff8f8' },
-    { name: 'Biru Navy', icon: '🔵', primary: '#0A1929', bg: '#f0f4ff' },
-    { name: 'Hijau Emerald', icon: '🟢', primary: '#064E3B', bg: '#f0fdf4' },
-    { name: 'Ungu Royal', icon: '🟣', primary: '#4C1D95', bg: '#faf5ff' },
-    { name: 'Slate Dark', icon: '⚫', primary: '#1E293B', bg: '#f8fafc' },
-    { name: 'Amber Gold', icon: '🟠', primary: '#78350F', bg: '#fffbeb' },
+    { name: 'Merah Marun', icon: '🔴', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff' },
+    { name: 'Biru Navy', icon: '🔵', primary: '#0A1929', bg: '#f0f4ff', card_bg: '#ffffff' },
+    { name: 'Hijau Emerald', icon: '🟢', primary: '#064E3B', bg: '#f0fdf4', card_bg: '#ffffff' },
+    { name: 'Ungu Royal', icon: '🟣', primary: '#4C1D95', bg: '#faf5ff', card_bg: '#ffffff' },
+    { name: 'Slate Dark', icon: '⚫', primary: '#1E293B', bg: '#f8fafc', card_bg: '#ffffff' },
+    { name: 'Amber Gold', icon: '🟠', primary: '#78350F', bg: '#fffbeb', card_bg: '#ffffff' },
 ];
+
+function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
+    const [file, setFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(currentLogoUrl || '/logo.png');
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState({ type: '', text: '' });
+
+    const handleFileChange = (e) => {
+        const f = e.target.files[0];
+        if (f) {
+            if (f.size > 2 * 1024 * 1024) {
+                setMessage({ type: 'danger', text: 'Ukuran file maksimal 2MB' });
+                return;
+            }
+            setFile(f);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result);
+            };
+            reader.readAsDataURL(f);
+            setMessage({ type: '', text: '' });
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!file) {
+            setMessage({ type: 'danger', text: 'Silakan pilih file logo terlebih dahulu' });
+            return;
+        }
+
+        setLoading(true);
+        setMessage({ type: '', text: '' });
+
+        const formData = new FormData();
+        formData.append('logo', file);
+        formData.append('type', type);
+
+        try {
+            await updateLogoFn(formData);
+            setMessage({ type: 'success', text: `${title} berhasil diperbarui` });
+            setFile(null);
+        } catch (error) {
+            setMessage({ type: 'danger', text: error.message || `Gagal memperbarui ${title.toLowerCase()}` });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div style={{ padding: '1.5rem 0', borderBottom: '1px solid var(--gray-200)', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--gray-800)', marginBottom: '1rem' }}>
+                {title}
+            </h3>
+            {message.text && (
+                <div className={`alert alert-${message.type}`} style={{ marginBottom: '1.5rem' }}>
+                    <span className="alert-icon">{message.type === 'success' ? '✅' : '⚠️'}</span>
+                    {message.text}
+                </div>
+            )}
+            <form onSubmit={handleSubmit}>
+                <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: '250px' }}>
+                        <div className="form-group">
+                            <label className="form-label" htmlFor={`logo_${type}`}>
+                                Pilih File Logo Baru (PNG, JPG, SVG)
+                            </label>
+                            <input
+                                type="file"
+                                id={`logo_${type}`}
+                                className="form-input"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                disabled={loading}
+                            />
+                            <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.5rem' }}>
+                                Ukuran maksimal: 2MB. {type === 'favicon_logo' ? 'Disarankan 1:1 (persegi).' : 'Disarankan aspek rasio 1:1 atau horizontal.'}
+                            </p>
+                        </div>
+                        <button
+                            type="submit"
+                            className="btn btn-primary"
+                            style={{ width: '100%', marginTop: '0.5rem' }}
+                            disabled={loading || !file}
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                    <span>Menyimpan...</span>
+                                </>
+                            ) : (
+                                `Simpan ${title}`
+                            )}
+                        </button>
+                    </div>
+                    <div style={{ width: '160px', textAlign: 'center' }}>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: '0.5rem' }}>Preview</p>
+                        <div style={{
+                            border: '1px solid var(--gray-200)',
+                            borderRadius: '0.5rem',
+                            padding: '1rem',
+                            background: 'var(--gray-50)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minHeight: '120px'
+                        }}>
+                            <img
+                                src={previewUrl}
+                                alt={`Preview ${title}`}
+                                style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    );
+}
 
 export default function AdminSettings() {
     const { settings, updateLogo, themeColors, updateTheme, previewTheme, resetPreview, DEFAULT_THEME } = useSettings();
-    const [logoFile, setLogoFile] = useState(null);
-    const [previewUrl, setPreviewUrl] = useState(settings.app_logo);
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: '', text: '' });
 
     // Theme state
     const [selectedPrimary, setSelectedPrimary] = useState(themeColors.primary);
     const [selectedBg, setSelectedBg] = useState(themeColors.bg);
+    const [selectedCardBg, setSelectedCardBg] = useState(themeColors.card_bg || '#ffffff');
     const [themeLoading, setThemeLoading] = useState(false);
     const [themeMessage, setThemeMessage] = useState({ type: '', text: '' });
     const [activePreset, setActivePreset] = useState(null);
@@ -39,9 +155,10 @@ export default function AdminSettings() {
     useEffect(() => {
         setSelectedPrimary(themeColors.primary);
         setSelectedBg(themeColors.bg);
+        setSelectedCardBg(themeColors.card_bg || '#ffffff');
         // find active preset
         const match = THEME_PRESETS.findIndex(
-            p => p.primary.toLowerCase() === themeColors.primary.toLowerCase() && p.bg.toLowerCase() === themeColors.bg.toLowerCase()
+            p => p.primary.toLowerCase() === themeColors.primary.toLowerCase() && p.bg.toLowerCase() === themeColors.bg.toLowerCase() && p.card_bg.toLowerCase() === (themeColors.card_bg || '#ffffff').toLowerCase()
         );
         setActivePreset(match >= 0 ? match : null);
     }, [themeColors]);
@@ -69,65 +186,26 @@ export default function AdminSettings() {
             console.error('Failed to load leave settings:', error);
         }
     };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                setMessage({ type: 'danger', text: 'Ukuran file maksimal 2MB' });
-                return;
-            }
-            setLogoFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPreviewUrl(reader.result);
-            };
-            reader.readAsDataURL(file);
-            setMessage({ type: '', text: '' });
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!logoFile) {
-            setMessage({ type: 'danger', text: 'Silakan pilih file logo terlebih dahulu' });
-            return;
-        }
-
-        setLoading(true);
-        setMessage({ type: '', text: '' });
-
-        const formData = new FormData();
-        formData.append('logo', logoFile);
-
-        try {
-            await updateLogo(formData);
-            setMessage({ type: 'success', text: 'Logo berhasil diperbarui' });
-            setLogoFile(null);
-        } catch (error) {
-            setMessage({ type: 'danger', text: error.message || 'Gagal memperbarui logo' });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Theme handlers
     const handlePresetSelect = (index) => {
         const preset = THEME_PRESETS[index];
         setActivePreset(index);
         setSelectedPrimary(preset.primary);
         setSelectedBg(preset.bg);
-        previewTheme({ primary: preset.primary, bg: preset.bg });
+        setSelectedCardBg(preset.card_bg);
+        previewTheme({ primary: preset.primary, bg: preset.bg, card_bg: preset.card_bg });
     };
 
     const handleCustomColorChange = (field, value) => {
         setActivePreset(null);
         if (field === 'primary') {
             setSelectedPrimary(value);
-            previewTheme({ primary: value, bg: selectedBg });
-        } else {
+            previewTheme({ primary: value, bg: selectedBg, card_bg: selectedCardBg });
+        } else if (field === 'bg') {
             setSelectedBg(value);
-            previewTheme({ primary: selectedPrimary, bg: value });
+            previewTheme({ primary: selectedPrimary, bg: value, card_bg: selectedCardBg });
+        } else if (field === 'card_bg') {
+            setSelectedCardBg(value);
+            previewTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: value });
         }
     };
 
@@ -135,7 +213,7 @@ export default function AdminSettings() {
         setThemeLoading(true);
         setThemeMessage({ type: '', text: '' });
         try {
-            await updateTheme({ primary: selectedPrimary, bg: selectedBg });
+            await updateTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: selectedCardBg });
             setThemeMessage({ type: 'success', text: 'Tema berhasil disimpan!' });
         } catch (error) {
             setThemeMessage({ type: 'danger', text: error.message || 'Gagal menyimpan tema' });
@@ -148,8 +226,9 @@ export default function AdminSettings() {
     const handleThemeReset = () => {
         setSelectedPrimary(DEFAULT_THEME.primary);
         setSelectedBg(DEFAULT_THEME.bg);
+        setSelectedCardBg(DEFAULT_THEME.card_bg);
         setActivePreset(0);
-        previewTheme({ primary: DEFAULT_THEME.primary, bg: DEFAULT_THEME.bg });
+        previewTheme({ primary: DEFAULT_THEME.primary, bg: DEFAULT_THEME.bg, card_bg: DEFAULT_THEME.card_bg });
     };
 
     // Leave Settings Handlers
@@ -301,7 +380,7 @@ export default function AdminSettings() {
                         {/* Custom Color Pickers */}
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                             gap: '1.25rem',
                             marginBottom: '1.5rem'
                         }}>
@@ -408,6 +487,59 @@ export default function AdminSettings() {
                                     </div>
                                 </div>
                             </div>
+                            
+                            {/* Card / Form BG Color */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--gray-600)',
+                                    marginBottom: '0.5rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    Warna Dasar Card/Form
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    background: 'var(--gray-50)',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1.5px solid var(--gray-200)'
+                                }}>
+                                    <input
+                                        type="color"
+                                        value={selectedCardBg}
+                                        onChange={(e) => handleCustomColorChange('card_bg', e.target.value)}
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 600,
+                                            color: 'var(--gray-800)',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {selectedCardBg}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
+                                            Form input & master
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Live Preview */}
@@ -470,8 +602,8 @@ export default function AdminSettings() {
                                         gap: '0.3rem',
                                         marginTop: '0.25rem'
                                     }}>
-                                        <div style={{ borderRadius: '4px', background: 'rgba(255,255,255,0.8)', border: '1px solid var(--gray-200)' }} />
-                                        <div style={{ borderRadius: '4px', background: 'rgba(255,255,255,0.8)', border: '1px solid var(--gray-200)' }} />
+                                        <div style={{ borderRadius: '4px', background: selectedCardBg, border: '1px solid var(--gray-200)' }} />
+                                        <div style={{ borderRadius: '4px', background: selectedCardBg, border: '1px solid var(--gray-200)' }} />
                                     </div>
                                 </div>
                             </div>
@@ -510,70 +642,30 @@ export default function AdminSettings() {
                 {/* ============ LOGO SECTION ============ */}
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">Ganti Logo Aplikasi</h2>
+                        <h2 className="card-title">🖼️ Manajemen Logo</h2>
                     </div>
-
-                    <div style={{ padding: '1.5rem 0' }}>
-                        {message.text && (
-                            <div className={`alert alert-${message.type}`} style={{ marginBottom: '1.5rem' }}>
-                                <span className="alert-icon">{message.type === 'success' ? '✅' : '⚠️'}</span>
-                                {message.text}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                                <p style={{ fontSize: '0.875rem', color: 'var(--gray-400)', marginBottom: '0.75rem' }}>
-                                    Preview Logo Saat Ini:
-                                </p>
-                                <div style={{
-                                    border: '2px dashed rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '1rem',
-                                    padding: '2.5rem',
-                                    display: 'inline-block',
-                                    background: 'rgba(255, 255, 255, 0.03)'
-                                }}>
-                                    <img
-                                        src={previewUrl}
-                                        alt="Preview Logo"
-                                        style={{ maxHeight: '120px', width: 'auto', borderRadius: '0.5rem' }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label" htmlFor="logo">
-                                    Pilih File Logo Baru (PNG, JPG, SVG)
-                                </label>
-                                <input
-                                    type="file"
-                                    id="logo"
-                                    className="form-input"
-                                    accept="image/*"
-                                    onChange={handleFileChange}
-                                    disabled={loading}
-                                />
-                                <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.5rem' }}>
-                                    Ukuran file maksimal: 2MB. Disarankan aspek rasio 1:1 atau horizontal.
-                                </p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                style={{ width: '100%', marginTop: '1rem' }}
-                                disabled={loading || !logoFile}
-                            >
-                                {loading ? (
-                                    <>
-                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                        <span>Menyimpan...</span>
-                                    </>
-                                ) : (
-                                    'Simpan Perubahan Logo'
-                                )}
-                            </button>
-                        </form>
+                    
+                    <div style={{ padding: '0 0.5rem' }}>
+                        <LogoUploader 
+                            title="Logo Utama Aplikasi" 
+                            type="app_logo" 
+                            currentLogoUrl={settings.app_logo} 
+                            updateLogoFn={updateLogo} 
+                        />
+                        
+                        <LogoUploader 
+                            title="Logo Login Page" 
+                            type="login_logo" 
+                            currentLogoUrl={settings.login_logo || settings.app_logo} 
+                            updateLogoFn={updateLogo} 
+                        />
+                        
+                        <LogoUploader 
+                            title="Favicon (Ikon Tab Browser)" 
+                            type="favicon_logo" 
+                            currentLogoUrl={settings.favicon_logo || settings.app_logo} 
+                            updateLogoFn={updateLogo} 
+                        />
                     </div>
                 </div>
 

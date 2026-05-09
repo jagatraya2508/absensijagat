@@ -168,11 +168,17 @@ export default function AdminRecruitment() {
         try {
             const formData = new FormData();
             Object.entries(candidateForm).forEach(([k, v]) => {
-                if (v !== null && v !== undefined && k !== 'resume_file' && k !== 'photo_file') {
+                if (v !== null && v !== undefined && k !== 'resume_file' && k !== 'resume_files' && k !== 'photo_file') {
                     formData.append(k, v);
                 }
             });
-            if (candidateForm.resume_file) formData.append('resume', candidateForm.resume_file);
+            if (candidateForm.resume_files) {
+                for (let i = 0; i < candidateForm.resume_files.length; i++) {
+                    formData.append('resume', candidateForm.resume_files[i]);
+                }
+            } else if (candidateForm.resume_file) {
+                formData.append('resume', candidateForm.resume_file);
+            }
             if (candidateForm.photo_file) formData.append('photo', candidateForm.photo_file);
 
             const res = await fetch(`${API}/api/recruitment/candidates`, {
@@ -241,6 +247,22 @@ export default function AdminRecruitment() {
             await fetch(`${API}/api/recruitment/interviews/${id}`, { method: 'DELETE', headers });
             fetchInterviews();
         } catch (err) { console.error(err); }
+    }
+
+    async function handleSendInterviewEmail(id) {
+        if (!confirm('Kirim email undangan interview ke kandidat? Pastikan pengaturan SMTP sudah dikonfigurasi.')) return;
+        try {
+            const res = await fetch(`${API}/api/recruitment/interviews/${id}/send-email`, { method: 'POST', headers });
+            const data = await res.json();
+            if (res.ok) {
+                alert('Berhasil: ' + data.message);
+            } else {
+                alert('Gagal: ' + data.error);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Terjadi kesalahan koneksi saat mengirim email.');
+        }
     }
 
     function resetInterviewForm() {
@@ -503,6 +525,7 @@ export default function AdminRecruitment() {
                                             <th>Posisi</th>
                                             <th>Pendidikan</th>
                                             <th>Pengalaman</th>
+                                            <th>Dokumen</th>
                                             <th>Sumber</th>
                                             <th>Status</th>
                                             <th>Pipeline</th>
@@ -521,6 +544,18 @@ export default function AdminRecruitment() {
                                                 <td>{c.position_title || '-'}</td>
                                                 <td>{c.education || '-'}</td>
                                                 <td>{c.experience_years} tahun</td>
+                                                <td>
+                                                    {c.resume_path ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            {c.resume_path.split(',').map((path, index) => (
+                                                                <a key={index} href={`${API}${path}`} target="_blank" rel="noopener noreferrer" 
+                                                                    style={{ color: 'var(--primary-600)', fontSize: '0.8rem', textDecoration: 'none' }}>
+                                                                    📄 Lampiran {index + 1}
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    ) : '-'}
+                                                </td>
                                                 <td><span className="badge badge-primary">{c.source}</span></td>
                                                 <td>
                                                     <span className={`badge ${STATUS_COLORS[c.status]}`}>
@@ -630,6 +665,10 @@ export default function AdminRecruitment() {
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <button className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                                                            onClick={() => handleSendInterviewEmail(i.id)} title="Kirim Email Undangan">
+                                                            ✉️ Kirim
+                                                        </button>
                                                         <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
                                                             onClick={() => openEditInterview(i)}>✏️</button>
                                                         <button className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
@@ -655,72 +694,74 @@ export default function AdminRecruitment() {
                             <button className="modal-close" onClick={() => setShowPositionModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handlePositionSubmit}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Judul Posisi *</label>
-                                    <input className="form-input" value={positionForm.title} required
-                                        onChange={e => setPositionForm(f => ({ ...f, title: e.target.value }))}
-                                        placeholder="Contoh: Frontend Developer" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Departemen</label>
-                                    <input className="form-input" value={positionForm.department}
-                                        onChange={e => setPositionForm(f => ({ ...f, department: e.target.value }))}
-                                        placeholder="Contoh: IT" />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Deskripsi</label>
-                                <textarea className="form-input" rows="3" value={positionForm.description}
-                                    onChange={e => setPositionForm(f => ({ ...f, description: e.target.value }))}
-                                    placeholder="Deskripsi pekerjaan..." />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Persyaratan</label>
-                                <textarea className="form-input" rows="3" value={positionForm.requirements}
-                                    onChange={e => setPositionForm(f => ({ ...f, requirements: e.target.value }))}
-                                    placeholder="Persyaratan kandidat..." />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Gaji Minimum</label>
-                                    <input type="number" className="form-input" value={positionForm.salary_range_min}
-                                        onChange={e => setPositionForm(f => ({ ...f, salary_range_min: e.target.value }))}
-                                        placeholder="0" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Gaji Maksimum</label>
-                                    <input type="number" className="form-input" value={positionForm.salary_range_max}
-                                        onChange={e => setPositionForm(f => ({ ...f, salary_range_max: e.target.value }))}
-                                        placeholder="0" />
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Tipe Pekerjaan</label>
-                                    <select className="form-input form-select" value={positionForm.employment_type}
-                                        onChange={e => setPositionForm(f => ({ ...f, employment_type: e.target.value }))}>
-                                        <option value="full-time">Full-time</option>
-                                        <option value="part-time">Part-time</option>
-                                        <option value="contract">Kontrak</option>
-                                        <option value="internship">Magang</option>
-                                    </select>
-                                </div>
-                                {editPositionId && (
+                            <div style={{ padding: '1.5rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div className="form-group">
-                                        <label className="form-label">Status</label>
-                                        <select className="form-input form-select" value={positionForm.status}
-                                            onChange={e => setPositionForm(f => ({ ...f, status: e.target.value }))}>
-                                            <option value="open">Open</option>
-                                            <option value="closed">Closed</option>
-                                            <option value="on-hold">On Hold</option>
+                                        <label className="form-label">Judul Posisi *</label>
+                                        <input className="form-input" value={positionForm.title} required
+                                            onChange={e => setPositionForm(f => ({ ...f, title: e.target.value }))}
+                                            placeholder="Contoh: Frontend Developer" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Departemen</label>
+                                        <input className="form-input" value={positionForm.department}
+                                            onChange={e => setPositionForm(f => ({ ...f, department: e.target.value }))}
+                                            placeholder="Contoh: IT" />
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Deskripsi</label>
+                                    <textarea className="form-input" rows="3" value={positionForm.description}
+                                        onChange={e => setPositionForm(f => ({ ...f, description: e.target.value }))}
+                                        placeholder="Deskripsi pekerjaan..." />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Persyaratan</label>
+                                    <textarea className="form-input" rows="3" value={positionForm.requirements}
+                                        onChange={e => setPositionForm(f => ({ ...f, requirements: e.target.value }))}
+                                        placeholder="Persyaratan kandidat..." />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Gaji Minimum</label>
+                                        <input type="number" className="form-input" value={positionForm.salary_range_min}
+                                            onChange={e => setPositionForm(f => ({ ...f, salary_range_min: e.target.value }))}
+                                            placeholder="0" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Gaji Maksimum</label>
+                                        <input type="number" className="form-input" value={positionForm.salary_range_max}
+                                            onChange={e => setPositionForm(f => ({ ...f, salary_range_max: e.target.value }))}
+                                            placeholder="0" />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Tipe Pekerjaan</label>
+                                        <select className="form-input form-select" value={positionForm.employment_type}
+                                            onChange={e => setPositionForm(f => ({ ...f, employment_type: e.target.value }))}>
+                                            <option value="full-time">Full-time</option>
+                                            <option value="part-time">Part-time</option>
+                                            <option value="contract">Kontrak</option>
+                                            <option value="internship">Magang</option>
                                         </select>
                                     </div>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setShowPositionModal(false)}>Batal</button>
-                                <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                    {editPositionId && (
+                                        <div className="form-group">
+                                            <label className="form-label">Status</label>
+                                            <select className="form-input form-select" value={positionForm.status}
+                                                onChange={e => setPositionForm(f => ({ ...f, status: e.target.value }))}>
+                                                <option value="open">Open</option>
+                                                <option value="closed">Closed</option>
+                                                <option value="on-hold">On Hold</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                                    <button type="button" className="btn btn-outline" onClick={() => setShowPositionModal(false)}>Batal</button>
+                                    <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -736,79 +777,81 @@ export default function AdminRecruitment() {
                             <button className="modal-close" onClick={() => setShowCandidateModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleCandidateSubmit}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Nama Lengkap *</label>
-                                    <input className="form-input" value={candidateForm.full_name} required
-                                        onChange={e => setCandidateForm(f => ({ ...f, full_name: e.target.value }))} />
+                            <div style={{ padding: '1.5rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Nama Lengkap *</label>
+                                        <input className="form-input" value={candidateForm.full_name} required
+                                            onChange={e => setCandidateForm(f => ({ ...f, full_name: e.target.value }))} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Email</label>
+                                        <input type="email" className="form-input" value={candidateForm.email}
+                                            onChange={e => setCandidateForm(f => ({ ...f, email: e.target.value }))} />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Telepon</label>
+                                        <input className="form-input" value={candidateForm.phone}
+                                            onChange={e => setCandidateForm(f => ({ ...f, phone: e.target.value }))} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Posisi Dilamar</label>
+                                        <select className="form-input form-select" value={candidateForm.applied_position_id}
+                                            onChange={e => setCandidateForm(f => ({ ...f, applied_position_id: e.target.value }))}>
+                                            <option value="">Pilih Posisi</option>
+                                            {positions.filter(p => p.status === 'open').map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Pendidikan</label>
+                                        <input className="form-input" value={candidateForm.education}
+                                            onChange={e => setCandidateForm(f => ({ ...f, education: e.target.value }))}
+                                            placeholder="Contoh: S1 Informatika" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Pengalaman (tahun)</label>
+                                        <input type="number" className="form-input" value={candidateForm.experience_years}
+                                            onChange={e => setCandidateForm(f => ({ ...f, experience_years: parseInt(e.target.value) || 0 }))} />
+                                    </div>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Email</label>
-                                    <input type="email" className="form-input" value={candidateForm.email}
-                                        onChange={e => setCandidateForm(f => ({ ...f, email: e.target.value }))} />
+                                    <label className="form-label">Alamat</label>
+                                    <textarea className="form-input" rows="2" value={candidateForm.address}
+                                        onChange={e => setCandidateForm(f => ({ ...f, address: e.target.value }))} />
                                 </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Telepon</label>
-                                    <input className="form-input" value={candidateForm.phone}
-                                        onChange={e => setCandidateForm(f => ({ ...f, phone: e.target.value }))} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Posisi Dilamar</label>
-                                    <select className="form-input form-select" value={candidateForm.applied_position_id}
-                                        onChange={e => setCandidateForm(f => ({ ...f, applied_position_id: e.target.value }))}>
-                                        <option value="">Pilih Posisi</option>
-                                        {positions.filter(p => p.status === 'open').map(p => (
-                                            <option key={p.id} value={p.id}>{p.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Pendidikan</label>
-                                    <input className="form-input" value={candidateForm.education}
-                                        onChange={e => setCandidateForm(f => ({ ...f, education: e.target.value }))}
-                                        placeholder="Contoh: S1 Informatika" />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Sumber</label>
+                                        <select className="form-input form-select" value={candidateForm.source}
+                                            onChange={e => setCandidateForm(f => ({ ...f, source: e.target.value }))}>
+                                            <option value="website">Website</option>
+                                            <option value="referral">Referral</option>
+                                            <option value="jobfair">Job Fair</option>
+                                            <option value="linkedin">LinkedIn</option>
+                                            <option value="other">Lainnya</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Upload Dokumen (Bisa lebih dari 1 file)</label>
+                                        <input type="file" className="form-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple
+                                            onChange={e => setCandidateForm(f => ({ ...f, resume_files: e.target.files }))} />
+                                    </div>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Pengalaman (tahun)</label>
-                                    <input type="number" className="form-input" value={candidateForm.experience_years}
-                                        onChange={e => setCandidateForm(f => ({ ...f, experience_years: parseInt(e.target.value) || 0 }))} />
+                                    <label className="form-label">Catatan</label>
+                                    <textarea className="form-input" rows="2" value={candidateForm.notes}
+                                        onChange={e => setCandidateForm(f => ({ ...f, notes: e.target.value }))} />
                                 </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Alamat</label>
-                                <textarea className="form-input" rows="2" value={candidateForm.address}
-                                    onChange={e => setCandidateForm(f => ({ ...f, address: e.target.value }))} />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Sumber</label>
-                                    <select className="form-input form-select" value={candidateForm.source}
-                                        onChange={e => setCandidateForm(f => ({ ...f, source: e.target.value }))}>
-                                        <option value="website">Website</option>
-                                        <option value="referral">Referral</option>
-                                        <option value="jobfair">Job Fair</option>
-                                        <option value="linkedin">LinkedIn</option>
-                                        <option value="other">Lainnya</option>
-                                    </select>
+                                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                                    <button type="button" className="btn btn-outline" onClick={() => setShowCandidateModal(false)}>Batal</button>
+                                    <button type="submit" className="btn btn-primary">💾 Simpan</button>
                                 </div>
-                                <div className="form-group">
-                                    <label className="form-label">Upload Resume</label>
-                                    <input type="file" className="form-input" accept=".pdf,.doc,.docx"
-                                        onChange={e => setCandidateForm(f => ({ ...f, resume_file: e.target.files[0] }))} />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Catatan</label>
-                                <textarea className="form-input" rows="2" value={candidateForm.notes}
-                                    onChange={e => setCandidateForm(f => ({ ...f, notes: e.target.value }))} />
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setShowCandidateModal(false)}>Batal</button>
-                                <button type="submit" className="btn btn-primary">💾 Simpan</button>
                             </div>
                         </form>
                     </div>
@@ -824,74 +867,76 @@ export default function AdminRecruitment() {
                             <button className="modal-close" onClick={() => setShowInterviewModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleInterviewSubmit}>
-                            <div className="form-group">
-                                <label className="form-label">Kandidat *</label>
-                                <select className="form-input form-select" value={interviewForm.candidate_id} required
-                                    onChange={e => setInterviewForm(f => ({ ...f, candidate_id: e.target.value }))}
-                                    disabled={!!editInterviewId}>
-                                    <option value="">Pilih Kandidat</option>
-                                    {candidates.filter(c => c.status !== 'hired' && c.status !== 'rejected').map(c => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.full_name} - {c.position_title || 'No Position'}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ padding: '1.5rem' }}>
                                 <div className="form-group">
-                                    <label className="form-label">Tanggal *</label>
-                                    <input type="date" className="form-input" value={interviewForm.interview_date} required
-                                        onChange={e => setInterviewForm(f => ({ ...f, interview_date: e.target.value }))} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Waktu</label>
-                                    <input type="time" className="form-input" value={interviewForm.interview_time}
-                                        onChange={e => setInterviewForm(f => ({ ...f, interview_time: e.target.value }))} />
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Tipe</label>
-                                    <select className="form-input form-select" value={interviewForm.type}
-                                        onChange={e => setInterviewForm(f => ({ ...f, type: e.target.value }))}>
-                                        <option value="onsite">🏢 Onsite</option>
-                                        <option value="online">🌐 Online</option>
+                                    <label className="form-label">Kandidat *</label>
+                                    <select className="form-input form-select" value={interviewForm.candidate_id} required
+                                        onChange={e => setInterviewForm(f => ({ ...f, candidate_id: e.target.value }))}
+                                        disabled={!!editInterviewId}>
+                                        <option value="">Pilih Kandidat</option>
+                                        {candidates.filter(c => c.status !== 'hired' && c.status !== 'rejected').map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.full_name} - {c.position_title || 'No Position'}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
-                                {editInterviewId && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div className="form-group">
-                                        <label className="form-label">Status</label>
-                                        <select className="form-input form-select" value={interviewForm.status}
-                                            onChange={e => setInterviewForm(f => ({ ...f, status: e.target.value }))}>
-                                            <option value="scheduled">Dijadwalkan</option>
-                                            <option value="completed">Selesai</option>
-                                            <option value="cancelled">Dibatalkan</option>
-                                            <option value="no-show">No Show</option>
+                                        <label className="form-label">Tanggal *</label>
+                                        <input type="date" className="form-input" value={interviewForm.interview_date} required
+                                            onChange={e => setInterviewForm(f => ({ ...f, interview_date: e.target.value }))} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Waktu</label>
+                                        <input type="time" className="form-input" value={interviewForm.interview_time}
+                                            onChange={e => setInterviewForm(f => ({ ...f, interview_time: e.target.value }))} />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Tipe</label>
+                                        <select className="form-input form-select" value={interviewForm.type}
+                                            onChange={e => setInterviewForm(f => ({ ...f, type: e.target.value }))}>
+                                            <option value="onsite">🏢 Onsite</option>
+                                            <option value="online">🌐 Online</option>
                                         </select>
                                     </div>
-                                )}
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{interviewForm.type === 'online' ? 'Link Meeting' : 'Lokasi'}</label>
-                                <input className="form-input"
-                                    value={interviewForm.type === 'online' ? interviewForm.meeting_link : interviewForm.location}
-                                    onChange={e => {
-                                        if (interviewForm.type === 'online') {
-                                            setInterviewForm(f => ({ ...f, meeting_link: e.target.value }));
-                                        } else {
-                                            setInterviewForm(f => ({ ...f, location: e.target.value }));
-                                        }
-                                    }}
-                                    placeholder={interviewForm.type === 'online' ? 'https://meet.google.com/...' : 'Ruang meeting lt. 3'} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Catatan</label>
-                                <textarea className="form-input" rows="2" value={interviewForm.notes}
-                                    onChange={e => setInterviewForm(f => ({ ...f, notes: e.target.value }))} />
-                            </div>
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setShowInterviewModal(false)}>Batal</button>
-                                <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                    {editInterviewId && (
+                                        <div className="form-group">
+                                            <label className="form-label">Status</label>
+                                            <select className="form-input form-select" value={interviewForm.status}
+                                                onChange={e => setInterviewForm(f => ({ ...f, status: e.target.value }))}>
+                                                <option value="scheduled">Dijadwalkan</option>
+                                                <option value="completed">Selesai</option>
+                                                <option value="cancelled">Dibatalkan</option>
+                                                <option value="no-show">No Show</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">{interviewForm.type === 'online' ? 'Link Meeting' : 'Lokasi'}</label>
+                                    <input className="form-input"
+                                        value={interviewForm.type === 'online' ? interviewForm.meeting_link : interviewForm.location}
+                                        onChange={e => {
+                                            if (interviewForm.type === 'online') {
+                                                setInterviewForm(f => ({ ...f, meeting_link: e.target.value }));
+                                            } else {
+                                                setInterviewForm(f => ({ ...f, location: e.target.value }));
+                                            }
+                                        }}
+                                        placeholder={interviewForm.type === 'online' ? 'https://meet.google.com/...' : 'Ruang meeting lt. 3'} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Catatan</label>
+                                    <textarea className="form-input" rows="2" value={interviewForm.notes}
+                                        onChange={e => setInterviewForm(f => ({ ...f, notes: e.target.value }))} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                                    <button type="button" className="btn btn-outline" onClick={() => setShowInterviewModal(false)}>Batal</button>
+                                    <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                </div>
                             </div>
                         </form>
                     </div>

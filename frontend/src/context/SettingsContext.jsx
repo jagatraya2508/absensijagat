@@ -6,7 +6,8 @@ const SettingsContext = createContext(null);
 // Default theme colors
 const DEFAULT_THEME = {
     primary: '#6D0000',
-    bg: '#fff8f8'
+    bg: '#fff8f8',
+    card_bg: '#ffffff'
 };
 
 // Helper: convert hex to RGB values
@@ -37,10 +38,11 @@ function lightenColor(hex, percent) {
 }
 
 // Apply theme CSS variables to document
-function applyThemeToDOM(primary, bg) {
+function applyThemeToDOM(primary, bg, card_bg = '#ffffff') {
     const root = document.documentElement;
     const rgb = hexToRgb(primary);
     const bgRgb = hexToRgb(bg);
+    const cardRgb = hexToRgb(card_bg);
 
     root.style.setProperty('--theme-primary', primary);
     root.style.setProperty('--theme-primary-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
@@ -49,8 +51,12 @@ function applyThemeToDOM(primary, bg) {
     root.style.setProperty('--theme-primary-darkest', darkenColor(primary, 58));
     root.style.setProperty('--theme-primary-light', lightenColor(primary, 60));
     root.style.setProperty('--theme-primary-lighter', lightenColor(primary, 80));
+    
     root.style.setProperty('--theme-bg', bg);
     root.style.setProperty('--theme-bg-rgb', `${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}`);
+    
+    root.style.setProperty('--theme-card-bg', card_bg);
+    root.style.setProperty('--theme-card-bg-rgb', `${cardRgb.r}, ${cardRgb.g}, ${cardRgb.b}`);
 }
 
 export function SettingsProvider({ children }) {
@@ -62,7 +68,7 @@ export function SettingsProvider({ children }) {
 
     // Apply theme on mount and when colors change
     useEffect(() => {
-        applyThemeToDOM(themeColors.primary, themeColors.bg);
+        applyThemeToDOM(themeColors.primary, themeColors.bg, themeColors.card_bg);
     }, [themeColors]);
 
     useEffect(() => {
@@ -79,8 +85,9 @@ export function SettingsProvider({ children }) {
                 // Apply saved theme colors
                 const primary = data.theme_primary_color || DEFAULT_THEME.primary;
                 const bg = data.theme_bg_color || DEFAULT_THEME.bg;
-                setThemeColors({ primary, bg });
-                applyThemeToDOM(primary, bg);
+                const card_bg = data.theme_card_bg_color || DEFAULT_THEME.card_bg;
+                setThemeColors({ primary, bg, card_bg });
+                applyThemeToDOM(primary, bg, card_bg);
             }
         } catch (error) {
             console.error('Fetch settings failed:', error);
@@ -89,11 +96,25 @@ export function SettingsProvider({ children }) {
         }
     };
 
+    // Update favicon dynamically
+    useEffect(() => {
+        if (settings.favicon_logo) {
+            let link = document.querySelector("link[rel~='icon']");
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'icon';
+                document.head.appendChild(link);
+            }
+            link.href = settings.favicon_logo;
+        }
+    }, [settings.favicon_logo]);
+
     const updateLogo = async (formData) => {
         try {
             const response = await settingsAPI.updateLogo(formData);
             if (response.logoPath) {
-                setSettings(prev => ({ ...prev, app_logo: response.logoPath }));
+                const type = response.type || 'app_logo';
+                setSettings(prev => ({ ...prev, [type]: response.logoPath }));
                 return response;
             }
         } catch (error) {
@@ -107,9 +128,10 @@ export function SettingsProvider({ children }) {
             await settingsAPI.updateTheme({
                 primary_color: colors.primary,
                 bg_color: colors.bg,
+                card_bg_color: colors.card_bg || '#ffffff'
             });
             setThemeColors(colors);
-            applyThemeToDOM(colors.primary, colors.bg);
+            applyThemeToDOM(colors.primary, colors.bg, colors.card_bg);
         } catch (error) {
             console.error('Update theme failed:', error);
             throw error;
@@ -118,12 +140,12 @@ export function SettingsProvider({ children }) {
 
     // Preview theme without saving (for live preview)
     const previewTheme = useCallback((colors) => {
-        applyThemeToDOM(colors.primary, colors.bg);
+        applyThemeToDOM(colors.primary, colors.bg, colors.card_bg || '#ffffff');
     }, []);
 
     // Reset preview to saved colors
     const resetPreview = useCallback(() => {
-        applyThemeToDOM(themeColors.primary, themeColors.bg);
+        applyThemeToDOM(themeColors.primary, themeColors.bg, themeColors.card_bg);
     }, [themeColors]);
 
     return (

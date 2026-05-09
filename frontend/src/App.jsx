@@ -82,6 +82,8 @@ function AppLayout({ children }) {
     );
 }
 
+import Careers from './pages/Careers';
+
 function AppRoutes() {
     const { user, loading } = useAuth();
 
@@ -95,6 +97,8 @@ function AppRoutes() {
 
     return (
         <Routes>
+            <Route path="/careers" element={<Careers />} />
+
             <Route
                 path="/login"
                 element={user ? <Navigate to="/" replace /> : <Login />}
