@@ -7,10 +7,19 @@ async function migrate() {
         await client.query('BEGIN');
         
         // Rename existing column to make it clear it's for 'dekat'
-        await client.query(`
-            ALTER TABLE employee_details 
-            RENAME COLUMN driver_ritase_allowance TO driver_ritase_dekat_allowance;
+        // Check if old column exists before renaming
+        const colCheck = await client.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='employee_details' AND column_name='driver_ritase_allowance'
         `);
+        
+        if (colCheck.rows.length > 0) {
+            await client.query(`
+                ALTER TABLE employee_details 
+                RENAME COLUMN driver_ritase_allowance TO driver_ritase_dekat_allowance;
+            `);
+        }
 
         // Add new column for 'jauh'
         await client.query(`
@@ -19,15 +28,29 @@ async function migrate() {
         `);
 
         // Update payroll_items
-        await client.query(`
-            ALTER TABLE payroll_items
-            RENAME COLUMN driver_extra_rit TO driver_extra_rit_dekat;
+        const colCheckExtra = await client.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='payroll_items' AND column_name='driver_extra_rit'
         `);
+        if (colCheckExtra.rows.length > 0) {
+            await client.query(`
+                ALTER TABLE payroll_items
+                RENAME COLUMN driver_extra_rit TO driver_extra_rit_dekat;
+            `);
+        }
         
-        await client.query(`
-            ALTER TABLE payroll_items
-            RENAME COLUMN driver_ritase_amount TO driver_ritase_dekat_amount;
+        const colCheckAmount = await client.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='payroll_items' AND column_name='driver_ritase_amount'
         `);
+        if (colCheckAmount.rows.length > 0) {
+            await client.query(`
+                ALTER TABLE payroll_items
+                RENAME COLUMN driver_ritase_amount TO driver_ritase_dekat_amount;
+            `);
+        }
 
         await client.query(`
             ALTER TABLE payroll_items
