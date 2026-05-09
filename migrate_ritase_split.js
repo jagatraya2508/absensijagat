@@ -19,6 +19,12 @@ async function migrate() {
                 ALTER TABLE employee_details 
                 RENAME COLUMN driver_ritase_allowance TO driver_ritase_dekat_allowance;
             `);
+        } else {
+            // Old column doesn't exist, just add the new one
+            await client.query(`
+                ALTER TABLE employee_details
+                ADD COLUMN IF NOT EXISTS driver_ritase_dekat_allowance NUMERIC DEFAULT 0;
+            `);
         }
 
         // Add new column for 'jauh'
@@ -38,6 +44,11 @@ async function migrate() {
                 ALTER TABLE payroll_items
                 RENAME COLUMN driver_extra_rit TO driver_extra_rit_dekat;
             `);
+        } else {
+            await client.query(`
+                ALTER TABLE payroll_items
+                ADD COLUMN IF NOT EXISTS driver_extra_rit_dekat INTEGER DEFAULT 0;
+            `);
         }
         
         const colCheckAmount = await client.query(`
@@ -49,6 +60,11 @@ async function migrate() {
             await client.query(`
                 ALTER TABLE payroll_items
                 RENAME COLUMN driver_ritase_amount TO driver_ritase_dekat_amount;
+            `);
+        } else {
+            await client.query(`
+                ALTER TABLE payroll_items
+                ADD COLUMN IF NOT EXISTS driver_ritase_dekat_amount NUMERIC DEFAULT 0;
             `);
         }
 
