@@ -641,6 +641,33 @@ export const vehicleTypesAPI = {
     delete: (id) => request(`/vehicle-types/${id}`, { method: 'DELETE' }),
 };
 
+// Manual Attendance API
+export const manualAttendanceAPI = {
+    // Create new manual attendance request
+    create: (data) => request('/manual-attendances', {
+        method: 'POST',
+        body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
+
+    // Get my requests
+    getMy: () => request('/manual-attendances/my'),
+
+    // Get all requests (admin)
+    getAll: (status) => {
+        const query = status && status !== 'all' ? `?status=${status}` : '';
+        return request(`/manual-attendances/all${query}`);
+    },
+
+    // Approve/reject request (admin)
+    updateStatus: (id, status, adminNotes) => request(`/manual-attendances/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, admin_notes: adminNotes }),
+    }),
+
+    // Delete request
+    delete: (id) => request(`/manual-attendances/${id}`, { method: 'DELETE' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -662,5 +689,6 @@ export default {
     driverTrackingAPI,
     customersAPI,
     licenseAPI,
-    vehicleTypesAPI
+    vehicleTypesAPI,
+    manualAttendanceAPI
 };

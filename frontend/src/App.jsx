@@ -17,6 +17,8 @@ import AdminSettings from './pages/AdminSettings';
 import ChangePassword from './pages/ChangePassword';
 import OffDays from './pages/OffDays';
 import AdminEmployees from './pages/AdminEmployees';
+import ManualAttendance from './pages/ManualAttendance';
+import AdminManualAttendance from './pages/AdminManualAttendance';
 
 import AdminLoans from './pages/AdminLoans';
 import AdminPayroll from './pages/AdminPayroll';
@@ -220,6 +222,17 @@ function AppRoutes() {
             />
 
             <Route
+                path="/manual-attendance"
+                element={
+                    <ProtectedRoute>
+                        <AppLayout>
+                            <ManualAttendance />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
                 path="/schedule"
                 element={
                     <ProtectedRoute>
@@ -236,6 +249,17 @@ function AppRoutes() {
                     <ProtectedRoute adminOnly>
                         <AppLayout>
                             <AdminLeaves />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/manual-attendance"
+                element={
+                    <ProtectedRoute adminOnly>
+                        <AppLayout>
+                            <AdminManualAttendance />
                         </AppLayout>
                     </ProtectedRoute>
                 }

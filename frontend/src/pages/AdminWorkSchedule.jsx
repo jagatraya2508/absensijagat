@@ -936,7 +936,7 @@ export default function AdminWorkSchedule() {
                             {scheduleForm.shifts.map((shift, idx) => (
                                 <div key={idx} style={{
                                     padding: '1rem', marginBottom: '0.75rem',
-                                    background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)',
+                                    background: 'var(--gray-50)', borderRadius: 'var(--radius-md)',
                                     borderLeft: `4px solid ${shift.color || SHIFT_COLORS[idx]}`
                                 }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>

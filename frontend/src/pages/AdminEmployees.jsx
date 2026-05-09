@@ -130,7 +130,8 @@ export default function AdminEmployees() {
                 driver_subuh_allowance: d.driver_subuh_allowance || 0,
                 driver_rit_allowance: d.driver_rit_allowance || 0,
                 driver_inap_allowance: d.driver_inap_allowance || 0,
-                driver_ritase_allowance: d.driver_ritase_allowance || 0,
+                driver_ritase_dekat_allowance: d.driver_ritase_dekat_allowance || 0,
+                driver_ritase_jauh_allowance: d.driver_ritase_jauh_allowance || 0,
                 vehicle_type_id: d.vehicle_type_id || '',
                 tax_status: d.tax_status || 'TK/0',
                 emergency_contact_name: d.emergency_contact_name || '',
@@ -808,11 +809,15 @@ export default function AdminEmployees() {
                                                         <input className="form-input" type="number" value={formData.driver_inap_allowance} onChange={e => updateField('driver_inap_allowance', parseFloat(e.target.value) || 0)} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚚 Uang Ritase / RIT Tambahan (Rp)</label>
-                                                        <input className="form-input" type="number" value={formData.driver_ritase_allowance} onChange={e => updateField('driver_ritase_allowance', parseFloat(e.target.value) || 0)} />
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', marginTop: 4, lineHeight: 1.2 }}>
-                                                            *Otomatis dihitung mulai dari perjalanan (RIT) ke-2 dan seterusnya
-                                                        </div>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚚 Uang Ritase Jarak Dekat (Rp)</label>
+                                                        <input className="form-input" type="number" value={formData.driver_ritase_dekat_allowance || 0} onChange={e => updateField('driver_ritase_dekat_allowance', parseFloat(e.target.value) || 0)} />
+                                                    </div>
+                                                    <div className="form-group" style={{ margin: 0 }}>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚚 Uang Ritase Jarak Jauh (Rp)</label>
+                                                        <input className="form-input" type="number" value={formData.driver_ritase_jauh_allowance || 0} onChange={e => updateField('driver_ritase_jauh_allowance', parseFloat(e.target.value) || 0)} />
+                                                    </div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', gridColumn: '1 / -1', marginTop: '-0.25rem', marginBottom: '0.25rem', lineHeight: 1.2 }}>
+                                                        *Otomatis dihitung mulai dari perjalanan (RIT) ke-2 dan seterusnya
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}>🚙 Jenis Kendaraan</label>

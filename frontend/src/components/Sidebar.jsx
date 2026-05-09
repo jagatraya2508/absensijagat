@@ -22,6 +22,7 @@ export default function Sidebar() {
     const menuItems = [
         { path: '/', icon: '🏠', label: 'Dashboard' },
         { path: '/attendance', icon: '📸', label: 'Absensi' },
+        { path: '/manual-attendance', icon: '📝', label: 'Pengajuan Absen' },
         { path: '/history', icon: '📋', label: 'Riwayat' },
         { path: '/schedule', icon: '🗓️', label: 'Kalender' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
@@ -49,6 +50,7 @@ export default function Sidebar() {
         { path: '/admin/driver-activities', icon: '🚛', label: 'Aktivitas Driver' },
         { path: '/admin/driver-tracking', icon: '📍', label: 'Tracking Kunjungan' },
         { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin' },
+        { path: '/admin/manual-attendance', icon: '📋', label: 'Persetujuan Absen' },
         { path: '/admin/loans', icon: '💰', label: 'Pinjaman' },
         { path: '/admin/payroll', icon: '💵', label: 'Payroll' },
         { path: '/admin/assessments', icon: '📋', label: 'Penilaian' },
