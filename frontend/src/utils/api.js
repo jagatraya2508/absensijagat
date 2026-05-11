@@ -399,6 +399,10 @@ export const settingsAPI = {
         method: 'PUT',
         body: JSON.stringify(data),
     }),
+    updateSmtp: (data) => request('/settings/smtp', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
 };
 
 // Schedule API

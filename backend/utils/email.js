@@ -1,25 +1,56 @@
 const nodemailer = require('nodemailer');
+const { pool } = require('../db');
 
-const createTransporter = () => {
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.SMTP_PORT || 587,
-        secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
-        auth: {
+const getSmtpConfig = async () => {
+    try {
+        const result = await pool.query("SELECT key, value FROM settings WHERE key LIKE 'smtp_%'");
+        const settings = {};
+        result.rows.forEach(row => {
+            settings[row.key] = row.value;
+        });
+
+        const host = settings.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com';
+        const port = settings.smtp_port ? parseInt(settings.smtp_port) : (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587);
+        const user = settings.smtp_user || process.env.SMTP_USER;
+        const pass = settings.smtp_pass || process.env.SMTP_PASS;
+        const secureStr = settings.smtp_secure || process.env.SMTP_SECURE;
+        const secure = secureStr === 'true' ? true : (secureStr === 'false' ? false : port === 465);
+
+        return { host, port, secure, user, pass };
+    } catch (error) {
+        console.error('Error fetching SMTP config from DB:', error);
+        return {
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT) || 587,
+            secure: process.env.SMTP_PORT == 465,
             user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
+            pass: process.env.SMTP_PASS
+        };
+    }
+};
+
+const createTransporter = async () => {
+    const config = await getSmtpConfig();
+    return nodemailer.createTransport({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        auth: {
+            user: config.user,
+            pass: config.pass,
         },
     });
 };
 
 const sendInterviewEmail = async (candidate, interview, position) => {
     try {
-        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        const config = await getSmtpConfig();
+        if (!config.user || !config.pass) {
             console.warn('SMTP credentials not configured. Skipping email send.');
             return { success: false, message: 'Pengaturan SMTP belum dikonfigurasi.' };
         }
 
-        const transporter = createTransporter();
+        const transporter = await createTransporter();
 
         const dateStr = new Date(interview.interview_date).toLocaleDateString('id-ID', {
             weekday: 'long',
@@ -37,7 +68,7 @@ const sendInterviewEmail = async (candidate, interview, position) => {
                <p><strong>Lokasi:</strong> ${interview.location || 'Akan diinformasikan menyusul'}</p>`;
 
         const mailOptions = {
-            from: `"Tim Rekrutmen" <${process.env.SMTP_USER}>`,
+            from: `"Tim Rekrutmen" <${config.user}>`,
             to: candidate.email,
             subject: `Undangan Interview: Posisi ${position.title}`,
             html: `

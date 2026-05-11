@@ -151,6 +151,17 @@ export default function AdminSettings() {
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [leaveMessage, setLeaveMessage] = useState({ type: '', text: '' });
 
+    // SMTP Settings state
+    const [smtpSettings, setSmtpSettings] = useState({
+        smtp_host: '',
+        smtp_port: '',
+        smtp_user: '',
+        smtp_pass: '',
+        smtp_secure: false
+    });
+    const [smtpLoading, setSmtpLoading] = useState(false);
+    const [smtpMessage, setSmtpMessage] = useState({ type: '', text: '' });
+
     // Sync when themeColors change (e.g. after save)
     useEffect(() => {
         setSelectedPrimary(themeColors.primary);
@@ -165,7 +176,24 @@ export default function AdminSettings() {
 
     useEffect(() => {
         fetchLeaveSettings();
+        fetchSmtpSettings();
     }, []);
+
+    const fetchSmtpSettings = async () => {
+        try {
+            const { settingsAPI } = await import('../utils/api');
+            const data = await settingsAPI.getAll();
+            setSmtpSettings({
+                smtp_host: data.smtp_host || '',
+                smtp_port: data.smtp_port || '',
+                smtp_user: data.smtp_user || '',
+                smtp_pass: data.smtp_pass || '',
+                smtp_secure: data.smtp_secure === 'true'
+            });
+        } catch (error) {
+            console.error('Failed to load SMTP settings:', error);
+        }
+    };
 
     const fetchLeaveSettings = async () => {
         try {
@@ -264,6 +292,21 @@ export default function AdminSettings() {
         const newRules = [...bigLeaveRules];
         newRules[index][field] = value;
         setBigLeaveRules(newRules);
+    };
+
+    const handleSmtpSave = async (e) => {
+        e.preventDefault();
+        setSmtpLoading(true);
+        setSmtpMessage({ type: '', text: '' });
+        try {
+            const { settingsAPI } = await import('../utils/api');
+            await settingsAPI.updateSmtp(smtpSettings);
+            setSmtpMessage({ type: 'success', text: 'Pengaturan SMTP berhasil disimpan!' });
+        } catch (error) {
+            setSmtpMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan SMTP' });
+        } finally {
+            setSmtpLoading(false);
+        }
     };
 
     return (
@@ -666,6 +709,104 @@ export default function AdminSettings() {
                             currentLogoUrl={settings.favicon_logo || settings.app_logo} 
                             updateLogoFn={updateLogo} 
                         />
+                    </div>
+                </div>
+
+                {/* ============ SMTP SETTINGS SECTION ============ */}
+                <div className="card">
+                    <div className="card-header">
+                        <h2 className="card-title">📧 Konfigurasi SMTP Email</h2>
+                    </div>
+
+                    <div style={{ padding: '1.5rem 0' }}>
+                        {smtpMessage.text && (
+                            <div className={`alert alert-${smtpMessage.type}`} style={{ marginBottom: '1.5rem' }}>
+                                <span className="alert-icon">{smtpMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                {smtpMessage.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSmtpSave}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">SMTP Host</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Contoh: smtp.gmail.com"
+                                        value={smtpSettings.smtp_host}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_host: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">SMTP Port</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        placeholder="Contoh: 587 atau 465"
+                                        value={smtpSettings.smtp_port}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_port: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Username (Email)</label>
+                                    <input
+                                        type="email"
+                                        className="form-input"
+                                        placeholder="Alamat Email"
+                                        value={smtpSettings.smtp_user}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_user: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Password / App Password</label>
+                                    <input
+                                        type="password"
+                                        className="form-input"
+                                        placeholder="Password"
+                                        value={smtpSettings.smtp_pass}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_pass: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={smtpSettings.smtp_secure}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_secure: e.target.checked })}
+                                        style={{ width: '18px', height: '18px' }}
+                                    />
+                                    <div>
+                                        <div style={{ fontWeight: 600 }}>Gunakan SSL/TLS (Secure)</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Biasanya dicentang jika menggunakan port 465</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                disabled={smtpLoading}
+                            >
+                                {smtpLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    '💾 Simpan SMTP'
+                                )}
+                            </button>
+                        </form>
                     </div>
                 </div>
 

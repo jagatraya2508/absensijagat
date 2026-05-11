@@ -220,4 +220,40 @@ router.put('/leave', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+// Update SMTP settings
+router.put('/smtp', authenticateToken, isAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure } = req.body;
+        
+        await client.query('BEGIN');
+        
+        const settingsToUpdate = {
+            'smtp_host': smtp_host || '',
+            'smtp_port': smtp_port || '',
+            'smtp_user': smtp_user || '',
+            'smtp_pass': smtp_pass || '',
+            'smtp_secure': smtp_secure !== undefined ? smtp_secure.toString() : 'false'
+        };
+
+        for (const [key, value] of Object.entries(settingsToUpdate)) {
+            await client.query(
+                `INSERT INTO settings (key, value) VALUES ($1, $2)
+                 ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+                [key, value]
+            );
+        }
+
+        await client.query('COMMIT');
+        
+        res.json({ message: 'Pengaturan SMTP berhasil diperbarui' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Update SMTP settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;
