@@ -645,6 +645,79 @@ router.put('/overtime-requests/:reqId/employees/:empId', authenticateToken, isAd
     }
 });
 
+// Edit overtime request (Admin only)
+router.put('/overtime-requests/:id', authenticateToken, isAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { date, shift_id, department, overtime_start, overtime_end, estimated_hours, reason, employee_ids } = req.body;
+
+        if (!date || !overtime_start || !overtime_end || !reason) {
+            return res.status(400).json({ error: 'Tanggal, jam mulai, jam selesai, dan alasan harus diisi' });
+        }
+
+        await client.query('BEGIN');
+
+        // Check if request exists
+        const checkResult = await client.query('SELECT * FROM overtime_requests WHERE id = $1 FOR UPDATE', [id]);
+        if (checkResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Pengajuan lembur tidak ditemukan' });
+        }
+
+        // Update main request
+        await client.query(`
+            UPDATE overtime_requests 
+            SET date = $1, shift_id = $2, department = $3, overtime_start = $4, overtime_end = $5, 
+                estimated_hours = $6, reason = $7, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $8
+        `, [date, shift_id || null, department || null, overtime_start, overtime_end, estimated_hours, reason, id]);
+
+        // Update employees if provided
+        if (employee_ids && employee_ids.length > 0) {
+            await client.query('DELETE FROM overtime_request_employees WHERE overtime_request_id = $1', [id]);
+            for (const empId of employee_ids) {
+                await client.query(
+                    'INSERT INTO overtime_request_employees (overtime_request_id, user_id) VALUES ($1, $2)',
+                    [id, empId]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+
+        // Fetch full updated record
+        const fullResult = await pool.query(`
+            SELECT otr.*,
+                   u_req.name as requested_by_name,
+                   u_app.name as approved_by_name,
+                   ws.name as shift_name,
+                   COALESCE(json_agg(
+                       json_build_object('id', ore.id, 'user_id', ore.user_id,
+                           'user_name', u_emp.name, 'employee_id', u_emp.employee_id,
+                           'actual_hours', ore.actual_hours, 'notes', ore.notes
+                       ) ORDER BY u_emp.name
+                   ) FILTER (WHERE ore.id IS NOT NULL), '[]') as employees
+            FROM overtime_requests otr
+            LEFT JOIN users u_req ON u_req.id = otr.requested_by
+            LEFT JOIN users u_app ON u_app.id = otr.approved_by
+            LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+            LEFT JOIN overtime_request_employees ore ON ore.overtime_request_id = otr.id
+            LEFT JOIN users u_emp ON u_emp.id = ore.user_id
+            WHERE otr.id = $1
+            GROUP BY otr.id, u_req.name, u_app.name, ws.name
+        `, [id]);
+
+        res.json({ message: 'Pengajuan lembur berhasil diperbarui', data: fullResult.rows[0] });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Edit overtime request error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    } finally {
+        client.release();
+    }
+});
+
 // Delete overtime request
 router.delete('/overtime-requests/:id', authenticateToken, isAdmin, async (req, res) => {
     try {

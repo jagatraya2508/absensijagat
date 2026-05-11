@@ -6,10 +6,12 @@ const API = import.meta.env.VITE_API_URL || '/api';
 export default function Overtime() {
     const { user } = useAuth();
     const token = localStorage.getItem('token');
+    const isAdmin = user?.role === 'admin';
 
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [editingId, setEditingId] = useState(null);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [printData, setPrintData] = useState(null);
 
@@ -31,10 +33,8 @@ export default function Overtime() {
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
-            // ?self=true ensures we only get our own requests (unless we remove it to get all? No, this page is for our own).
-            // Wait, if an admin makes a request for an employee, it's their "requested_by" or the employee is involved.
-            // ?self=true will map to what we just added in backend.
-            const res = await fetch(`${API}/work-schedules/overtime-requests/list?self=true`, {
+            const selfParam = isAdmin ? '' : '?self=true';
+            const res = await fetch(`${API}/work-schedules/overtime-requests/list${selfParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -44,7 +44,7 @@ export default function Overtime() {
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, [token, isAdmin]);
 
     const fetchAllShifts = useCallback(async () => {
         try {
@@ -55,17 +55,16 @@ export default function Overtime() {
     }, [token]);
 
     const fetchDepartments = useCallback(async () => {
-        if (user.role !== 'admin') return;
+        if (!isAdmin) return;
         try {
             const res = await fetch(`${API}/departments`, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
             if (res.ok) setDepartments(data.map(d => d.name));
         } catch (e) { console.error(e); }
-    }, [token, user.role]);
+    }, [token, isAdmin]);
 
     const fetchEmployees = useCallback(async (dept) => {
-        if (user.role !== 'admin') {
-            // Regular user implicitly only selects themselves
+        if (!isAdmin) {
             setEmployees([{ id: user.id, name: user.name, employee_id: user.employee_id }]);
             return;
         }
@@ -76,7 +75,7 @@ export default function Overtime() {
             const data = await res.json();
             if (res.ok) setEmployees(data);
         } catch (e) { console.error(e); }
-    }, [token, user]);
+    }, [token, user, isAdmin]);
 
     useEffect(() => {
         fetchRequests();
@@ -84,17 +83,33 @@ export default function Overtime() {
         fetchDepartments();
         fetchEmployees();
 
-        // Listen for afterprint event to reset print mode
         const afterPrint = () => setPrintData(null);
         window.addEventListener('afterprint', afterPrint);
         return () => window.removeEventListener('afterprint', afterPrint);
     }, [fetchRequests, fetchAllShifts, fetchDepartments, fetchEmployees]);
 
     function openModal() {
+        setEditingId(null);
         setOtForm({
             date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '',
-            employee_ids: user.role === 'admin' ? [] : [user.id]
+            employee_ids: isAdmin ? [] : [user.id]
         });
+        setShowModal(true);
+    }
+
+    function openEditModal(req) {
+        setEditingId(req.id);
+        setOtForm({
+            date: req.date ? new Date(req.date).toISOString().split('T')[0] : '',
+            shift_id: req.shift_id || '',
+            department: req.department || '',
+            overtime_start: req.overtime_start ? req.overtime_start.substring(0, 5) : '',
+            overtime_end: req.overtime_end ? req.overtime_end.substring(0, 5) : '',
+            estimated_hours: req.estimated_hours || '',
+            reason: req.reason || '',
+            employee_ids: req.employees ? req.employees.map(e => e.user_id) : []
+        });
+        if (req.department) fetchEmployees(req.department);
         setShowModal(true);
     }
 
@@ -113,13 +128,21 @@ export default function Overtime() {
             const estimated = calcEstimatedHours();
             const body = { ...otForm, estimated_hours: estimated };
 
-            // If not admin, ensure they only submit for themselves
-            if (user.role !== 'admin') {
+            if (!isAdmin) {
                 body.employee_ids = [user.id];
             }
 
-            const res = await fetch(`${API}/work-schedules/overtime-requests`, {
-                method: 'POST',
+            let url, method;
+            if (editingId) {
+                url = `${API}/work-schedules/overtime-requests/${editingId}`;
+                method = 'PUT';
+            } else {
+                url = `${API}/work-schedules/overtime-requests`;
+                method = 'POST';
+            }
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify(body)
             });
@@ -127,8 +150,9 @@ export default function Overtime() {
                 const err = await res.json();
                 throw new Error(err.error);
             }
-            showMsg('success', 'Pengajuan lembur berhasil dibuat');
+            showMsg('success', editingId ? 'Pengajuan lembur berhasil diperbarui' : 'Pengajuan lembur berhasil dibuat');
             setShowModal(false);
+            setEditingId(null);
             fetchRequests();
         } catch (e) {
             showMsg('danger', e.message);
@@ -138,12 +162,35 @@ export default function Overtime() {
     }
 
     async function deleteRequest(id) {
+        if (!confirm('Yakin ingin menghapus pengajuan lembur ini?')) return;
+        try {
+            const res = await fetch(`${API}/work-schedules/overtime-requests/${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Gagal menghapus');
+            }
+            showMsg('success', 'Pengajuan lembur berhasil dihapus');
+            fetchRequests();
+        } catch (e) {
+            showMsg('danger', e.message);
+        }
+    }
+
+    async function cancelRequest(id) {
         if (!confirm('Yakin ingin membatalkan pengajuan lembur ini?')) return;
         try {
-            await fetch(`${API}/work-schedules/overtime-requests/${id}`, { 
-                method: 'DELETE', 
-                headers: { Authorization: `Bearer ${token}` } 
+            const res = await fetch(`${API}/work-schedules/overtime-requests/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ status: 'rejected', admin_notes: 'Dibatalkan oleh admin' })
             });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Gagal membatalkan');
+            }
             showMsg('success', 'Pengajuan lembur berhasil dibatalkan');
             fetchRequests();
         } catch (e) {
@@ -153,9 +200,7 @@ export default function Overtime() {
 
     function handlePrint(req) {
         setPrintData(req);
-        setTimeout(() => {
-            window.print();
-        }, 100);
+        setTimeout(() => window.print(), 100);
     }
 
     function showMsg(type, text) {
@@ -168,7 +213,6 @@ export default function Overtime() {
         return t.substring(0, 5);
     }
 
-    // Modal helpers
     const toggleEmployeeSelection = (empId) => {
         setOtForm(f => {
             const current = f.employee_ids;
@@ -185,6 +229,9 @@ export default function Overtime() {
         if (!groupedShifts[key]) groupedShifts[key] = [];
         groupedShifts[key].push(s);
     });
+
+    const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger', completed: 'primary' };
+    const statusLabels = { pending: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak', completed: 'Selesai' };
 
     return (
         <>
@@ -228,6 +275,7 @@ export default function Overtime() {
                                     <th>Tanggal</th>
                                     <th>Waktu</th>
                                     <th>Shift / Dept</th>
+                                    {isAdmin && <th>Diajukan Oleh</th>}
                                     <th>Status</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -247,18 +295,43 @@ export default function Overtime() {
                                             <div style={{ fontSize: '0.85rem' }}>{req.shift_name || '-'}</div>
                                             {req.department && <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{req.department}</div>}
                                         </td>
+                                        {isAdmin && (
+                                            <td>
+                                                <span style={{ fontSize: '0.85rem' }}>{req.requested_by_name || '-'}</span>
+                                            </td>
+                                        )}
                                         <td>
-                                            <span className={`badge ${req.status === 'approved' ? 'badge-success' : req.status === 'rejected' ? 'badge-danger' : req.status === 'completed' ? 'badge-primary' : 'badge-warning'}`}>
-                                                {req.status === 'approved' ? 'Disetujui' : req.status === 'rejected' ? 'Ditolak' : req.status === 'completed' ? 'Selesai' : 'Menunggu'}
+                                            <span className={`badge badge-${statusColors[req.status]}`}>
+                                                {statusLabels[req.status]}
                                             </span>
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                                                {req.status === 'pending' && (
-                                                    <button className="btn btn-outline" style={{ color: 'var(--danger-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }} 
+                                            <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                {/* Admin actions: edit, cancel, delete — on any status */}
+                                                {isAdmin && (
+                                                    <>
+                                                        <button className="btn btn-outline" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                                                            onClick={() => openEditModal(req)} title="Edit">
+                                                            ✏️ Edit
+                                                        </button>
+                                                        {req.status === 'pending' && (
+                                                            <button className="btn btn-outline" style={{ color: 'var(--warning-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                                                                onClick={() => cancelRequest(req.id)} title="Batalkan">
+                                                                ⛔ Batal
+                                                            </button>
+                                                        )}
+                                                        <button className="btn btn-outline" style={{ color: 'var(--danger-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                                                            onClick={() => deleteRequest(req.id)} title="Hapus">
+                                                            🗑️
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {/* Non-admin: only cancel own pending */}
+                                                {!isAdmin && req.status === 'pending' && (
+                                                    <button className="btn btn-outline" style={{ color: 'var(--danger-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                                                         onClick={() => deleteRequest(req.id)}>Batalkan</button>
                                                 )}
-                                                <button className="btn btn-outline" style={{ color: 'var(--primary-color)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }} 
+                                                <button className="btn btn-outline" style={{ color: 'var(--primary-color)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                                                     onClick={() => handlePrint(req)}>Cetak</button>
                                             </div>
                                         </td>
@@ -270,23 +343,23 @@ export default function Overtime() {
                 )}
             </div>
 
-            {/* MODAL */}
+            {/* MODAL - Create / Edit */}
             {showModal && (
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">📋 Ajukan Lembur Baru</h2>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <h2 className="modal-title">{editingId ? '✏️ Edit Pengajuan Lembur' : '📋 Ajukan Lembur Baru'}</h2>
+                            <button className="modal-close" onClick={() => { setShowModal(false); setEditingId(null); }}>×</button>
                         </div>
 
                         <div style={{ padding: '1.5rem' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: user.role === 'admin' ? '1fr 1fr' : '1fr', gap: '0.75rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: '0.75rem' }}>
                                 <div className="form-group">
                                     <label className="form-label">Tanggal Lembur *</label>
                                     <input type="date" className="form-input" value={otForm.date}
                                         onChange={e => setOtForm(f => ({ ...f, date: e.target.value }))} />
                                 </div>
-                                {user.role === 'admin' && (
+                                {isAdmin && (
                                     <div className="form-group">
                                         <label className="form-label">Departemen</label>
                                         <select className="form-input form-select" value={otForm.department}
@@ -341,7 +414,7 @@ export default function Overtime() {
                             </div>
 
                             {/* Employee multiselect only for Admin */}
-                            {user.role === 'admin' && (
+                            {isAdmin && (
                                 <div className="form-group">
                                     <label className="form-label">Karyawan Lembur * ({otForm.employee_ids.length} dipilih)</label>
                                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -368,10 +441,10 @@ export default function Overtime() {
                             )}
 
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                                <button className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
+                                <button className="btn btn-outline" onClick={() => { setShowModal(false); setEditingId(null); }}>Batal</button>
                                 <button className="btn btn-primary" onClick={saveOvertimeRequest}
                                     disabled={loading || !otForm.date || !otForm.overtime_start || !otForm.overtime_end || !otForm.reason || !otForm.employee_ids.length}>
-                                    {loading ? 'Menyimpan...' : 'Ajukan Lembur'}
+                                    {loading ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Ajukan Lembur'}
                                 </button>
                             </div>
                         </div>
