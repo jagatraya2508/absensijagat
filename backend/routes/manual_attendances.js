@@ -138,7 +138,7 @@ router.get('/all', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
-// Approve/Reject manual attendance request (Admin only)
+// Approve/Reject/Cancel manual attendance request (Admin only)
 router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
@@ -146,13 +146,13 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
         const { status, admin_notes } = req.body;
         const adminId = req.user.id;
 
-        if (!['approved', 'rejected'].includes(status)) {
+        if (!['approved', 'rejected', 'cancelled'].includes(status)) {
             return res.status(400).json({ error: 'Status tidak valid' });
         }
 
         await client.query('BEGIN');
 
-        // Check if request exists and is pending
+        // Check if request exists
         const checkResult = await client.query(
             `SELECT * FROM manual_attendances WHERE id = $1 FOR UPDATE`,
             [id]
@@ -165,9 +165,20 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
 
         const request = checkResult.rows[0];
 
-        if (request.status !== 'pending') {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Pengajuan sudah diproses sebelumnya' });
+        // If cancelling an approved request, delete the attendance_records that were created
+        if (status === 'cancelled' && request.status === 'approved') {
+            const userId = request.user_id;
+            const targetDateStr = new Date(request.date).toISOString().split('T')[0];
+
+            // Delete attendance records created by this manual attendance approval
+            await client.query(
+                `DELETE FROM attendance_records 
+                 WHERE user_id = $1 
+                   AND notes = 'Absen Manual (Disetujui Admin)' 
+                   AND photo_path = 'manual'
+                   AND recorded_at::date = $2::date`,
+                [userId, targetDateStr]
+            );
         }
 
         const updateResult = await client.query(
@@ -208,8 +219,14 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
 
         await client.query('COMMIT');
 
+        const messages = {
+            approved: 'Pengajuan disetujui dan absen tercatat',
+            rejected: 'Pengajuan ditolak',
+            cancelled: 'Persetujuan dibatalkan dan record absen dihapus'
+        };
+
         res.json({
-            message: status === 'approved' ? 'Pengajuan disetujui dan absen tercatat' : 'Pengajuan ditolak',
+            message: messages[status],
             data: updateResult.rows[0]
         });
     } catch (error) {

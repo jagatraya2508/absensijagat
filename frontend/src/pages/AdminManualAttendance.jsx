@@ -58,10 +58,26 @@ export default function AdminManualAttendance() {
         }
     };
 
+    const handleCancelApproval = async (request) => {
+        if (!confirm(`Yakin ingin membatalkan persetujuan absen manual untuk ${request.employee_name}?\n\nRecord absen yang sudah tercatat akan dihapus.`)) return;
+        try {
+            setProcessing(true);
+            await manualAttendanceAPI.updateStatus(request.id, 'cancelled', 'Persetujuan dibatalkan oleh admin');
+            alert('Persetujuan berhasil dibatalkan dan record absen dihapus');
+            fetchRequests();
+        } catch (error) {
+            console.error('Error cancelling approval:', error);
+            alert(error.message || 'Gagal membatalkan persetujuan');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     const getStatusBadgeClass = (status) => {
         switch (status) {
             case 'approved': return 'bg-success';
             case 'rejected': return 'bg-danger';
+            case 'cancelled': return 'bg-danger';
             default: return 'bg-warning text-dark';
         }
     };
@@ -70,6 +86,7 @@ export default function AdminManualAttendance() {
         switch (status) {
             case 'approved': return 'Disetujui';
             case 'rejected': return 'Ditolak';
+            case 'cancelled': return 'Dibatalkan';
             default: return 'Menunggu';
         }
     };
@@ -207,6 +224,19 @@ export default function AdminManualAttendance() {
                                                 ❌ Tolak
                                             </button>
                                         </div>
+                                    </div>
+                                )}
+
+                                {request.status === 'approved' && (
+                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+                                        <button
+                                            className="btn btn-outline"
+                                            onClick={() => handleCancelApproval(request)}
+                                            disabled={processing}
+                                            style={{ padding: '0.5rem 1rem', color: 'var(--danger-500)', borderColor: 'var(--danger-500)' }}
+                                        >
+                                            {processing ? '⏳ Memproses...' : '⛔ Batalkan Persetujuan'}
+                                        </button>
                                     </div>
                                 )}
                             </div>
