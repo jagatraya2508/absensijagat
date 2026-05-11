@@ -188,9 +188,9 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
                 const recordedAtIn = `${targetDateStr} ${request.time_in}`;
                 await client.query(
                     `INSERT INTO attendance_records 
-                     (user_id, type, is_valid, notes, recorded_at)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [userId, 'in', true, 'Absen Manual (Disetujui Admin)', recordedAtIn]
+                     (user_id, type, photo_path, latitude, longitude, is_valid, notes, recorded_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [userId, 'check_in', 'manual', 0, 0, true, 'Absen Manual (Disetujui Admin)', recordedAtIn]
                 );
             }
 
@@ -199,9 +199,9 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
                 const recordedAtOut = `${targetDateStr} ${request.time_out}`;
                 await client.query(
                     `INSERT INTO attendance_records 
-                     (user_id, type, is_valid, notes, recorded_at)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [userId, 'out', true, 'Absen Manual (Disetujui Admin)', recordedAtOut]
+                     (user_id, type, photo_path, latitude, longitude, is_valid, notes, recorded_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [userId, 'check_out', 'manual', 0, 0, true, 'Absen Manual (Disetujui Admin)', recordedAtOut]
                 );
             }
         }
