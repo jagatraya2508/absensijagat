@@ -274,6 +274,21 @@ export default function AdminWorkSchedule() {
         setShowScheduleModal(true);
     }
 
+    function openDuplicateSchedule(sched) {
+        setScheduleForm({
+            id: null, // Null to create a new one
+            name: `${sched.name} (Copy)`,
+            type: sched.type,
+            shift_count: sched.shift_count,
+            department: '', // Clear department so admin has to select a new one
+            position: sched.position || '',
+            is_default: false, // Don't copy default status
+            shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(s => ({ ...s, id: undefined })) : [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
+            overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? { ...sched.overtime_rule, id: undefined } : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
+        });
+        setShowScheduleModal(true);
+    }
+
     function handleTypeChange(type) {
         const count = type === 'normal' ? 1 : 2;
         const newShifts = [];
@@ -583,8 +598,9 @@ export default function AdminWorkSchedule() {
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openEditSchedule(sched)}>✏️</button>
-                                        <button className="btn btn-danger" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => deleteSchedule(sched.id)}>🗑️</button>
+                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openDuplicateSchedule(sched)} title="Duplikasi Jadwal">📄</button>
+                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openEditSchedule(sched)} title="Edit Jadwal">✏️</button>
+                                        <button className="btn btn-danger" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => deleteSchedule(sched.id)} title="Hapus Jadwal">🗑️</button>
                                     </div>
                                 </div>
 
