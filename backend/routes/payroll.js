@@ -134,7 +134,8 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                    COALESCE(ed.driver_subuh_allowance, 0) as driver_subuh_allowance,
                    COALESCE(ed.driver_rit_allowance, 0) as driver_rit_allowance,
                    COALESCE(ed.driver_inap_allowance, 0) as driver_inap_allowance,
-                   COALESCE(ed.driver_ritase_allowance, 0) as driver_ritase_allowance,
+                   COALESCE(ed.driver_ritase_dekat_allowance, 0) as driver_ritase_dekat_allowance,
+                   COALESCE(ed.driver_ritase_jauh_allowance, 0) as driver_ritase_jauh_allowance,
                    COALESCE(ed.bpjs_kes_enrolled, true) as bpjs_kes_enrolled,
                    COALESCE(ed.bpjs_jht_enrolled, true) as bpjs_jht_enrolled,
                    COALESCE(ed.bpjs_jp_enrolled, true) as bpjs_jp_enrolled,
@@ -219,7 +220,9 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
             let driverSubuhDays = 0, driverSubuhAmount = 0;
             let driverRitTotal = 0, driverRitAmount = 0;
             let driverOvernightDays = 0, driverOvernightAmount = 0;
-            let driverExtraRit = 0, driverRitaseAmount = 0;
+            let driverExtraRitDekat = 0, driverRitaseDekatAmount = 0;
+            let driverExtraRitJauh = 0, driverRitaseJauhAmount = 0;
+            let driverRitaseAmount = 0; // Total
             let driverTotalAllowance = 0;
 
             if (emp.is_driver) {
@@ -228,7 +231,8 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                         COALESCE(SUM(CASE WHEN is_subuh THEN 1 ELSE 0 END), 0) as total_subuh,
                         COALESCE(SUM(rit_count), 0) as total_rit,
                         COALESCE(SUM(CASE WHEN is_overnight THEN 1 ELSE 0 END), 0) as total_overnight,
-                        COALESCE(SUM(GREATEST(rit_count - 1, 0)), 0) as extra_rit
+                        COALESCE(SUM(ritase_dekat), 0) as extra_rit_dekat,
+                        COALESCE(SUM(ritase_jauh), 0) as extra_rit_jauh
                     FROM driver_activities
                     WHERE user_id = $1
                       AND EXTRACT(MONTH FROM activity_date) = $2
@@ -238,12 +242,15 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                 driverSubuhDays = parseInt(driverResult.rows[0].total_subuh);
                 driverRitTotal = parseInt(driverResult.rows[0].total_rit);
                 driverOvernightDays = parseInt(driverResult.rows[0].total_overnight);
-                driverExtraRit = parseInt(driverResult.rows[0].extra_rit);
+                driverExtraRitDekat = parseInt(driverResult.rows[0].extra_rit_dekat);
+                driverExtraRitJauh = parseInt(driverResult.rows[0].extra_rit_jauh);
 
                 driverSubuhAmount = driverSubuhDays * parseFloat(emp.driver_subuh_allowance);
                 driverRitAmount = driverRitTotal * parseFloat(emp.driver_rit_allowance);
-                   driverOvernightAmount = driverOvernightDays * parseFloat(emp.driver_inap_allowance);
-                driverRitaseAmount = driverExtraRit * parseFloat(emp.driver_ritase_allowance);
+                driverOvernightAmount = driverOvernightDays * parseFloat(emp.driver_inap_allowance);
+                driverRitaseDekatAmount = driverExtraRitDekat * parseFloat(emp.driver_ritase_dekat_allowance);
+                driverRitaseJauhAmount = driverExtraRitJauh * parseFloat(emp.driver_ritase_jauh_allowance);
+                driverRitaseAmount = driverRitaseDekatAmount + driverRitaseJauhAmount;
                 driverTotalAllowance = driverSubuhAmount + driverRitAmount + driverOvernightAmount + driverRitaseAmount;
             }
 
@@ -320,8 +327,8 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                     salary_type, working_days,
                     driver_subuh_days, driver_subuh_amount, driver_rit_total, driver_rit_amount,
                     driver_overnight_days, driver_overnight_amount, driver_total_allowance,
-                    driver_extra_rit, driver_ritase_amount
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+                    driver_extra_rit_dekat, driver_extra_rit_jauh, driver_ritase_dekat_amount, driver_ritase_jauh_amount
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
             `, [
                 payrollRunId, emp.id, basicSalary, transportAllowance, mealAllowance,
                 overtimeHours, overtimeAmount,
@@ -331,7 +338,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                 salaryType, workingDays,
                 driverSubuhDays, driverSubuhAmount, driverRitTotal, driverRitAmount,
                 driverOvernightDays, driverOvernightAmount, driverTotalAllowance,
-                driverExtraRit, driverRitaseAmount
+                driverExtraRitDekat, driverExtraRitJauh, driverRitaseDekatAmount, driverRitaseJauhAmount
             ]);
         }
 
@@ -764,8 +771,10 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
                 addRow(`Uang Mel/RIT (${slip.driver_rit_total} trip)`, slip.driver_rit_amount);
             if (parseFloat(slip.driver_overnight_amount) > 0)
                 addRow(`Uang Menginap (${slip.driver_overnight_days} hari)`, slip.driver_overnight_amount);
-            if (parseFloat(slip.driver_ritase_amount) > 0)
-                addRow(`Uang Ritase Tambahan (${slip.driver_extra_rit} trip)`, slip.driver_ritase_amount);
+            if (parseFloat(slip.driver_ritase_dekat_amount) > 0)
+                addRow(`Uang Ritase Dekat (${slip.driver_extra_rit_dekat} trip)`, slip.driver_ritase_dekat_amount);
+            if (parseFloat(slip.driver_ritase_jauh_amount) > 0)
+                addRow(`Uang Ritase Jauh (${slip.driver_extra_rit_jauh} trip)`, slip.driver_ritase_jauh_amount);
         }
         doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
         doc.moveDown(0.3);

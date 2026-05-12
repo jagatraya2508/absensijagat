@@ -11,7 +11,8 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
         const { month, year, user_id } = req.query;
         let query = `
             SELECT da.*, u.name as user_name, u.employee_id,
-                   ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance
+                   ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance,
+                   ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance
             FROM driver_activities da
             JOIN users u ON da.user_id = u.id
             LEFT JOIN employee_details ed ON da.user_id = ed.user_id
@@ -54,18 +55,20 @@ router.get('/summary', authenticateToken, isAdmin, async (req, res) => {
                    SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
                    SUM(da.rit_count) as total_rit,
                    SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
-                   SUM(GREATEST(da.rit_count - 1, 0)) as extra_rit,
+                   SUM(COALESCE(da.ritase_dekat, 0)) as total_ritase_dekat,
+                   SUM(COALESCE(da.ritase_jauh, 0)) as total_ritase_jauh,
                    COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
                    COALESCE(ed.driver_rit_allowance, 0) as tarif_rit,
                    COALESCE(ed.driver_inap_allowance, 0) as tarif_inap,
-                   COALESCE(ed.driver_ritase_allowance, 0) as tarif_ritase
+                   COALESCE(ed.driver_ritase_dekat_allowance, 0) as tarif_ritase_dekat,
+                   COALESCE(ed.driver_ritase_jauh_allowance, 0) as tarif_ritase_jauh
             FROM driver_activities da
             JOIN users u ON da.user_id = u.id
             LEFT JOIN employee_details ed ON da.user_id = ed.user_id
             WHERE EXTRACT(MONTH FROM da.activity_date) = $1
               AND EXTRACT(YEAR FROM da.activity_date) = $2
             GROUP BY da.user_id, u.name, u.employee_id, 
-                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_allowance
+                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance
             ORDER BY u.name ASC
         `, [month, year]);
 
@@ -74,12 +77,16 @@ router.get('/summary', authenticateToken, isAdmin, async (req, res) => {
             const subuhAmt = parseInt(row.total_subuh) * parseFloat(row.tarif_subuh);
             const ritAmt = parseInt(row.total_rit) * parseFloat(row.tarif_rit);
             const overnightAmt = parseInt(row.total_overnight) * parseFloat(row.tarif_inap);
-            const ritaseAmt = parseInt(row.extra_rit) * parseFloat(row.tarif_ritase);
+            const ritaseDekatAmt = parseInt(row.total_ritase_dekat) * parseFloat(row.tarif_ritase_dekat);
+            const ritaseJauhAmt = parseInt(row.total_ritase_jauh) * parseFloat(row.tarif_ritase_jauh);
+            const ritaseAmt = ritaseDekatAmt + ritaseJauhAmt;
             return {
                 ...row,
                 total_subuh_amount: subuhAmt,
                 total_rit_amount: ritAmt,
                 total_overnight_amount: overnightAmt,
+                total_ritase_dekat_amount: ritaseDekatAmt,
+                total_ritase_jauh_amount: ritaseJauhAmt,
                 total_ritase_amount: ritaseAmt,
                 grand_total: subuhAmt + ritAmt + overnightAmt + ritaseAmt
             };
@@ -112,7 +119,7 @@ router.get('/drivers', authenticateToken, isAdmin, async (req, res) => {
 // Create driver activity
 router.post('/', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const { user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes } = req.body;
+        const { user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh } = req.body;
 
         if (!user_id || !activity_date) {
             return res.status(400).json({ error: 'Driver dan tanggal harus diisi' });
@@ -128,8 +135,8 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
         }
 
         const result = await pool.query(`
-            INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ON CONFLICT (user_id, activity_date) DO UPDATE SET
                 is_subuh = EXCLUDED.is_subuh,
                 departure_time = EXCLUDED.departure_time,
@@ -137,6 +144,8 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
                 rit_notes = EXCLUDED.rit_notes,
                 is_overnight = EXCLUDED.is_overnight,
                 notes = EXCLUDED.notes,
+                ritase_dekat = EXCLUDED.ritase_dekat,
+                ritase_jauh = EXCLUDED.ritase_jauh,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING *
         `, [
@@ -147,7 +156,9 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
             rit_notes || null,
             is_overnight || false,
             notes || null,
-            req.user.id
+            req.user.id,
+            ritase_dekat || 0,
+            ritase_jauh || 0
         ]);
 
         res.status(201).json(result.rows[0]);
@@ -161,17 +172,18 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes } = req.body;
+        const { is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh } = req.body;
 
         const result = await pool.query(`
             UPDATE driver_activities SET
                 is_subuh = $1, departure_time = $2, rit_count = $3, rit_notes = $4,
-                is_overnight = $5, notes = $6, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $7
+                is_overnight = $5, notes = $6, ritase_dekat = $7, ritase_jauh = $8, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $9
             RETURNING *
         `, [
             is_subuh || false, departure_time || null, rit_count || 1,
-            rit_notes || null, is_overnight || false, notes || null, id
+            rit_notes || null, is_overnight || false, notes || null, 
+            ritase_dekat || 0, ritase_jauh || 0, id
         ]);
 
         if (result.rows.length === 0) {
@@ -213,8 +225,8 @@ router.post('/bulk', authenticateToken, isAdmin, async (req, res) => {
         const results = [];
         for (const act of activities) {
             const result = await client.query(`
-                INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 ON CONFLICT (user_id, activity_date) DO UPDATE SET
                     is_subuh = EXCLUDED.is_subuh,
                     departure_time = EXCLUDED.departure_time,
@@ -222,6 +234,8 @@ router.post('/bulk', authenticateToken, isAdmin, async (req, res) => {
                     rit_notes = EXCLUDED.rit_notes,
                     is_overnight = EXCLUDED.is_overnight,
                     notes = EXCLUDED.notes,
+                    ritase_dekat = EXCLUDED.ritase_dekat,
+                    ritase_jauh = EXCLUDED.ritase_jauh,
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING *
             `, [
@@ -229,7 +243,8 @@ router.post('/bulk', authenticateToken, isAdmin, async (req, res) => {
                 act.is_subuh || false, act.departure_time || null,
                 act.rit_count || 1, act.rit_notes || null,
                 act.is_overnight || false, act.notes || null,
-                req.user.id
+                req.user.id,
+                act.ritase_dekat || 0, act.ritase_jauh || 0
             ]);
             results.push(result.rows[0]);
         }
@@ -272,18 +287,20 @@ router.get('/export/summary/pdf', authenticateToken, isAdmin, async (req, res) =
                    SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
                    SUM(da.rit_count) as total_rit,
                    SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
-                   SUM(GREATEST(da.rit_count - 1, 0)) as extra_rit,
+                   SUM(COALESCE(da.ritase_dekat, 0)) as total_ritase_dekat,
+                   SUM(COALESCE(da.ritase_jauh, 0)) as total_ritase_jauh,
                    COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
                    COALESCE(ed.driver_rit_allowance, 0) as tarif_rit,
                    COALESCE(ed.driver_inap_allowance, 0) as tarif_inap,
-                   COALESCE(ed.driver_ritase_allowance, 0) as tarif_ritase
+                   COALESCE(ed.driver_ritase_dekat_allowance, 0) as tarif_ritase_dekat,
+                   COALESCE(ed.driver_ritase_jauh_allowance, 0) as tarif_ritase_jauh
             FROM driver_activities da
             JOIN users u ON da.user_id = u.id
             LEFT JOIN employee_details ed ON da.user_id = ed.user_id
             WHERE EXTRACT(MONTH FROM da.activity_date) = $1
               AND EXTRACT(YEAR FROM da.activity_date) = $2
             GROUP BY da.user_id, u.name, u.employee_id, 
-                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_allowance
+                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance
             ORDER BY u.name ASC
         `, [targetMonth, targetYear]);
 
@@ -291,12 +308,16 @@ router.get('/export/summary/pdf', authenticateToken, isAdmin, async (req, res) =
             const subuhAmt = parseInt(row.total_subuh) * parseFloat(row.tarif_subuh);
             const ritAmt = parseInt(row.total_rit) * parseFloat(row.tarif_rit);
             const overnightAmt = parseInt(row.total_overnight) * parseFloat(row.tarif_inap);
-            const ritaseAmt = parseInt(row.extra_rit) * parseFloat(row.tarif_ritase);
+            const ritaseDekatAmt = parseInt(row.total_ritase_dekat) * parseFloat(row.tarif_ritase_dekat);
+            const ritaseJauhAmt = parseInt(row.total_ritase_jauh) * parseFloat(row.tarif_ritase_jauh);
+            const ritaseAmt = ritaseDekatAmt + ritaseJauhAmt;
             return {
                 ...row,
                 total_subuh_amount: subuhAmt,
                 total_rit_amount: ritAmt,
                 total_overnight_amount: overnightAmt,
+                total_ritase_dekat_amount: ritaseDekatAmt,
+                total_ritase_jauh_amount: ritaseJauhAmt,
                 total_ritase_amount: ritaseAmt,
                 grand_total: subuhAmt + ritAmt + overnightAmt + ritaseAmt
             };
@@ -392,18 +413,20 @@ router.get('/export/summary/excel', authenticateToken, isAdmin, async (req, res)
                    SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
                    SUM(da.rit_count) as total_rit,
                    SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
-                   SUM(GREATEST(da.rit_count - 1, 0)) as extra_rit,
+                   SUM(COALESCE(da.ritase_dekat, 0)) as total_ritase_dekat,
+                   SUM(COALESCE(da.ritase_jauh, 0)) as total_ritase_jauh,
                    COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
                    COALESCE(ed.driver_rit_allowance, 0) as tarif_rit,
                    COALESCE(ed.driver_inap_allowance, 0) as tarif_inap,
-                   COALESCE(ed.driver_ritase_allowance, 0) as tarif_ritase
+                   COALESCE(ed.driver_ritase_dekat_allowance, 0) as tarif_ritase_dekat,
+                   COALESCE(ed.driver_ritase_jauh_allowance, 0) as tarif_ritase_jauh
             FROM driver_activities da
             JOIN users u ON da.user_id = u.id
             LEFT JOIN employee_details ed ON da.user_id = ed.user_id
             WHERE EXTRACT(MONTH FROM da.activity_date) = $1
               AND EXTRACT(YEAR FROM da.activity_date) = $2
             GROUP BY da.user_id, u.name, u.employee_id, 
-                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_allowance
+                     ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance
             ORDER BY u.name ASC
         `, [targetMonth, targetYear]);
 
@@ -411,12 +434,16 @@ router.get('/export/summary/excel', authenticateToken, isAdmin, async (req, res)
             const subuhAmt = parseInt(row.total_subuh) * parseFloat(row.tarif_subuh);
             const ritAmt = parseInt(row.total_rit) * parseFloat(row.tarif_rit);
             const overnightAmt = parseInt(row.total_overnight) * parseFloat(row.tarif_inap);
-            const ritaseAmt = parseInt(row.extra_rit) * parseFloat(row.tarif_ritase);
+            const ritaseDekatAmt = parseInt(row.total_ritase_dekat) * parseFloat(row.tarif_ritase_dekat);
+            const ritaseJauhAmt = parseInt(row.total_ritase_jauh) * parseFloat(row.tarif_ritase_jauh);
+            const ritaseAmt = ritaseDekatAmt + ritaseJauhAmt;
             return {
                 ...row,
                 total_subuh_amount: subuhAmt,
                 total_rit_amount: ritAmt,
                 total_overnight_amount: overnightAmt,
+                total_ritase_dekat_amount: ritaseDekatAmt,
+                total_ritase_jauh_amount: ritaseJauhAmt,
                 total_ritase_amount: ritaseAmt,
                 grand_total: subuhAmt + ritAmt + overnightAmt + ritaseAmt
             };

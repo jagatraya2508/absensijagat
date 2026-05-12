@@ -25,7 +25,7 @@ export default function AdminDriverActivities() {
     const [formData, setFormData] = useState({
         user_id: '', activity_date: '', is_subuh: false,
         departure_time: '', rit_count: 1, rit_notes: '',
-        is_overnight: false, notes: ''
+        is_overnight: false, notes: '', ritase_dekat: 0, ritase_jauh: 0
     });
 
     useEffect(() => {
@@ -77,7 +77,8 @@ export default function AdminDriverActivities() {
             user_id: selectedDriver || (drivers[0]?.id || ''),
             activity_date: date || '',
             is_subuh: false, departure_time: '', rit_count: 1,
-            rit_notes: '', is_overnight: false, notes: ''
+            rit_notes: '', is_overnight: false, notes: '',
+            ritase_dekat: 0, ritase_jauh: 0
         });
         setShowModal(true);
         setError('');
@@ -94,7 +95,9 @@ export default function AdminDriverActivities() {
             rit_count: act.rit_count || 1,
             rit_notes: act.rit_notes || '',
             is_overnight: act.is_overnight,
-            notes: act.notes || ''
+            notes: act.notes || '',
+            ritase_dekat: act.ritase_dekat || 0,
+            ritase_jauh: act.ritase_jauh || 0
         });
         setShowModal(true);
         setError('');
@@ -181,13 +184,16 @@ export default function AdminDriverActivities() {
             subuh: acc.subuh + parseInt(s.total_subuh || 0),
             rit: acc.rit + parseInt(s.total_rit || 0),
             overnight: acc.overnight + parseInt(s.total_overnight || 0),
-            extraRit: acc.extraRit + parseInt(s.extra_rit || 0),
+            extraRitDekat: acc.extraRitDekat + parseInt(s.total_ritase_dekat || 0),
+            extraRitJauh: acc.extraRitJauh + parseInt(s.total_ritase_jauh || 0),
             subuhAmount: acc.subuhAmount + (s.total_subuh_amount || 0),
             ritAmount: acc.ritAmount + (s.total_rit_amount || 0),
             overnightAmount: acc.overnightAmount + (s.total_overnight_amount || 0),
+            ritaseDekatAmount: acc.ritaseDekatAmount + (s.total_ritase_dekat_amount || 0),
+            ritaseJauhAmount: acc.ritaseJauhAmount + (s.total_ritase_jauh_amount || 0),
             ritaseAmount: acc.ritaseAmount + (s.total_ritase_amount || 0),
             grandTotal: acc.grandTotal + (s.grand_total || 0),
-        }), { subuh: 0, rit: 0, overnight: 0, extraRit: 0, subuhAmount: 0, ritAmount: 0, overnightAmount: 0, ritaseAmount: 0, grandTotal: 0 });
+        }), { subuh: 0, rit: 0, overnight: 0, extraRitDekat: 0, extraRitJauh: 0, subuhAmount: 0, ritAmount: 0, overnightAmount: 0, ritaseDekatAmount: 0, ritaseJauhAmount: 0, ritaseAmount: 0, grandTotal: 0 });
     }, [summary]);
 
     return (
@@ -267,12 +273,13 @@ export default function AdminDriverActivities() {
             </div>
 
             {/* Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                 {[
                     { label: '🌙 Total Subuh', value: totalStats.subuh + ' hari', amount: totalStats.subuhAmount, color: '#6366f1' },
                     { label: '🔄 Total RIT', value: totalStats.rit + ' trip', amount: totalStats.ritAmount, color: '#f59e0b' },
-                    { label: '🚚 Ritase Tambahan', value: totalStats.extraRit + ' trip', amount: totalStats.ritaseAmount, color: '#8b5cf6' },
-                    { label: '🏨 Total Menginap', value: totalStats.overnight + ' hari', amount: totalStats.overnightAmount, color: '#ef4444' },
+                    { label: '🚚 Ritase Dekat', value: totalStats.extraRitDekat + ' trip', amount: totalStats.ritaseDekatAmount, color: '#8b5cf6' },
+                    { label: '🚛 Ritase Jauh', value: totalStats.extraRitJauh + ' trip', amount: totalStats.ritaseJauhAmount, color: '#a855f7' },
+                    { label: '🏨 Menginap', value: totalStats.overnight + ' hari', amount: totalStats.overnightAmount, color: '#ef4444' },
                     { label: '💰 Grand Total', value: '', amount: totalStats.grandTotal, color: '#10b981' },
                 ].map((stat, i) => (
                     <div key={i} className="card" style={{ padding: '1.25rem', borderLeft: `4px solid ${stat.color}` }}>
@@ -338,7 +345,10 @@ export default function AdminDriverActivities() {
                                                         🔄 {act.rit_count} RIT
                                                     </span>
                                                     {act.rit_count > 1 && (
-                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(139,92,246,0.3)', padding: '1px 4px', borderRadius: 4, color: '#c4b5fd' }}>🚚 +{act.rit_count - 1} Ritase</span>
+                                                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                            {act.ritase_dekat > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(139,92,246,0.3)', padding: '1px 4px', borderRadius: 4, color: '#c4b5fd' }}>🚚 {act.ritase_dekat} Dekat</span>}
+                                                            {act.ritase_jauh > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(168,85,247,0.3)', padding: '1px 4px', borderRadius: 4, color: '#d8b4fe' }}>🚛 {act.ritase_jauh} Jauh</span>}
+                                                        </div>
                                                     )}
                                                     {act.is_overnight && (
                                                         <span style={{ fontSize: '0.6rem', background: 'rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: 4, color: '#fca5a5' }}>🏨 Inap</span>
@@ -379,8 +389,10 @@ export default function AdminDriverActivities() {
                                         <th style={{ textAlign: 'right' }}>Uang Subuh</th>
                                         <th style={{ textAlign: 'center' }}>🔄 Total RIT</th>
                                         <th style={{ textAlign: 'right' }}>Uang RIT</th>
-                                        <th style={{ textAlign: 'center' }}>🚚 Ritase+</th>
-                                        <th style={{ textAlign: 'right' }}>Uang Ritase</th>
+                                        <th style={{ textAlign: 'center' }}>🚚 Dekat+</th>
+                                        <th style={{ textAlign: 'right' }}>Uang Dekat</th>
+                                        <th style={{ textAlign: 'center' }}>🚛 Jauh+</th>
+                                        <th style={{ textAlign: 'right' }}>Uang Jauh</th>
                                         <th style={{ textAlign: 'center' }}>🏨 Menginap</th>
                                         <th style={{ textAlign: 'right' }}>Uang Inap</th>
                                         <th style={{ textAlign: 'right', fontWeight: 700 }}>Total</th>
@@ -403,9 +415,13 @@ export default function AdminDriverActivities() {
                                             </td>
                                             <td style={{ textAlign: 'right' }}>{formatCurrency(s.total_rit_amount)}</td>
                                             <td style={{ textAlign: 'center' }}>
-                                                <span className="badge" style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{s.extra_rit}</span>
+                                                <span className="badge" style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{s.total_ritase_dekat}</span>
                                             </td>
-                                            <td style={{ textAlign: 'right' }}>{formatCurrency(s.total_ritase_amount)}</td>
+                                            <td style={{ textAlign: 'right' }}>{formatCurrency(s.total_ritase_dekat_amount)}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className="badge" style={{ background: 'rgba(168,85,247,0.2)', color: '#d8b4fe' }}>{s.total_ritase_jauh}</span>
+                                            </td>
+                                            <td style={{ textAlign: 'right' }}>{formatCurrency(s.total_ritase_jauh_amount)}</td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <span className="badge badge-danger" style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}>{s.total_overnight}</span>
                                             </td>
@@ -423,8 +439,10 @@ export default function AdminDriverActivities() {
                                         <td style={{ textAlign: 'right' }}>{formatCurrency(totalStats.subuhAmount)}</td>
                                         <td style={{ textAlign: 'center' }}>{totalStats.rit}</td>
                                         <td style={{ textAlign: 'right' }}>{formatCurrency(totalStats.ritAmount)}</td>
-                                        <td style={{ textAlign: 'center' }}>{totalStats.extraRit}</td>
-                                        <td style={{ textAlign: 'right' }}>{formatCurrency(totalStats.ritaseAmount)}</td>
+                                        <td style={{ textAlign: 'center' }}>{totalStats.extraRitDekat}</td>
+                                        <td style={{ textAlign: 'right' }}>{formatCurrency(totalStats.ritaseDekatAmount)}</td>
+                                        <td style={{ textAlign: 'center' }}>{totalStats.extraRitJauh}</td>
+                                        <td style={{ textAlign: 'right' }}>{formatCurrency(totalStats.ritaseJauhAmount)}</td>
                                         <td style={{ textAlign: 'center' }}>{totalStats.overnight}</td>
                                         <td style={{ textAlign: 'right' }}>{formatCurrency(totalStats.overnightAmount)}</td>
                                         <td style={{ textAlign: 'right', color: '#10b981', fontSize: '1.1rem' }}>{formatCurrency(totalStats.grandTotal)}</td>
@@ -460,7 +478,8 @@ export default function AdminDriverActivities() {
                                         <th>Driver</th>
                                         <th style={{ textAlign: 'center' }}>Subuh</th>
                                         <th style={{ textAlign: 'center' }}>RIT</th>
-                                        <th style={{ textAlign: 'center' }}>Ritase Tambahan</th>
+                                        <th style={{ textAlign: 'center' }}>Ritase Dekat</th>
+                                        <th style={{ textAlign: 'center' }}>Ritase Jauh</th>
                                         <th style={{ textAlign: 'center' }}>Menginap</th>
                                         <th>Catatan Rute</th>
                                         {isAdmin && <th style={{ textAlign: 'right' }}>Aksi</th>}
@@ -481,7 +500,10 @@ export default function AdminDriverActivities() {
                                                 <span className="badge badge-warning">{act.rit_count}</span>
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
-                                                {act.rit_count > 1 ? <span className="badge" style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{act.rit_count - 1}</span> : '-'}
+                                                {act.ritase_dekat > 0 ? <span className="badge" style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{act.ritase_dekat}</span> : '-'}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {act.ritase_jauh > 0 ? <span className="badge" style={{ background: 'rgba(168,85,247,0.2)', color: '#d8b4fe' }}>{act.ritase_jauh}</span> : '-'}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {act.is_overnight ? <span style={{ color: '#ef4444' }}>🏨 Ya</span> : '-'}
@@ -561,13 +583,31 @@ export default function AdminDriverActivities() {
                                         <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🔄</div>
                                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fbbf24', marginBottom: 6 }}>Jumlah RIT</div>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, rit_count: Math.max(1, prev.rit_count - 1) }))}
+                                            <button type="button" onClick={() => {
+                                                setFormData(prev => {
+                                                    const newCount = Math.max(1, prev.rit_count - 1);
+                                                    const totalRitase = Math.max(0, newCount - 1);
+                                                    // auto-adjust dekat/jauh if needed
+                                                    let d = prev.ritase_dekat, j = prev.ritase_jauh;
+                                                    if (d + j > totalRitase) {
+                                                        if (d > totalRitase) { d = totalRitase; j = 0; }
+                                                        else { j = totalRitase - d; }
+                                                    }
+                                                    return { ...prev, rit_count: newCount, ritase_dekat: d, ritase_jauh: j };
+                                                });
+                                            }}
                                                 style={{
                                                     width: 28, height: 28, borderRadius: '50%', border: 'none',
                                                     background: 'var(--gray-600)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '1rem'
                                                 }}>−</button>
                                             <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fbbf24', minWidth: 24 }}>{formData.rit_count}</span>
-                                            <button type="button" onClick={() => setFormData(prev => ({ ...prev, rit_count: prev.rit_count + 1 }))}
+                                            <button type="button" onClick={() => {
+                                                setFormData(prev => {
+                                                    const newCount = prev.rit_count + 1;
+                                                    // default new ritase to dekat
+                                                    return { ...prev, rit_count: newCount, ritase_dekat: prev.ritase_dekat + 1 };
+                                                });
+                                            }}
                                                 style={{
                                                     width: 28, height: 28, borderRadius: '50%', border: 'none',
                                                     background: 'var(--gray-600)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '1rem'
@@ -593,20 +633,53 @@ export default function AdminDriverActivities() {
                                     </div>
                                 </div>
 
-                                {/* Ritase Info Banner */}
+                                {/* Ritase Info Banner & Selection */}
                                 {formData.rit_count > 1 && (
                                     <div style={{
-                                        padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)',
-                                        background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
-                                        display: 'flex', alignItems: 'center', gap: '0.75rem'
+                                        padding: '1rem', borderRadius: 'var(--radius-md)',
+                                        background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)',
+                                        marginBottom: '1rem'
                                     }}>
-                                        <span style={{ fontSize: '1.5rem' }}>🚚</span>
-                                        <div>
-                                            <div style={{ fontWeight: 700, color: '#c4b5fd', fontSize: '0.85rem' }}>
-                                                Ritase Tambahan: +{formData.rit_count - 1} trip
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                            <span style={{ fontSize: '1.5rem' }}>🚚</span>
+                                            <div>
+                                                <div style={{ fontWeight: 700, color: '#c4b5fd', fontSize: '0.85rem' }}>
+                                                    Ritase Tambahan: {formData.rit_count - 1} trip
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>
+                                                    Alokasikan ke jarak dekat atau jarak jauh.
+                                                </div>
                                             </div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>
-                                                Driver melakukan {formData.rit_count} RIT → {formData.rit_count - 1} ritase tambahan akan dihitung otomatis di payroll
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                            <div>
+                                                <label className="form-label" style={{ fontSize: '0.75rem', color: '#c4b5fd' }}>Ritase Dekat</label>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <button type="button" onClick={() => {
+                                                        const newVal = Math.max(0, formData.ritase_dekat - 1);
+                                                        setFormData(prev => ({ ...prev, ritase_dekat: newVal, ritase_jauh: (prev.rit_count - 1) - newVal }));
+                                                    }} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--gray-600)', color: '#fff', cursor: 'pointer' }}>−</button>
+                                                    <span style={{ fontSize: '1.1rem', fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{formData.ritase_dekat}</span>
+                                                    <button type="button" onClick={() => {
+                                                        const newVal = Math.min(formData.rit_count - 1, formData.ritase_dekat + 1);
+                                                        setFormData(prev => ({ ...prev, ritase_dekat: newVal, ritase_jauh: (prev.rit_count - 1) - newVal }));
+                                                    }} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--gray-600)', color: '#fff', cursor: 'pointer' }}>+</button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="form-label" style={{ fontSize: '0.75rem', color: '#d8b4fe' }}>Ritase Jauh</label>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <button type="button" onClick={() => {
+                                                        const newVal = Math.max(0, formData.ritase_jauh - 1);
+                                                        setFormData(prev => ({ ...prev, ritase_jauh: newVal, ritase_dekat: (prev.rit_count - 1) - newVal }));
+                                                    }} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--gray-600)', color: '#fff', cursor: 'pointer' }}>−</button>
+                                                    <span style={{ fontSize: '1.1rem', fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{formData.ritase_jauh}</span>
+                                                    <button type="button" onClick={() => {
+                                                        const newVal = Math.min(formData.rit_count - 1, formData.ritase_jauh + 1);
+                                                        setFormData(prev => ({ ...prev, ritase_jauh: newVal, ritase_dekat: (prev.rit_count - 1) - newVal }));
+                                                    }} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--gray-600)', color: '#fff', cursor: 'pointer' }}>+</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
