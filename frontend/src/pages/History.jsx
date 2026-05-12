@@ -77,12 +77,21 @@ export default function History() {
         });
     }
 
-    // Group records by date
+    // Group records by date, then by user
     const groupedRecords = Array.isArray(records) ? records.reduce((acc, record) => {
         if (record && record.recorded_at) {
             const date = new Date(record.recorded_at).toDateString();
-            if (!acc[date]) acc[date] = [];
-            acc[date].push(record);
+            if (!acc[date]) acc[date] = {};
+            
+            const userKey = record.user_id || 'unknown';
+            if (!acc[date][userKey]) {
+                acc[date][userKey] = {
+                    user_name: record.user_name,
+                    employee_id: record.employee_id,
+                    records: []
+                };
+            }
+            acc[date][userKey].records.push(record);
         }
         return acc;
     }, {}) : {};
@@ -255,49 +264,57 @@ export default function History() {
                         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
                     })
                     .map((date) => {
-                        const dayRecords = groupedRecords[date];
+                        const dayUsers = groupedRecords[date];
                         return (
                             <div key={date} className="card mb-3">
                                 <div className="card-header">
                                     <h3 className="card-title" style={{ fontSize: '1rem' }}>
-                                        {formatDate(dayRecords[0].recorded_at)}
+                                        {formatDate(new Date(date))}
                                     </h3>
                                 </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {dayRecords.map((record) => (
-                                        record.type === 'off_day' ? (
-                                            <div
-                                                key={record.id}
-                                                style={{
-                                                    display: 'flex',
-                                                    gap: '1rem',
-                                                    alignItems: 'center',
-                                                    padding: '1rem',
-                                                    background: 'rgba(99, 102, 241, 0.1)',
-                                                    borderRadius: 'var(--radius-lg)',
-                                                    border: '1px solid rgba(99, 102, 241, 0.3)'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: 50, height: 50,
-                                                    borderRadius: 'var(--radius)',
-                                                    background: 'rgba(99, 102, 241, 0.2)',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: '1.5rem', flexShrink: 0
-                                                }}>
-                                                    🏖️
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    {Object.values(dayUsers).map((userData, idx) => (
+                                        <div key={idx} style={{ 
+                                            padding: '1rem', 
+                                            background: 'rgba(0,0,0,0.02)', 
+                                            borderRadius: 'var(--radius-md)', 
+                                            border: '1px solid rgba(0,0,0,0.05)' 
+                                        }}>
+                                            {isAdmin && userData.user_name && (
+                                                <div style={{ fontWeight: 600, marginBottom: '0.75rem', fontSize: '1.05rem', color: 'var(--gray-800)' }}>
+                                                    {userData.user_name}
+                                                    <span style={{ color: 'var(--gray-500)', fontWeight: 400, marginLeft: '0.5rem', fontSize: '0.9rem' }}>
+                                                        ({userData.employee_id})
+                                                    </span>
                                                 </div>
-                                                <div style={{ flex: 1 }}>
-                                                    {isAdmin && record.user_name && (
-                                                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                                                            {record.user_name}
-                                                            <span style={{ color: 'var(--gray-400)', fontWeight: 400, marginLeft: '0.5rem' }}>
-                                                                ({record.employee_id})
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    <div style={{ fontWeight: 600, color: 'var(--primary-300)' }}>Hari Libur</div>
+                                            )}
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
+                                                {userData.records.map((record) => (
+                                                    record.type === 'off_day' ? (
+                                                        <div
+                                                            key={record.id}
+                                                            style={{
+                                                                display: 'flex',
+                                                                gap: '1rem',
+                                                                alignItems: 'center',
+                                                                padding: '1rem',
+                                                                background: 'rgba(99, 102, 241, 0.1)',
+                                                                borderRadius: 'var(--radius-lg)',
+                                                                border: '1px solid rgba(99, 102, 241, 0.3)'
+                                                            }}
+                                                        >
+                                                            <div style={{
+                                                                width: 50, height: 50,
+                                                                borderRadius: 'var(--radius)',
+                                                                background: 'rgba(99, 102, 241, 0.2)',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontSize: '1.5rem', flexShrink: 0
+                                                            }}>
+                                                                🏖️
+                                                            </div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: 600, color: 'var(--primary-300)' }}>Hari Libur</div>
                                                 </div>
                                                 <span className="badge badge-primary" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
                                                     OFF
@@ -325,16 +342,8 @@ export default function History() {
                                                 }}>
                                                     📝
                                                 </div>
-                                                <div style={{ flex: 1 }}>
-                                                    {isAdmin && record.user_name && (
-                                                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                                                            {record.user_name}
-                                                            <span style={{ color: 'var(--gray-400)', fontWeight: 400, marginLeft: '0.5rem' }}>
-                                                                ({record.employee_id})
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                         <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`}>
                                                             {getLeaveLabel(record.leave_type)}
                                                         </span>
@@ -371,16 +380,8 @@ export default function History() {
                                                         isOpen: true
                                                     })}
                                                 />
-                                                <div style={{ flex: 1 }}>
-                                                    {isAdmin && record.user_name && (
-                                                        <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                                                            {record.user_name}
-                                                            <span style={{ color: 'var(--gray-400)', fontWeight: 400, marginLeft: '0.5rem' }}>
-                                                                ({record.employee_id})
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                                                         <span className={`badge ${record.type === 'check_in' ? 'badge-primary' : 'badge-warning'}`}>
                                                             {record.type === 'check_in' ? '📥 Masuk' : '📤 Pulang'}
                                                         </span>
@@ -421,6 +422,9 @@ export default function History() {
                                                 </div>
                                             </div>
                                         )
+                                    ))}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
