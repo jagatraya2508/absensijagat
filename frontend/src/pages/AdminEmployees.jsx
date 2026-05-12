@@ -788,10 +788,10 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.is_driver ? 'var(--primary-300)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                                        🚛 Driver
+                                                        🚛 Driver & Kenek
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
-                                                        Aktifkan jika karyawan ini adalah driver
+                                                        Aktifkan jika karyawan ini adalah driver atau kenek
                                                     </div>
                                                 </div>
                                             </div>
