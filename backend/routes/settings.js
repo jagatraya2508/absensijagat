@@ -98,7 +98,7 @@ router.post('/logo', authenticateToken, isAdmin, upload.single('logo'), async (r
 // Update theme colors (Admin only)
 router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const { primary_color, bg_color, card_bg_color } = req.body;
+        const { primary_color, bg_color, card_bg_color, btn_bg_color } = req.body;
 
         if (!primary_color || !bg_color) {
             return res.status(400).json({ error: 'primary_color dan bg_color wajib diisi' });
@@ -106,7 +106,7 @@ router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
 
         // Validate hex color format
         const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-        if (!hexRegex.test(primary_color) || !hexRegex.test(bg_color) || (card_bg_color && !hexRegex.test(card_bg_color))) {
+        if (!hexRegex.test(primary_color) || !hexRegex.test(bg_color) || (card_bg_color && !hexRegex.test(card_bg_color)) || (btn_bg_color && !hexRegex.test(btn_bg_color))) {
             return res.status(400).json({ error: 'Format warna harus hex (contoh: #6D0000)' });
         }
 
@@ -133,14 +133,46 @@ router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
             );
         }
 
+        // Upsert theme_btn_bg_color if provided
+        if (btn_bg_color) {
+            await pool.query(
+                `INSERT INTO settings (key, value) VALUES ('theme_btn_bg_color', $1)
+                 ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+                [btn_bg_color]
+            );
+        }
+
         res.json({
             message: 'Tema berhasil diperbarui',
             theme_primary_color: primary_color,
             theme_bg_color: bg_color,
-            theme_card_bg_color: card_bg_color
+            theme_card_bg_color: card_bg_color,
+            theme_btn_bg_color: btn_bg_color
         });
     } catch (error) {
         console.error('Update theme error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Update company name (Admin only)
+router.put('/company-name', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { company_name } = req.body;
+
+        if (!company_name || !company_name.trim()) {
+            return res.status(400).json({ error: 'Nama perusahaan wajib diisi' });
+        }
+
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('company_name', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [company_name.trim()]
+        );
+
+        res.json({ message: 'Nama perusahaan berhasil diperbarui', company_name: company_name.trim() });
+    } catch (error) {
+        console.error('Update company name error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });

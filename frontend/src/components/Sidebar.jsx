@@ -5,7 +5,7 @@ import { useSettings } from '../context/SettingsContext';
 
 export default function Sidebar() {
     const { user, logout } = useAuth();
-    const { settings } = useSettings();
+    const { settings, companyName } = useSettings();
     const navigate = useNavigate();
     const location = useLocation();
     const [openMenus, setOpenMenus] = useState({ master: true });
@@ -58,6 +58,7 @@ export default function Sidebar() {
         { path: '/admin/assets', icon: '📦', label: 'Manajemen Aset' },
         { path: '/admin/reports', icon: '📊', label: 'Laporan' },
         { path: '/admin/users', icon: '👥', label: 'Kelola User' },
+        { path: '/kiosk', icon: '🖥️', label: 'Mode Kiosk' },
         { path: '/admin/settings', icon: '⚙️', label: 'Pengaturan' },
         { path: '/admin/license', icon: '🔑', label: 'License' },
     ];
@@ -69,7 +70,7 @@ export default function Sidebar() {
             <aside className="sidebar">
                 <div className="sidebar-logo">
                     <div>
-                        <h1>Absensi</h1>
+                        <h1>{companyName || 'Absensi'}</h1>
                         <span>Attendance System</span>
                     </div>
                 </div>

@@ -7,7 +7,8 @@ const SettingsContext = createContext(null);
 const DEFAULT_THEME = {
     primary: '#6D0000',
     bg: '#fff8f8',
-    card_bg: '#ffffff'
+    card_bg: '#ffffff',
+    btn_bg: '#ef4444'
 };
 
 // Helper: convert hex to RGB values
@@ -38,7 +39,7 @@ function lightenColor(hex, percent) {
 }
 
 // Apply theme CSS variables to document
-function applyThemeToDOM(primary, bg, card_bg = '#ffffff') {
+function applyThemeToDOM(primary, bg, card_bg = '#ffffff', btn_bg = '#ef4444') {
     const root = document.documentElement;
     const rgb = hexToRgb(primary);
     const bgRgb = hexToRgb(bg);
@@ -57,6 +58,9 @@ function applyThemeToDOM(primary, bg, card_bg = '#ffffff') {
     
     root.style.setProperty('--theme-card-bg', card_bg);
     root.style.setProperty('--theme-card-bg-rgb', `${cardRgb.r}, ${cardRgb.g}, ${cardRgb.b}`);
+
+    root.style.setProperty('--theme-btn-bg', btn_bg);
+    root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${btn_bg} 0%, ${darkenColor(btn_bg, 15)} 100%)`);
 }
 
 export function SettingsProvider({ children }) {
@@ -64,11 +68,12 @@ export function SettingsProvider({ children }) {
         app_logo: '/logo.png'
     });
     const [themeColors, setThemeColors] = useState(DEFAULT_THEME);
+    const [companyName, setCompanyName] = useState('Absensi');
     const [loading, setLoading] = useState(true);
 
     // Apply theme on mount and when colors change
     useEffect(() => {
-        applyThemeToDOM(themeColors.primary, themeColors.bg, themeColors.card_bg);
+        applyThemeToDOM(themeColors.primary, themeColors.bg, themeColors.card_bg, themeColors.btn_bg);
     }, [themeColors]);
 
     useEffect(() => {
@@ -86,8 +91,13 @@ export function SettingsProvider({ children }) {
                 const primary = data.theme_primary_color || DEFAULT_THEME.primary;
                 const bg = data.theme_bg_color || DEFAULT_THEME.bg;
                 const card_bg = data.theme_card_bg_color || DEFAULT_THEME.card_bg;
-                setThemeColors({ primary, bg, card_bg });
-                applyThemeToDOM(primary, bg, card_bg);
+                const btn_bg = data.theme_btn_bg_color || DEFAULT_THEME.btn_bg;
+                setThemeColors({ primary, bg, card_bg, btn_bg });
+                applyThemeToDOM(primary, bg, card_bg, btn_bg);
+                // Load company name
+                if (data.company_name) {
+                    setCompanyName(data.company_name);
+                }
             }
         } catch (error) {
             console.error('Fetch settings failed:', error);
@@ -128,30 +138,50 @@ export function SettingsProvider({ children }) {
             await settingsAPI.updateTheme({
                 primary_color: colors.primary,
                 bg_color: colors.bg,
-                card_bg_color: colors.card_bg || '#ffffff'
+                card_bg_color: colors.card_bg || '#ffffff',
+                btn_bg_color: colors.btn_bg || DEFAULT_THEME.btn_bg
             });
             setThemeColors(colors);
-            applyThemeToDOM(colors.primary, colors.bg, colors.card_bg);
+            applyThemeToDOM(colors.primary, colors.bg, colors.card_bg, colors.btn_bg);
         } catch (error) {
             console.error('Update theme failed:', error);
             throw error;
         }
     };
 
+    const updateCompanyName = async (name) => {
+        try {
+            const token = localStorage.getItem('token');
+            const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const res = await fetch(`${API}/settings/company-name`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ company_name: name })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Gagal menyimpan nama perusahaan');
+            setCompanyName(name);
+        } catch (error) {
+            console.error('Update company name failed:', error);
+            throw error;
+        }
+    };
+
     // Preview theme without saving (for live preview)
     const previewTheme = useCallback((colors) => {
-        applyThemeToDOM(colors.primary, colors.bg, colors.card_bg || '#ffffff');
+        applyThemeToDOM(colors.primary, colors.bg, colors.card_bg || '#ffffff', colors.btn_bg || DEFAULT_THEME.btn_bg);
     }, []);
 
     // Reset preview to saved colors
     const resetPreview = useCallback(() => {
-        applyThemeToDOM(themeColors.primary, themeColors.bg, themeColors.card_bg);
+        applyThemeToDOM(themeColors.primary, themeColors.bg, themeColors.card_bg, themeColors.btn_bg);
     }, [themeColors]);
 
     return (
         <SettingsContext.Provider value={{
             settings, loading, fetchSettings, updateLogo,
             themeColors, updateTheme, previewTheme, resetPreview,
+            companyName, updateCompanyName,
             DEFAULT_THEME
         }}>
             {children}

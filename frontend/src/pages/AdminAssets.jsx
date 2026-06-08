@@ -356,7 +356,7 @@ export default function AdminAssets() {
                                     )}
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
                                     <button className="btn btn-outline" style={{ padding: '0.5rem 0' }} onClick={() => { setSelectedQR(a.asset_code); setSelectedAssetInfo(a); setShowQRModal(true); }} title="QR Code">
                                         <svg style={{ width: '16px', height: '16px', margin: 'auto' }} fill="currentColor" viewBox="0 0 16 16"><path d="M2 2h4v4H2V2Z"/><path d="M2 10h4v4H2v-4Z"/><path d="M10 2h4v4h-4V2Z"/><path d="M10 10h2v2h-2v-2Z"/><path d="M12 12h2v2h-2v-2Z"/><path d="M10 14h2v2h-2v-2Z"/></svg>
                                     </button>
@@ -375,10 +375,11 @@ export default function AdminAssets() {
                                             ↙️
                                         </button>
                                     ) : (
-                                         <button className="btn btn-outline" style={{ padding: '0.5rem 0' }} onClick={() => handleDeleteAsset(a.id)} title="Hapus">
-                                            🗑️
-                                        </button>
+                                         <div style={{ padding: '0.5rem 0', textAlign: 'center', opacity: 0.5 }}>-</div>
                                     )}
+                                    <button className="btn btn-outline" style={{ padding: '0.5rem 0', color: '#ef4444', borderColor: '#fca5a5' }} onClick={() => handleDeleteAsset(a.id)} title="Hapus">
+                                        🗑️
+                                    </button>
                                 </div>
                             </div>
                         ))}

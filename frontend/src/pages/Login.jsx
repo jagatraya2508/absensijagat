@@ -10,7 +10,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
 
     const { login } = useAuth();
-    const { settings } = useSettings();
+    const { settings, companyName } = useSettings();
     const navigate = useNavigate();
 
     // Check if running in a native Capacitor wrapper
@@ -43,7 +43,7 @@ export default function Login() {
                 <div className="login-card">
                     <div className="login-logo">
                         <img src={settings.login_logo || settings.app_logo} alt="Logo" style={{ width: '150px', maxWidth: '100%', height: 'auto', marginBottom: '1rem' }} />
-                        <h1>Absensi Karyawan</h1>
+                        <h1>{companyName || 'Absensi Karyawan'}</h1>
                         <p>Silakan login untuk melanjutkan</p>
                     </div>
 
@@ -124,7 +124,7 @@ export default function Login() {
                 )}
 
                 <p className="text-center text-muted" style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>
-                    © 2024 Absensi Karyawan. All rights reserved.
+                    © 2024 {companyName || 'Absensi Karyawan'}. All rights reserved.
                 </p>
             </div>
         </div>

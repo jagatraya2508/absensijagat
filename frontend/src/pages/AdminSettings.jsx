@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 
 const THEME_PRESETS = [
-    { name: 'Merah Marun', icon: '🔴', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff' },
-    { name: 'Biru Navy', icon: '🔵', primary: '#0A1929', bg: '#f0f4ff', card_bg: '#ffffff' },
-    { name: 'Hijau Emerald', icon: '🟢', primary: '#064E3B', bg: '#f0fdf4', card_bg: '#ffffff' },
-    { name: 'Ungu Royal', icon: '🟣', primary: '#4C1D95', bg: '#faf5ff', card_bg: '#ffffff' },
-    { name: 'Slate Dark', icon: '⚫', primary: '#1E293B', bg: '#f8fafc', card_bg: '#ffffff' },
-    { name: 'Amber Gold', icon: '🟠', primary: '#78350F', bg: '#fffbeb', card_bg: '#ffffff' },
+    { name: 'Merah Marun', icon: '🔴', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
+    { name: 'Biru Navy', icon: '🔵', primary: '#0A1929', bg: '#f0f4ff', card_bg: '#ffffff', btn_bg: '#3b82f6' },
+    { name: 'Hijau Emerald', icon: '🟢', primary: '#064E3B', bg: '#f0fdf4', card_bg: '#ffffff', btn_bg: '#10b981' },
+    { name: 'Ungu Royal', icon: '🟣', primary: '#4C1D95', bg: '#faf5ff', card_bg: '#ffffff', btn_bg: '#8b5cf6' },
+    { name: 'Slate Dark', icon: '⚫', primary: '#1E293B', bg: '#f8fafc', card_bg: '#ffffff', btn_bg: '#64748b' },
+    { name: 'Amber Gold', icon: '🟠', primary: '#78350F', bg: '#fffbeb', card_bg: '#ffffff', btn_bg: '#f59e0b' },
 ];
 
 function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
@@ -130,12 +130,18 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
 }
 
 export default function AdminSettings() {
-    const { settings, updateLogo, themeColors, updateTheme, previewTheme, resetPreview, DEFAULT_THEME } = useSettings();
+    const { settings, updateLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
+
+    // Company Name state
+    const [editCompanyName, setEditCompanyName] = useState(companyName || 'Absensi');
+    const [companyLoading, setCompanyLoading] = useState(false);
+    const [companyMessage, setCompanyMessage] = useState({ type: '', text: '' });
 
     // Theme state
     const [selectedPrimary, setSelectedPrimary] = useState(themeColors.primary);
     const [selectedBg, setSelectedBg] = useState(themeColors.bg);
     const [selectedCardBg, setSelectedCardBg] = useState(themeColors.card_bg || '#ffffff');
+    const [selectedBtnBg, setSelectedBtnBg] = useState(themeColors.btn_bg || '#ef4444');
     const [themeLoading, setThemeLoading] = useState(false);
     const [themeMessage, setThemeMessage] = useState({ type: '', text: '' });
     const [activePreset, setActivePreset] = useState(null);
@@ -167,12 +173,17 @@ export default function AdminSettings() {
         setSelectedPrimary(themeColors.primary);
         setSelectedBg(themeColors.bg);
         setSelectedCardBg(themeColors.card_bg || '#ffffff');
+        setSelectedBtnBg(themeColors.btn_bg || '#ef4444');
         // find active preset
         const match = THEME_PRESETS.findIndex(
-            p => p.primary.toLowerCase() === themeColors.primary.toLowerCase() && p.bg.toLowerCase() === themeColors.bg.toLowerCase() && p.card_bg.toLowerCase() === (themeColors.card_bg || '#ffffff').toLowerCase()
+            p => p.primary.toLowerCase() === themeColors.primary.toLowerCase() && p.bg.toLowerCase() === themeColors.bg.toLowerCase() && p.card_bg.toLowerCase() === (themeColors.card_bg || '#ffffff').toLowerCase() && p.btn_bg.toLowerCase() === (themeColors.btn_bg || '#ef4444').toLowerCase()
         );
         setActivePreset(match >= 0 ? match : null);
     }, [themeColors]);
+
+    useEffect(() => {
+        setEditCompanyName(companyName || 'Absensi');
+    }, [companyName]);
 
     useEffect(() => {
         fetchLeaveSettings();
@@ -220,20 +231,24 @@ export default function AdminSettings() {
         setSelectedPrimary(preset.primary);
         setSelectedBg(preset.bg);
         setSelectedCardBg(preset.card_bg);
-        previewTheme({ primary: preset.primary, bg: preset.bg, card_bg: preset.card_bg });
+        setSelectedBtnBg(preset.btn_bg);
+        previewTheme({ primary: preset.primary, bg: preset.bg, card_bg: preset.card_bg, btn_bg: preset.btn_bg });
     };
 
     const handleCustomColorChange = (field, value) => {
         setActivePreset(null);
         if (field === 'primary') {
             setSelectedPrimary(value);
-            previewTheme({ primary: value, bg: selectedBg, card_bg: selectedCardBg });
+            previewTheme({ primary: value, bg: selectedBg, card_bg: selectedCardBg, btn_bg: selectedBtnBg });
         } else if (field === 'bg') {
             setSelectedBg(value);
-            previewTheme({ primary: selectedPrimary, bg: value, card_bg: selectedCardBg });
+            previewTheme({ primary: selectedPrimary, bg: value, card_bg: selectedCardBg, btn_bg: selectedBtnBg });
         } else if (field === 'card_bg') {
             setSelectedCardBg(value);
-            previewTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: value });
+            previewTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: value, btn_bg: selectedBtnBg });
+        } else if (field === 'btn_bg') {
+            setSelectedBtnBg(value);
+            previewTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: selectedCardBg, btn_bg: value });
         }
     };
 
@@ -241,7 +256,7 @@ export default function AdminSettings() {
         setThemeLoading(true);
         setThemeMessage({ type: '', text: '' });
         try {
-            await updateTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: selectedCardBg });
+            await updateTheme({ primary: selectedPrimary, bg: selectedBg, card_bg: selectedCardBg, btn_bg: selectedBtnBg });
             setThemeMessage({ type: 'success', text: 'Tema berhasil disimpan!' });
         } catch (error) {
             setThemeMessage({ type: 'danger', text: error.message || 'Gagal menyimpan tema' });
@@ -255,8 +270,9 @@ export default function AdminSettings() {
         setSelectedPrimary(DEFAULT_THEME.primary);
         setSelectedBg(DEFAULT_THEME.bg);
         setSelectedCardBg(DEFAULT_THEME.card_bg);
+        setSelectedBtnBg(DEFAULT_THEME.btn_bg);
         setActivePreset(0);
-        previewTheme({ primary: DEFAULT_THEME.primary, bg: DEFAULT_THEME.bg, card_bg: DEFAULT_THEME.card_bg });
+        previewTheme({ primary: DEFAULT_THEME.primary, bg: DEFAULT_THEME.bg, card_bg: DEFAULT_THEME.card_bg, btn_bg: DEFAULT_THEME.btn_bg });
     };
 
     // Leave Settings Handlers
@@ -309,6 +325,20 @@ export default function AdminSettings() {
         }
     };
 
+    const handleCompanyNameSave = async () => {
+        if (!editCompanyName.trim()) return;
+        setCompanyLoading(true);
+        setCompanyMessage({ type: '', text: '' });
+        try {
+            await updateCompanyName(editCompanyName.trim());
+            setCompanyMessage({ type: 'success', text: 'Nama perusahaan berhasil disimpan!' });
+        } catch (error) {
+            setCompanyMessage({ type: 'danger', text: error.message || 'Gagal menyimpan nama perusahaan' });
+        } finally {
+            setCompanyLoading(false);
+        }
+    };
+
     return (
         <div>
             <div className="page-header">
@@ -317,6 +347,58 @@ export default function AdminSettings() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', maxWidth: '800px' }}>
+
+                {/* ============ COMPANY NAME SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title">🏢 Nama Perusahaan</h2>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {companyMessage.text && (
+                            <div className={`alert alert-${companyMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                <span className="alert-icon">{companyMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                {companyMessage.text}
+                            </div>
+                        )}
+
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1rem' }}>
+                            Nama ini akan ditampilkan di sidebar navigasi dan area branding aplikasi.
+                        </p>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+                            <div style={{ flex: 1 }}>
+                                <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                    Nama Perusahaan
+                                </label>
+                                <input
+                                    className="form-input"
+                                    type="text"
+                                    value={editCompanyName}
+                                    onChange={(e) => setEditCompanyName(e.target.value)}
+                                    placeholder="Contoh: PT Jagatraya"
+                                    maxLength={50}
+                                    style={{ background: 'white', color: 'var(--gray-900)', border: '1.5px solid var(--gray-200)' }}
+                                />
+                            </div>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleCompanyNameSave}
+                                disabled={companyLoading || !editCompanyName.trim()}
+                                style={{ minWidth: '120px', height: '42px' }}
+                            >
+                                {companyLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                                        <span>Simpan...</span>
+                                    </>
+                                ) : (
+                                    '💾 Simpan'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 {/* ============ THEME COLOR SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
@@ -579,6 +661,59 @@ export default function AdminSettings() {
                                         </div>
                                         <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
                                             Form input & master
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Button BG Color */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--gray-600)',
+                                    marginBottom: '0.5rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    Warna Tombol
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    background: 'var(--gray-50)',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1.5px solid var(--gray-200)'
+                                }}>
+                                    <input
+                                        type="color"
+                                        value={selectedBtnBg}
+                                        onChange={(e) => handleCustomColorChange('btn_bg', e.target.value)}
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 600,
+                                            color: 'var(--gray-800)',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {selectedBtnBg}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
+                                            Tombol aksi utama
                                         </div>
                                     </div>
                                 </div>

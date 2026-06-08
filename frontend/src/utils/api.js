@@ -117,6 +117,12 @@ export const attendanceAPI = {
             body: formData,
         }),
 
+    kioskAttend: (formData) =>
+        request('/attendance/kiosk', {
+            method: 'POST',
+            body: formData,
+        }),
+
     getToday: () => request('/attendance/today'),
 
     getHistory: (params = {}) => {
@@ -366,6 +372,9 @@ export const faceAPI = {
 
     // Delete face registration (admin)
     delete: (userId) => request(`/face/${userId}`, { method: 'DELETE' }),
+
+    // Get all face descriptors (admin, for kiosk)
+    getAllDescriptors: () => request('/face/all-descriptors'),
 };
 
 // Announcements API

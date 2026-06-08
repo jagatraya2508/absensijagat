@@ -141,6 +141,30 @@ router.get('/users-status', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+// Get all face descriptors for Kiosk matching (Admin)
+router.get('/all-descriptors', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, employee_id, name, face_descriptor 
+            FROM users 
+            WHERE face_descriptor IS NOT NULL
+        `);
+
+        // Parse descriptors from string
+        const descriptors = result.rows.map(row => ({
+            id: row.id,
+            employee_id: row.employee_id,
+            name: row.name,
+            descriptor: JSON.parse(row.face_descriptor)
+        }));
+
+        res.json(descriptors);
+    } catch (error) {
+        console.error('Get all descriptors error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 // Delete face registration (Admin only)
 router.delete('/:userId', authenticateToken, isAdmin, async (req, res) => {
     try {

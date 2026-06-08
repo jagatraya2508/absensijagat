@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, isAdmin } = require('../middleware/auth');
 const { calculateDistance } = require('../utils/distance');
 
 // Configure multer for photo uploads
@@ -294,6 +294,72 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
         });
     } catch (error) {
         console.error('Check-out error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Kiosk Attendance
+router.post('/kiosk', authenticateToken, isAdmin, upload.single('photo'), async (req, res) => {
+    try {
+        const { user_id, location_id } = req.body;
+
+        if (!user_id) {
+            return res.status(400).json({ error: 'User ID tidak ditemukan' });
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Check user off day
+        const offDayCheck = await pool.query(
+            'SELECT * FROM user_off_days WHERE user_id = $1 AND off_date = $2',
+            [user_id, today]
+        );
+
+        if (offDayCheck.rows.length > 0) {
+            return res.status(400).json({ error: 'Sedang libur hari ini.' });
+        }
+
+        // Get user details
+        const userCheck = await pool.query('SELECT name FROM users WHERE id = $1', [user_id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'User tidak ditemukan' });
+        }
+        const userName = userCheck.rows[0].name;
+
+        // Check existing records today
+        const existingRecords = await pool.query(
+            `SELECT type FROM attendance_records 
+             WHERE user_id = $1 AND DATE(recorded_at) = $2`,
+            [user_id, today]
+        );
+
+        const hasCheckIn = existingRecords.rows.some(r => r.type === 'check_in');
+        const hasCheckOut = existingRecords.rows.some(r => r.type === 'check_out');
+
+        if (hasCheckIn && hasCheckOut) {
+            return res.status(400).json({ error: 'Sudah selesai absen hari ini.' });
+        }
+
+        const type = hasCheckIn ? 'check_out' : 'check_in';
+        const photoPath = req.file ? `/uploads/attendance/${req.file.filename}` : null;
+
+        // Note: Kiosk mode automatically assumes valid location
+        const result = await pool.query(
+            `INSERT INTO attendance_records 
+             (user_id, location_id, type, photo_path, latitude, longitude, distance_meters, is_valid, notes)
+             VALUES ($1, $2, $3, $4, 0, 0, 0, true, 'Absen via Kiosk')
+             RETURNING *`,
+            [user_id, location_id || null, type, photoPath]
+        );
+
+        res.status(201).json({
+            ...result.rows[0],
+            user_name: userName,
+            message: `${type === 'check_in' ? 'Check-in' : 'Check-out'} berhasil untuk ${userName}`
+        });
+
+    } catch (error) {
+        console.error('Kiosk attendance error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });

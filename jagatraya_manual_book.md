@@ -99,3 +99,32 @@ Karyawan menggunakan aplikasi ini untuk keperluan absensi mandiri, mengajukan pe
 - Masuk ke menu **Riwayat (History)**.
 - Di sini Anda dapat melihat secara lengkap catatan kehadiran Anda pada bulan-bulan sebelumnya.
 - Rincian yang ditampilkan meliputi: jam Anda absen masuk dan absen pulang, total jam kerja di hari tersebut, catatan keterlambatan, dan riwayat status cuti/izin/sakit.
+
+---
+
+## 4. Panduan Khusus Administrator: Reset Database
+
+Jika pada suatu saat Anda perlu menghapus seluruh data transaksi secara massal (misalnya setelah masa *testing/trial* selesai dan aplikasi akan mulai digunakan sungguhan), Anda dapat menggunakan *script* Reset Database yang sudah disediakan.
+
+Fitur ini akan **mengosongkan dan menghapus permanen** data berikut dari sistem:
+- **Transaksi Absensi**: Catatan kehadiran, lokasi absensi, tracking, dan jam kerja.
+- **Perizinan & Cuti**: Semua pengajuan cuti, sakit, lembur, dan izin karyawan.
+- **Penggajian**: Riwayat pembuatan slip gaji (*payroll*), komponen gaji, dan pinjaman karyawan.
+- **Data & Akun Karyawan**: Semua profil, dokumen, penempatan shift, dan akun login seluruh karyawan.
+
+> **Pengecualian Penting:** Akun Administrator utama (dengan ID `ADMIN001`) tidak akan terhapus. Anda akan tetap bisa login dengan akun admin Anda setelah proses reset selesai.
+
+### Langkah-langkah Menjalankan Reset Data:
+> **PERINGATAN:** Tindakan ini bersifat permanen dan data tidak dapat dikembalikan. Lakukan dengan sangat hati-hati.
+
+1. Buka aplikasi **Command Prompt (CMD)**, **PowerShell**, atau **Terminal** di komputer server/lokal Anda.
+2. Arahkan *directory* (folder) ke folder utama aplikasi Absensi (folder tempat aplikasi disimpan). Contoh:
+   ```bash
+   cd d:\Programer\absensi
+   ```
+3. Ketik perintah berikut lalu tekan **Enter**:
+   ```bash
+   node reset_data.js
+   ```
+4. Tunggu beberapa detik hingga proses selesai. Anda akan melihat daftar data apa saja yang dihapus di layar terminal.
+5. Jika di akhir muncul pesan `✅ Proses reset data berhasil diselesaikan!`, maka database Anda sudah kembali bersih dan siap digunakan dari nol.
