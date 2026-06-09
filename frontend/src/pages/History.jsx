@@ -9,8 +9,13 @@ export default function History() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const _today = new Date();
+    const _firstDay = `${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, '0')}-01`;
+    const _lastDayObj = new Date(_today.getFullYear(), _today.getMonth() + 1, 0);
+    const _lastDay = `${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, '0')}-${String(_lastDayObj.getDate()).padStart(2, '0')}`;
+
+    const [startDate, setStartDate] = useState(_firstDay);
+    const [endDate, setEndDate] = useState(_lastDay);
     const [selectedUser, setSelectedUser] = useState('all');
     const [sortOrder, setSortOrder] = useState('desc');
     const [exporting, setExporting] = useState(false);
@@ -181,8 +186,8 @@ export default function History() {
                         type="button"
                         className="btn btn-outline"
                         onClick={() => {
-                            setStartDate('');
-                            setEndDate('');
+                            setStartDate(_firstDay);
+                            setEndDate(_lastDay);
                             setSelectedUser('all');
                             setTimeout(fetchHistory, 0);
                         }}

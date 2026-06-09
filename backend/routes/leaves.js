@@ -339,10 +339,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Tidak memiliki akses' });
         }
 
-        // Non-admin can only delete pending requests
-        if (!isAdmin && request.status !== 'pending') {
-            return res.status(400).json({ error: 'Hanya pengajuan pending yang bisa dihapus' });
-        }
+        // Non-admin can delete any of their own requests to clear history
+        // if (!isAdmin && request.status !== 'pending') {
+        //     return res.status(400).json({ error: 'Hanya pengajuan pending yang bisa dihapus' });
+        // }
 
         // Delete attachment if exists
         if (request.attachment_path) {

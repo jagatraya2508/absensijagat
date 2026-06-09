@@ -381,15 +381,13 @@ export default function Leaves() {
                                     <small style={{ color: 'var(--gray-500)' }}>
                                         Dibuat: {new Date(req.created_at).toLocaleString('id-ID')}
                                     </small>
-                                    {req.status === 'pending' && (
-                                        <button
-                                            className="btn btn-danger"
-                                            style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-                                            onClick={() => handleDelete(req.id)}
-                                        >
-                                            🗑️ Hapus
-                                        </button>
-                                    )}
+                                    <button
+                                        className="btn btn-danger"
+                                        style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
+                                        onClick={() => handleDelete(req.id)}
+                                    >
+                                        🗑️ Hapus
+                                    </button>
                                 </div>
                             </div>
                         ))}
