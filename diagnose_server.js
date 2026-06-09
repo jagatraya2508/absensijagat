@@ -39,10 +39,16 @@ async function diagnose() {
         const eco = await ssh.execCommand('cat /home/wisnu/absensijagat/ecosystem.config.js 2>/dev/null || echo "No ecosystem file found"');
         console.log(eco.stdout);
 
-        // 5. Cek firewall
-        console.log('\n=== UFW STATUS ===');
-        const ufw = await ssh.execCommand('echo "sa" | sudo -S ufw status');
-        console.log(ufw.stdout);
+        // 5. Run migration
+        console.log('\n=== RUNNING MIGRATION ON SERVER ===');
+        const migration = await ssh.execCommand('cd /home/wisnu/absensijagat/backend && node migrate_license.js');
+        console.log(migration.stdout);
+        if (migration.stderr) console.log('ERROR:', migration.stderr);
+
+        // 6. Restart PM2 backend
+        console.log('\n=== RESTARTING BACKEND ===');
+        const restart = await ssh.execCommand('pm2 restart absensijagat-backend-5000');
+        console.log(restart.stdout);
 
         ssh.dispose();
     } catch (e) {

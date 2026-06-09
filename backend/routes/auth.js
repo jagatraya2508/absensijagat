@@ -133,6 +133,7 @@ router.post('/register', authenticateToken, isAdmin, async (req, res) => {
 
         res.status(201).json(result.rows[0]);
     } catch (error) {
+        logError(error);
         console.error('Register error:', error);
         if (error.code === '23505') {
             return res.status(400).json({ error: 'Employee ID atau email sudah terdaftar' });
