@@ -33,6 +33,8 @@ echo "Running migration: migrate_off_days_table.js"
 node migrate_off_days_table.js
 echo "Running migration: migrate_change_off.js"
 node migrate_change_off.js
+echo "Running migration: migrate_license.js"
+node migrate_license.js
 cd ..
 
 # 3. Build Frontend
