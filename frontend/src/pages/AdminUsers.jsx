@@ -296,7 +296,7 @@ export default function AdminUsers() {
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
                     <h2 className="card-title">Daftar User</h2>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
                         <input
                             type="text"
                             className="form-input"

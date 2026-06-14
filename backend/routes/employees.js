@@ -227,7 +227,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Update employee error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
     }
 });
 
