@@ -23,6 +23,8 @@ export default function Attendance() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [userManuallySelected, setUserManuallySelected] = useState(false);
+    const [currentDistance, setCurrentDistance] = useState(null);
+    const hasAttemptedAutoSubmit = useRef(false);
 
     // Face verification states
     const [hasFaceRegistered, setHasFaceRegistered] = useState(null);
@@ -67,6 +69,25 @@ export default function Attendance() {
             }
         }
     }, [location, locations, userManuallySelected, selectedLocation]);
+
+    useEffect(() => {
+        if (location && selectedLocation) {
+            const dist = calculateDistance(location.latitude, location.longitude, parseFloat(selectedLocation.latitude), parseFloat(selectedLocation.longitude));
+            setCurrentDistance(dist);
+            // Reset auto-submit when location changes significantly to allow retry if they move into area
+            hasAttemptedAutoSubmit.current = false;
+        }
+    }, [location, selectedLocation]);
+
+    useEffect(() => {
+        if (step === 3 && photoBlob && location && selectedLocation && currentDistance !== null && !loading && !success && !error) {
+            const isWithinRadius = currentDistance <= (selectedLocation.radius_meters || 100);
+            if (isWithinRadius && !hasAttemptedAutoSubmit.current) {
+                hasAttemptedAutoSubmit.current = true;
+                handleSubmit();
+            }
+        }
+    }, [step, photoBlob, location, selectedLocation, currentDistance, loading, success, error]);
 
     async function checkFaceStatus() {
         try {
@@ -492,22 +513,31 @@ export default function Attendance() {
                             </div>
                         </div>
 
-                        <button
-                            className={`btn ${isCheckIn ? 'btn-success' : 'btn-danger'} btn-block btn-lg`}
-                            onClick={handleSubmit}
-                            disabled={loading || !photo || !location}
-                        >
-                            {loading ? (
-                                <>
-                                    <span className="loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
-                                    Memproses...
-                                </>
-                            ) : (
-                                <>
-                                    {isCheckIn ? '📥 Konfirmasi Check-in' : '📤 Konfirmasi Check-out'}
-                                </>
-                            )}
-                        </button>
+                        {currentDistance !== null && selectedLocation && currentDistance > (selectedLocation.radius_meters || 100) ? (
+                            <button
+                                className="btn btn-warning btn-block btn-lg"
+                                onClick={handlePhotoReset}
+                            >
+                                🔄 Di Luar Area - Absen Ulang
+                            </button>
+                        ) : (
+                            <button
+                                className={`btn ${isCheckIn ? 'btn-success' : 'btn-danger'} btn-block btn-lg`}
+                                onClick={handleSubmit}
+                                disabled={loading || !photo || !location}
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className="loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                                        Memproses Otomatis...
+                                    </>
+                                ) : (
+                                    <>
+                                        {isCheckIn ? '📥 Konfirmasi Check-in' : '📤 Konfirmasi Check-out'}
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
