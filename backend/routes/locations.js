@@ -19,9 +19,23 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get active locations only
 router.get('/active', authenticateToken, async (req, res) => {
     try {
-        const result = await pool.query(
-            'SELECT * FROM attendance_locations WHERE is_active = true ORDER BY name'
-        );
+        const userId = req.user.id;
+        const role = req.user.role;
+
+        const userLocs = await pool.query('SELECT location_id FROM user_locations WHERE user_id = $1', [userId]);
+
+        let query = 'SELECT * FROM attendance_locations WHERE is_active = true';
+        let params = [];
+
+        if (role !== 'admin' && userLocs.rows.length > 0) {
+            const locIds = userLocs.rows.map(r => r.location_id);
+            query += ' AND id = ANY($1)';
+            params.push(locIds);
+        }
+
+        query += ' ORDER BY name';
+
+        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (error) {
         console.error('Get active locations error:', error);

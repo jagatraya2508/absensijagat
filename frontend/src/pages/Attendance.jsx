@@ -22,6 +22,7 @@ export default function Attendance() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [userManuallySelected, setUserManuallySelected] = useState(false);
 
     // Face verification states
     const [hasFaceRegistered, setHasFaceRegistered] = useState(null);
@@ -36,6 +37,36 @@ export default function Attendance() {
         fetchLocations();
         checkFaceStatus();
     }, []);
+
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+
+    useEffect(() => {
+        if (location && locations.length > 1 && !userManuallySelected) {
+            let closestLoc = locations[0];
+            let minDist = calculateDistance(location.latitude, location.longitude, parseFloat(locations[0].latitude), parseFloat(locations[0].longitude));
+            
+            for (let i = 1; i < locations.length; i++) {
+                const dist = calculateDistance(location.latitude, location.longitude, parseFloat(locations[i].latitude), parseFloat(locations[i].longitude));
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestLoc = locations[i];
+                }
+            }
+            
+            if (!selectedLocation || selectedLocation.id !== closestLoc.id) {
+                setSelectedLocation(closestLoc);
+            }
+        }
+    }, [location, locations, userManuallySelected, selectedLocation]);
 
     async function checkFaceStatus() {
         try {
@@ -454,6 +485,7 @@ export default function Attendance() {
                                         onChange={(e) => {
                                             const loc = locations.find(l => l.id === parseInt(e.target.value));
                                             setSelectedLocation(loc);
+                                            setUserManuallySelected(true);
                                         }}
                                     >
                                         {locations.map((loc) => (
