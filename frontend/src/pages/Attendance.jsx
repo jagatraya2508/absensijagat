@@ -476,24 +476,7 @@ export default function Attendance() {
                                 targetLocation={selectedLocation}
                             />
 
-                            {locations.length > 1 && (
-                                <div className="form-group mt-3">
-                                    <label className="form-label">Pilih Lokasi Kantor</label>
-                                    <select
-                                        className="form-input form-select"
-                                        value={selectedLocation?.id || ''}
-                                        onChange={(e) => {
-                                            const loc = locations.find(l => l.id === parseInt(e.target.value));
-                                            setSelectedLocation(loc);
-                                            setUserManuallySelected(true);
-                                        }}
-                                    >
-                                        {locations.map((loc) => (
-                                            <option key={loc.id} value={loc.id}>{loc.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                            {/* Dropdown lokasi disembunyikan karena sudah otomatis memilih yang terdekat */}
                         </div>
 
                         <div className="card mb-3">

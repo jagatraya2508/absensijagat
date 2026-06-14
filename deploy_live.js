@@ -11,7 +11,7 @@ async function deployLive() {
         });
         
         console.log('Berhasil terhubung. Menjalankan update.sh...');
-        const res = await ssh.execCommand('./update.sh', { cwd: '/home/wisnu/absensijagat' });
+        const res = await ssh.execCommand('bash update.sh', { cwd: '/home/wisnu/absensijagat' });
         
         console.log('Output Update:\n', res.stdout);
         if (res.stderr) {
