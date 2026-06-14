@@ -160,7 +160,24 @@ router.get('/me', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'User tidak ditemukan' });
         }
 
-        res.json(result.rows[0]);
+        const user = result.rows[0];
+
+        // Fetch permissions for the user's role
+        let permissions = [];
+        if (user.role !== 'admin') {
+            const permsResult = await pool.query(
+                `SELECT rp.permission_key 
+                 FROM role_permissions rp 
+                 JOIN roles r ON rp.role_id = r.id 
+                 WHERE r.name = $1`,
+                [user.role]
+            );
+            permissions = permsResult.rows.map(p => p.permission_key);
+        }
+
+        user.permissions = permissions; // Will be empty for admin (they have all), or populated for custom roles
+
+        res.json(user);
     } catch (error) {
         console.error('Get user error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
@@ -171,7 +188,10 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.get('/users', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, employee_id, name, email, role, created_at FROM users ORDER BY created_at DESC'
+            `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, r.label as role_label 
+             FROM users u 
+             LEFT JOIN roles r ON u.role = r.name 
+             ORDER BY u.created_at DESC`
         );
         res.json(result.rows);
     } catch (error) {

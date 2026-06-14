@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { authAPI, licenseAPI } from '../utils/api';
+import { authAPI, licenseAPI, rolesAPI } from '../utils/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 export default function AdminUsers() {
     const [users, setUsers] = useState([]);
+    const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
@@ -19,6 +20,7 @@ export default function AdminUsers() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [changingRole, setChangingRole] = useState(null); // track which user's role is being changed
     const [search, setSearch] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
 
@@ -26,9 +28,24 @@ export default function AdminUsers() {
     const [licenseInfo, setLicenseInfo] = useState(null);
 
     useEffect(() => {
-        fetchUsers();
+        fetchData();
         fetchLicenseInfo();
     }, []);
+
+    async function fetchData() {
+        try {
+            const [usersData, rolesData] = await Promise.all([
+                authAPI.getUsers(),
+                rolesAPI.getAll()
+            ]);
+            setUsers(usersData);
+            setRoles(rolesData);
+        } catch (error) {
+            console.error('Failed to fetch data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
 
     async function fetchLicenseInfo() {
         try {
@@ -41,16 +58,7 @@ export default function AdminUsers() {
         }
     }
 
-    async function fetchUsers() {
-        try {
-            const data = await authAPI.getUsers();
-            setUsers(data);
-        } catch (error) {
-            console.error('Failed to fetch users:', error);
-        } finally {
-            setLoading(false);
-        }
-    }
+
 
     function openAddModal() {
         if (licenseInfo && users.length >= licenseInfo.max_users) {
@@ -139,6 +147,35 @@ export default function AdminUsers() {
             setSuccess(result.message || 'Password berhasil direset');
         } catch (error) {
             alert(error.message || 'Gagal mereset password');
+        }
+    }
+
+    async function handleRoleChange(user, newRole) {
+        if (newRole === user.role) return;
+
+        const roleLabels = { admin: 'Admin', manager: 'Pimpinan / Manager', employee: 'Karyawan' };
+        const confirmed = confirm(
+            `Ubah role ${user.name} dari "${roleLabels[user.role]}" menjadi "${roleLabels[newRole]}"?`
+        );
+        if (!confirmed) return;
+
+        setChangingRole(user.id);
+        try {
+            await authAPI.updateUser(user.id, { role: newRole });
+            const selectedRole = roles.find(r => r.name === newRole);
+            setSuccess(`Role ${user.name} berhasil diubah menjadi ${selectedRole?.label || newRole}`);
+            
+            // Just update the user in the local state to avoid full refetch
+            setUsers(users.map(u => {
+                if (u.id === user.id) {
+                    return { ...u, role: newRole, role_label: selectedRole?.label || newRole };
+                }
+                return u;
+            }));
+        } catch (err) {
+            alert(err.message || 'Gagal mengubah role');
+        } finally {
+            setChangingRole(null);
         }
     }
 
@@ -382,9 +419,44 @@ export default function AdminUsers() {
                                         <td>{user.name}</td>
                                         <td>{user.email || '-'}</td>
                                         <td>
-                                            <span className={`badge ${user.role === 'admin' ? 'badge-primary' : user.role === 'manager' ? 'badge-info' : 'badge-success'}`}>
-                                                {getRoleLabel(user.role)}
-                                            </span>
+                                            <select
+                                                className="form-input form-select"
+                                                value={user.role}
+                                                onChange={(e) => handleRoleChange(user, e.target.value)}
+                                                disabled={changingRole === user.id}
+                                                style={{
+                                                    padding: '0.35rem 0.6rem',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 600,
+                                                    minWidth: 155,
+                                                    borderRadius: 'var(--radius-md)',
+                                                    cursor: changingRole === user.id ? 'wait' : 'pointer',
+                                                    opacity: changingRole === user.id ? 0.6 : 1,
+                                                    background: user.role === 'admin'
+                                                        ? 'rgba(99, 102, 241, 0.1)'
+                                                        : user.role === 'manager'
+                                                            ? 'rgba(6, 182, 212, 0.1)'
+                                                            : 'rgba(16, 185, 129, 0.1)',
+                                                    borderColor: user.role === 'admin'
+                                                        ? 'rgba(99, 102, 241, 0.3)'
+                                                        : user.role === 'manager'
+                                                            ? 'rgba(6, 182, 212, 0.3)'
+                                                            : 'rgba(16, 185, 129, 0.3)',
+                                                    color: user.role === 'admin'
+                                                        ? 'var(--primary-400, #818cf8)'
+                                                        : user.role === 'manager'
+                                                            ? 'var(--info-500, #06b6d4)'
+                                                            : 'var(--success-500, #10b981)',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                {roles.map(r => (
+                                                    <option key={r.id} value={r.name}>
+                                                        {r.name === 'admin' ? '🛡️ ' : r.name === 'manager' ? '👔 ' : '👤 '}
+                                                        {r.label}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </td>
                                         <td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
                                         <td>
@@ -493,14 +565,14 @@ export default function AdminUsers() {
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Role</label>
                                     <select
-                                        className="form-input form-select"
-                                        value={formData.role}
-                                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                    >
-                                        <option value="employee">Karyawan</option>
-                                        <option value="manager">Pimpinan / Manager</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
+                                    className="form-input"
+                                    value={formData.role}
+                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                >
+                                    {roles.map(r => (
+                                        <option key={r.id} value={r.name}>{r.label}</option>
+                                    ))}
+                                </select>
                                 </div>
                             </div>
 

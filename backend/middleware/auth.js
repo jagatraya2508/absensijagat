@@ -19,6 +19,8 @@ function authenticateToken(req, res, next) {
     });
 }
 
+const { pool } = require('../db'); // Need pool for DB query
+
 function isAdmin(req, res, next) {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ error: 'Akses ditolak. Hanya admin yang diizinkan.' });
@@ -33,4 +35,40 @@ function isManagerOrAdmin(req, res, next) {
     next();
 }
 
-module.exports = { authenticateToken, isAdmin, isManagerOrAdmin, JWT_SECRET };
+// Middleware to check specific permission
+function hasPermission(permissionKey) {
+    return async (req, res, next) => {
+        try {
+            // Admin always has all permissions
+            if (req.user.role === 'admin') {
+                return next();
+            }
+
+            // Query database for role permissions
+            const result = await pool.query(
+                `SELECT 1 FROM role_permissions rp 
+                 JOIN roles r ON rp.role_id = r.id 
+                 WHERE r.name = $1 AND rp.permission_key = $2`,
+                [req.user.role, permissionKey]
+            );
+
+            if (result.rows.length > 0) {
+                return next(); // Has permission
+            }
+
+            return res.status(403).json({ error: `Akses ditolak. Membutuhkan permission: ${permissionKey}` });
+        } catch (error) {
+            console.error('Permission check error:', error);
+            return res.status(500).json({ error: 'Terjadi kesalahan saat memeriksa hak akses' });
+        }
+    };
+}
+
+module.exports = { 
+    authenticateToken, 
+    verifyToken: authenticateToken, // Alias for backward compatibility
+    isAdmin, 
+    isManagerOrAdmin, 
+    hasPermission,
+    JWT_SECRET 
+};

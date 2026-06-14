@@ -37,8 +37,15 @@ export function AuthProvider({ children }) {
         setUser(null);
     }
 
+    function hasPermission(permissionKey) {
+        if (!user) return false;
+        if (user.role === 'admin') return true; // Admin always has all permissions
+        if (!user.permissions) return false;
+        return user.permissions.includes(permissionKey);
+    }
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, setUser, hasPermission }}>
             {children}
         </AuthContext.Provider>
     );

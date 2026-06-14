@@ -686,6 +686,21 @@ export const manualAttendanceAPI = {
     delete: (id) => request(`/manual-attendances/${id}`, { method: 'DELETE' }),
 };
 
+// Roles API
+export const rolesAPI = {
+    getAll: () => request('/roles'),
+    getPermissions: () => request('/roles/permissions'),
+    create: (data) => request('/roles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/roles/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/roles/${id}`, { method: 'DELETE' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -708,5 +723,6 @@ export default {
     customersAPI,
     licenseAPI,
     vehicleTypesAPI,
-    manualAttendanceAPI
+    manualAttendanceAPI,
+    rolesAPI
 };

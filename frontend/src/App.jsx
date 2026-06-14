@@ -19,6 +19,7 @@ import OffDays from './pages/OffDays';
 import AdminEmployees from './pages/AdminEmployees';
 import ManualAttendance from './pages/ManualAttendance';
 import AdminManualAttendance from './pages/AdminManualAttendance';
+import AdminRoles from './pages/AdminRoles';
 
 import AdminLoans from './pages/AdminLoans';
 import AdminPayroll from './pages/AdminPayroll';
@@ -39,8 +40,8 @@ import AdminAssets from './pages/AdminAssets';
 import AdminCustomers from './pages/AdminCustomers';
 import Kiosk from './pages/Kiosk';
 
-function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false }) {
-    const { user, loading } = useAuth();
+function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, permission = null }) {
+    const { user, loading, hasPermission } = useAuth();
 
     if (loading) {
         return (
@@ -59,6 +60,10 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false })
     }
 
     if (managerOrAdmin && user.role !== 'admin' && user.role !== 'manager') {
+        return <Navigate to="/" replace />;
+    }
+
+    if (permission && !hasPermission(permission)) {
         return <Navigate to="/" replace />;
     }
 
@@ -152,7 +157,7 @@ function AppRoutes() {
             <Route
                 path="/off-days"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.off_days">
                         <AppLayout>
                             <OffDays />
                         </AppLayout>
@@ -163,7 +168,7 @@ function AppRoutes() {
             <Route
                 path="/admin/locations"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.locations">
                         <AppLayout>
                             <AdminLocations />
                         </AppLayout>
@@ -174,7 +179,7 @@ function AppRoutes() {
             <Route
                 path="/admin/users"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.users">
                         <AppLayout>
                             <AdminUsers />
                         </AppLayout>
@@ -183,9 +188,20 @@ function AppRoutes() {
             />
 
             <Route
+                path="/admin/roles"
+                element={
+                    <ProtectedRoute permission="admin.roles">
+                        <AppLayout>
+                            <AdminRoles />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
                 path="/admin/reports"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.reports">
                         <AppLayout>
                             <AdminReports />
                         </AppLayout>
@@ -196,7 +212,7 @@ function AppRoutes() {
             <Route
                 path="/admin/face-registration"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.face_registration">
                         <AppLayout>
                             <AdminFaceRegistration />
                         </AppLayout>
@@ -251,7 +267,7 @@ function AppRoutes() {
             <Route
                 path="/admin/leaves"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.leaves">
                         <AppLayout>
                             <AdminLeaves />
                         </AppLayout>
@@ -262,7 +278,7 @@ function AppRoutes() {
             <Route
                 path="/admin/manual-attendance"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.manual_attendance">
                         <AppLayout>
                             <AdminManualAttendance />
                         </AppLayout>
@@ -273,7 +289,7 @@ function AppRoutes() {
             <Route
                 path="/approvals"
                 element={
-                    <ProtectedRoute managerOrAdmin>
+                    <ProtectedRoute permission="manager.approvals">
                         <AppLayout>
                             <ManagerApprovals />
                         </AppLayout>
@@ -284,7 +300,7 @@ function AppRoutes() {
             <Route
                 path="/admin/announcements"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.announcements">
                         <AppLayout>
                             <AdminAnnouncements />
                         </AppLayout>
@@ -295,7 +311,7 @@ function AppRoutes() {
             <Route
                 path="/admin/settings"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.settings">
                         <AppLayout>
                             <AdminSettings />
                         </AppLayout>
@@ -306,7 +322,7 @@ function AppRoutes() {
             <Route
                 path="/admin/license"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.license">
                         <AppLayout>
                             <LicenseSettings />
                         </AppLayout>
@@ -317,7 +333,7 @@ function AppRoutes() {
             <Route
                 path="/admin/employees"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.employees">
                         <AppLayout>
                             <AdminEmployees />
                         </AppLayout>
@@ -330,7 +346,7 @@ function AppRoutes() {
             <Route
                 path="/admin/loans"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.loans">
                         <AppLayout>
                             <AdminLoans />
                         </AppLayout>
@@ -341,7 +357,7 @@ function AppRoutes() {
             <Route
                 path="/admin/payroll"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.payroll">
                         <AppLayout>
                             <AdminPayroll />
                         </AppLayout>
@@ -352,7 +368,7 @@ function AppRoutes() {
             <Route
                 path="/admin/assessments"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.assessments">
                         <AppLayout>
                             <AdminAssessments />
                         </AppLayout>
@@ -363,7 +379,7 @@ function AppRoutes() {
             <Route
                 path="/admin/recruitment"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.recruitment">
                         <AppLayout>
                             <AdminRecruitment />
                         </AppLayout>
@@ -374,7 +390,7 @@ function AppRoutes() {
             <Route
                 path="/admin/work-schedule"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.work_schedule">
                         <AppLayout>
                             <AdminWorkSchedule />
                         </AppLayout>
@@ -385,7 +401,7 @@ function AppRoutes() {
             <Route
                 path="/admin/departments"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.departments">
                         <AppLayout>
                             <AdminDepartments />
                         </AppLayout>
@@ -396,7 +412,7 @@ function AppRoutes() {
             <Route
                 path="/admin/positions"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.positions">
                         <AppLayout>
                             <AdminPositions />
                         </AppLayout>
@@ -407,7 +423,7 @@ function AppRoutes() {
             <Route
                 path="/admin/vehicle-types"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.vehicle_types">
                         <AppLayout>
                             <AdminVehicleTypes />
                         </AppLayout>
@@ -418,7 +434,7 @@ function AppRoutes() {
             <Route
                 path="/admin/driver-activities"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.driver_activities">
                         <AppLayout>
                             <AdminDriverActivities />
                         </AppLayout>
@@ -440,7 +456,7 @@ function AppRoutes() {
             <Route
                 path="/admin/driver-tracking"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.driver_tracking">
                         <AppLayout>
                             <AdminDriverTracking />
                         </AppLayout>
@@ -451,7 +467,7 @@ function AppRoutes() {
             <Route
                 path="/admin/assets"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.assets">
                         <AppLayout>
                             <AdminAssets />
                         </AppLayout>
@@ -462,7 +478,7 @@ function AppRoutes() {
             <Route
                 path="/admin/customers"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.customers">
                         <AppLayout>
                             <AdminCustomers />
                         </AppLayout>
@@ -473,7 +489,7 @@ function AppRoutes() {
             <Route
                 path="/kiosk"
                 element={
-                    <ProtectedRoute adminOnly>
+                    <ProtectedRoute permission="admin.kiosk">
                         <Kiosk />
                     </ProtectedRoute>
                 }

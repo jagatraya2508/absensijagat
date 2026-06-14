@@ -35,6 +35,8 @@ echo "Running migration: migrate_change_off.js"
 node migrate_change_off.js
 echo "Running migration: migrate_license.js"
 node migrate_license.js
+echo "Running migration: migrate_roles.js"
+node migrate_roles.js
 cd ..
 
 # 3. Build Frontend
