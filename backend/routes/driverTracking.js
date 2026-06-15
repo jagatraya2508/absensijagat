@@ -43,6 +43,12 @@ const upload = multer({
 // Middleware: check if user is allowed to use tracking
 async function isTrackingUser(req, res, next) {
     try {
+        // Admin always has access
+        if (req.user.role === 'admin') {
+            req.userRole = { is_driver: true, is_collector: true, use_tracking: true };
+            return next();
+        }
+
         const result = await pool.query(
             'SELECT is_driver, is_collector, use_tracking FROM employee_details WHERE user_id = $1',
             [req.user.id]

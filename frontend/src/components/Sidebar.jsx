@@ -27,7 +27,7 @@ export default function Sidebar() {
         { path: '/schedule', icon: '🗓️', label: 'Kalender' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
         { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
-        ...(user?.use_tracking ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
+        ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
         { path: '/change-password', icon: '🔑', label: 'Ubah Password' },
     ];
 
