@@ -71,17 +71,27 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
 }
 
 function AppLayout({ children }) {
-    const { settings } = useSettings();
+    const { user } = useAuth();
 
     return (
         <div className="app-container">
             <Sidebar />
             <main className="main-content" style={{ position: 'relative' }}>
-                {settings?.app_logo && (
-                    <div className="global-logo-container">
-                        <img src={settings.app_logo} alt="Company Logo" className="global-logo" />
+                <div className="global-logo-container">
+                    <div 
+                        className="sidebar-user-avatar" 
+                        style={{ 
+                            width: '40px', 
+                            height: '40px', 
+                            fontSize: '1.2rem', 
+                            margin: 0,
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                        }}
+                        title={user?.name || 'User'}
+                    >
+                        {user?.name?.charAt(0) || '?'}
                     </div>
-                )}
+                </div>
                 {children}
             </main>
         </div>
