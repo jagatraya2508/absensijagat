@@ -5,12 +5,6 @@ import { useAuth } from '../context/AuthContext';
 export default function ChangePassword() {
     const { user, setUser } = useAuth();
     
-    // Password state
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordLoading, setPasswordLoading] = useState(false);
-    
     // Photo state
     const [photoFile, setPhotoFile] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
@@ -21,40 +15,6 @@ export default function ChangePassword() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    async function handlePasswordSubmit(e) {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-
-        if (!currentPassword || !newPassword || !confirmPassword) {
-            setError('Semua field harus diisi');
-            return;
-        }
-
-        if (newPassword.length < 6) {
-            setError('Password baru minimal 6 karakter');
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            setError('Konfirmasi password tidak cocok');
-            return;
-        }
-
-        setPasswordLoading(true);
-
-        try {
-            const result = await authAPI.changePassword(currentPassword, newPassword);
-            setSuccess(result.message || 'Password berhasil diubah');
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
-        } catch (err) {
-            setError(err.message || 'Gagal mengubah password');
-        } finally {
-            setPasswordLoading(false);
-        }
-    }
 
     function handlePhotoChange(e) {
         const file = e.target.files[0];
@@ -100,7 +60,7 @@ export default function ChangePassword() {
         <div>
             <div className="page-header">
                 <h1 className="page-title">👤 Profil Saya</h1>
-                <p className="page-subtitle">Kelola foto profil dan password akun Anda</p>
+                <p className="page-subtitle">Kelola foto profil Anda</p>
             </div>
 
             <div className="card" style={{ maxWidth: 600, margin: '0 auto', marginBottom: '2rem' }}>
@@ -118,7 +78,7 @@ export default function ChangePassword() {
                     </div>
                 )}
 
-                <div style={{ padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '1.5rem', textAlign: 'center' }}>
+                <div style={{ padding: '1rem', textAlign: 'center' }}>
                     <h3 style={{ marginBottom: '1.5rem', color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem' }}>Foto Profil</h3>
                     
                     <div style={{ position: 'relative', display: 'inline-block', marginBottom: '1.5rem' }}>
@@ -175,54 +135,6 @@ export default function ChangePassword() {
                             </button>
                         )}
                     </div>
-                </div>
-
-                <div style={{ padding: '1rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem', color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem' }}>Ubah Password</h3>
-                    <form onSubmit={handlePasswordSubmit}>
-                        <div className="form-group">
-                            <label className="form-label">Password Lama</label>
-                            <input
-                                type="password"
-                                className="form-input"
-                                value={currentPassword}
-                                onChange={(e) => setCurrentPassword(e.target.value)}
-                                placeholder="Masukkan password lama"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label">Password Baru</label>
-                            <input
-                                type="password"
-                                className="form-input"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="Minimal 6 karakter"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label">Konfirmasi Password Baru</label>
-                            <input
-                                type="password"
-                                className="form-input"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                placeholder="Ulangi password baru"
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                disabled={passwordLoading}
-                            >
-                                {passwordLoading ? 'Menyimpan...' : 'Ubah Password'}
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
