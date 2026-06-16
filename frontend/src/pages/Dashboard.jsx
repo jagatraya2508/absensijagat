@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { attendanceAPI, announcementsAPI, scheduleAPI } from '../utils/api';
 import ImageModal from '../components/ImageModal';
-// OffDayManager import removed
-// Modal state removed
-// Modal JSX removed
+
 
 export default function Dashboard() {
-    const { user } = useAuth();
+    const { user, hasPermission, logout } = useAuth();
     const { settings } = useSettings();
+    const navigate = useNavigate();
     const [todayStatus, setTodayStatus] = useState(null);
     const [history, setHistory] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
@@ -163,68 +162,245 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                {/* User Menus Grid */}
+                {/* ===== MENU KARYAWAN ===== */}
                 <div className="menu-grid">
+                    <Link to="/attendance" className="menu-item">
+                        <div className="menu-icon bg-blue-100 text-blue-600">📸</div>
+                        <span className="menu-label">Absensi</span>
+                    </Link>
+                    <Link to="/manual-attendance" className="menu-item">
+                        <div className="menu-icon bg-amber-100 text-amber-600">📝</div>
+                        <span className="menu-label">Pengajuan Absen</span>
+                    </Link>
                     <Link to="/history" className="menu-item">
-                        <div className="menu-icon bg-blue-100 text-blue-600">📋</div>
+                        <div className="menu-icon bg-cyan-100 text-cyan-600">📋</div>
                         <span className="menu-label">Riwayat</span>
+                    </Link>
+                    <Link to="/schedule" className="menu-item">
+                        <div className="menu-icon bg-purple-100 text-purple-600">🗓️</div>
+                        <span className="menu-label">Kalender</span>
                     </Link>
                     <Link to="/leaves" className="menu-item">
                         <div className="menu-icon bg-green-100 text-green-600">📝</div>
                         <span className="menu-label">Izin & Cuti</span>
                     </Link>
+                    <Link to="/overtime" className="menu-item">
+                        <div className="menu-icon bg-orange-100 text-orange-600">⏰</div>
+                        <span className="menu-label">Lembur</span>
+                    </Link>
                     <Link to="/change-password" className="menu-item">
-                        <div className="menu-icon bg-purple-100 text-purple-600">🔑</div>
+                        <div className="menu-icon bg-slate-100 text-slate-600">🔑</div>
                         <span className="menu-label">Ubah Password</span>
                     </Link>
 
-                    {/* Tracking */}
-                    {user?.use_tracking && (
+                    {/* Tracking - hanya jika user adalah driver */}
+                    {(user?.use_tracking || user?.role === 'admin') && (
                         <Link to="/driver-tracking" className="menu-item">
                             <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
                             <span className="menu-label">Tracking</span>
                         </Link>
                     )}
 
-                    {/* Off Day Setting */}
-                    {user?.role === 'admin' && (
-                        <Link to="/off-days" className="menu-item">
-                            <div className="menu-icon bg-red-100 text-red-600">📅</div>
-                            <span className="menu-label">
-                                Atur Libur
-                            </span>
-                        </Link>
-                    )}
-
-                    {user?.role === 'admin' && (
-                        <>
-                            <Link to="/admin/announcements" className="menu-item">
-                                <div className="menu-icon bg-yellow-100 text-yellow-600">📢</div>
-                                <span className="menu-label">Pengumuman</span>
-                            </Link>
-                            <Link to="/admin/locations" className="menu-item">
-                                <div className="menu-icon bg-red-100 text-red-600">📍</div>
-                                <span className="menu-label">Kelola Lokasi</span>
-                            </Link>
-                            <Link to="/admin/users" className="menu-item">
-                                <div className="menu-icon bg-pink-100 text-pink-600">👥</div>
-                                <span className="menu-label">Kelola User</span>
-                            </Link>
-                            <Link to="/admin/leaves" className="menu-item">
-                                <div className="menu-icon bg-teal-100 text-teal-600">📝</div>
-                                <span className="menu-label">Kelola Izin</span>
-                            </Link>
-                            <Link to="/admin/reports" className="menu-item">
-                                <div className="menu-icon bg-orange-100 text-orange-600">📊</div>
-                                <span className="menu-label">Laporan</span>
-                            </Link>
-                            <Link to="/admin/face-registration" className="menu-item">
-                                <div className="menu-icon bg-indigo-100 text-indigo-600">🔐</div>
-                                <span className="menu-label">Registrasi Wajah</span>
-                            </Link>
-                        </>
-                    )}
+                    {/* Logout button for mobile */}
+                    <button
+                        className="menu-item"
+                        onClick={() => { logout(); navigate('/login'); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                    >
+                        <div className="menu-icon bg-red-100 text-red-600">🚪</div>
+                        <span className="menu-label">Logout</span>
+                    </button>
                 </div>
+
+                {/* ===== MENU MANAGER ===== */}
+                {hasPermission('manager.approvals') && (
+                    <>
+                        <div className="dashboard-section-header">
+                            <span className="dashboard-section-title">✅ Task Pimpinan</span>
+                            <span className="dashboard-section-line" />
+                        </div>
+                        <div className="menu-grid">
+                            <Link to="/approvals" className="menu-item">
+                                <div className="menu-icon bg-emerald-100 text-emerald-600">✅</div>
+                                <span className="menu-label">Persetujuan Lembur</span>
+                            </Link>
+                        </div>
+                    </>
+                )}
+
+                {/* ===== MENU ADMIN - MASTER DATA ===== */}
+                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
+                    <>
+                        <div className="dashboard-section-header">
+                            <span className="dashboard-section-title">📦 Master Data</span>
+                            <span className="dashboard-section-line" />
+                        </div>
+                        <div className="menu-grid">
+                            {hasPermission('admin.locations') && (
+                                <Link to="/admin/locations" className="menu-item">
+                                    <div className="menu-icon bg-red-100 text-red-600">📍</div>
+                                    <span className="menu-label">Kelola Lokasi</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.departments') && (
+                                <Link to="/admin/departments" className="menu-item">
+                                    <div className="menu-icon bg-blue-100 text-blue-600">🏢</div>
+                                    <span className="menu-label">Departemen</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.positions') && (
+                                <Link to="/admin/positions" className="menu-item">
+                                    <div className="menu-icon bg-amber-100 text-amber-600">🏅</div>
+                                    <span className="menu-label">Jabatan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.vehicle_types') && (
+                                <Link to="/admin/vehicle-types" className="menu-item">
+                                    <div className="menu-icon bg-cyan-100 text-cyan-600">🚚</div>
+                                    <span className="menu-label">Kendaraan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.employees') && (
+                                <Link to="/admin/employees" className="menu-item">
+                                    <div className="menu-icon bg-purple-100 text-purple-600">👤</div>
+                                    <span className="menu-label">Data Karyawan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.face_registration') && (
+                                <Link to="/admin/face-registration" className="menu-item">
+                                    <div className="menu-icon bg-indigo-100 text-indigo-600">🔐</div>
+                                    <span className="menu-label">Registrasi Wajah</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.work_schedule') && (
+                                <Link to="/admin/work-schedule" className="menu-item">
+                                    <div className="menu-icon bg-teal-100 text-teal-600">🕐</div>
+                                    <span className="menu-label">Jadwal Kerja</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.customers') && (
+                                <Link to="/admin/customers" className="menu-item">
+                                    <div className="menu-icon bg-rose-100 text-rose-600">🏪</div>
+                                    <span className="menu-label">Customer</span>
+                                </Link>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {/* ===== MENU ADMIN - OPERASIONAL ===== */}
+                {(hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.users') || hasPermission('admin.roles') || hasPermission('admin.kiosk') || hasPermission('admin.settings') || hasPermission('admin.license')) && (
+                    <>
+                        <div className="dashboard-section-header">
+                            <span className="dashboard-section-title">⚙️ Admin Panel</span>
+                            <span className="dashboard-section-line" />
+                        </div>
+                        <div className="menu-grid">
+                            {hasPermission('admin.off_days') && (
+                                <Link to="/off-days" className="menu-item">
+                                    <div className="menu-icon bg-red-100 text-red-600">📅</div>
+                                    <span className="menu-label">Atur Libur</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.announcements') && (
+                                <Link to="/admin/announcements" className="menu-item">
+                                    <div className="menu-icon bg-yellow-100 text-yellow-600">📢</div>
+                                    <span className="menu-label">Pengumuman</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.driver_activities') && (
+                                <Link to="/admin/driver-activities" className="menu-item">
+                                    <div className="menu-icon bg-orange-100 text-orange-600">🚛</div>
+                                    <span className="menu-label">Aktivitas Driver</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.driver_tracking') && (
+                                <Link to="/admin/driver-tracking" className="menu-item">
+                                    <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
+                                    <span className="menu-label">Tracking Kunjungan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.leaves') && (
+                                <Link to="/admin/leaves" className="menu-item">
+                                    <div className="menu-icon bg-green-100 text-green-600">📝</div>
+                                    <span className="menu-label">Kelola Izin</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.manual_attendance') && (
+                                <Link to="/admin/manual-attendance" className="menu-item">
+                                    <div className="menu-icon bg-cyan-100 text-cyan-600">📋</div>
+                                    <span className="menu-label">Persetujuan Absen</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.loans') && (
+                                <Link to="/admin/loans" className="menu-item">
+                                    <div className="menu-icon bg-amber-100 text-amber-600">💰</div>
+                                    <span className="menu-label">Pinjaman</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.payroll') && (
+                                <Link to="/admin/payroll" className="menu-item">
+                                    <div className="menu-icon bg-emerald-100 text-emerald-600">💵</div>
+                                    <span className="menu-label">Payroll</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.assessments') && (
+                                <Link to="/admin/assessments" className="menu-item">
+                                    <div className="menu-icon bg-indigo-100 text-indigo-600">📋</div>
+                                    <span className="menu-label">Penilaian</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.recruitment') && (
+                                <Link to="/admin/recruitment" className="menu-item">
+                                    <div className="menu-icon bg-purple-100 text-purple-600">🧑‍💼</div>
+                                    <span className="menu-label">Recruitment</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.assets') && (
+                                <Link to="/admin/assets" className="menu-item">
+                                    <div className="menu-icon bg-slate-100 text-slate-600">📦</div>
+                                    <span className="menu-label">Manajemen Aset</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.reports') && (
+                                <Link to="/admin/reports" className="menu-item">
+                                    <div className="menu-icon bg-orange-100 text-orange-600">📊</div>
+                                    <span className="menu-label">Laporan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.users') && (
+                                <Link to="/admin/users" className="menu-item">
+                                    <div className="menu-icon bg-pink-100 text-pink-600">👥</div>
+                                    <span className="menu-label">Kelola User</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.roles') && (
+                                <Link to="/admin/roles" className="menu-item">
+                                    <div className="menu-icon bg-rose-100 text-rose-600">🔑</div>
+                                    <span className="menu-label">Kelola Role</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.kiosk') && (
+                                <Link to="/kiosk" className="menu-item">
+                                    <div className="menu-icon bg-blue-100 text-blue-600">🖥️</div>
+                                    <span className="menu-label">Mode Kiosk</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.settings') && (
+                                <Link to="/admin/settings" className="menu-item">
+                                    <div className="menu-icon bg-slate-100 text-slate-600">⚙️</div>
+                                    <span className="menu-label">Pengaturan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.license') && (
+                                <Link to="/admin/license" className="menu-item">
+                                    <div className="menu-icon bg-amber-100 text-amber-600">🔑</div>
+                                    <span className="menu-label">License</span>
+                                </Link>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
 

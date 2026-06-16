@@ -224,41 +224,7 @@ export default function Sidebar() {
                 </div>
             </aside>
 
-            {/* Mobile Bottom Navigation */}
-            <nav className="mobile-nav">
-                {menuItems.map((item) => (
-                    <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) =>
-                            `mobile-nav-link ${isActive ? 'active' : ''}`
-                        }
-                        end={item.path === '/'}
-                    >
-                        <span className="mobile-nav-link-icon">{item.icon}</span>
-                        {item.label}
-                    </NavLink>
-                ))}
-                {hasPermission('admin.reports') && (
-                    <NavLink
-                        to="/admin/reports"
-                        className={({ isActive }) =>
-                            `mobile-nav-link ${isActive ? 'active' : ''}`
-                        }
-                    >
-                        <span className="mobile-nav-link-icon">📊</span>
-                        Admin
-                    </NavLink>
-                )}
-                <button
-                    className="mobile-nav-link"
-                    onClick={handleLogout}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit' }}
-                >
-                    <span className="mobile-nav-link-icon" style={{ color: 'var(--danger-500)' }}>🚪</span>
-                    Logout
-                </button>
-            </nav>
+
         </>
     );
 }
