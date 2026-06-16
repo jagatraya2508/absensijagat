@@ -414,7 +414,7 @@ export default function Dashboard() {
                     <div className="grid grid-2">
                         {todayStatus?.check_in && (
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                                {todayStatus.check_in.photo_path ? (
+                                {todayStatus.check_in.photo_path && todayStatus.check_in.photo_path !== 'manual' ? (
                                     <img
                                         src={todayStatus.check_in.photo_path}
                                         alt="Check-in"
@@ -459,7 +459,7 @@ export default function Dashboard() {
 
                         {todayStatus?.check_out && (
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                                {todayStatus.check_out.photo_path ? (
+                                {todayStatus.check_out.photo_path && todayStatus.check_out.photo_path !== 'manual' ? (
                                     <img
                                         src={todayStatus.check_out.photo_path}
                                         alt="Check-out"

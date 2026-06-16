@@ -375,7 +375,7 @@ export default function History() {
                                                     borderRadius: 'var(--radius-lg)'
                                                 }}
                                             >
-                                                {record.photo_path ? (
+                                                {record.photo_path && record.photo_path !== 'manual' ? (
                                                     <img
                                                         src={record.photo_path}
                                                         alt={record.type}
