@@ -101,6 +101,13 @@ export const authAPI = {
             method: 'PUT',
             body: JSON.stringify(data),
         }),
+
+    // Update own profile photo
+    updateProfilePhoto: (formData) =>
+        request('/auth/profile/photo', {
+            method: 'PUT',
+            body: formData,
+        }),
 };
 
 // Attendance API

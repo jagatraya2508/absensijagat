@@ -408,7 +408,7 @@ router.get('/history', authenticateToken, async (req, res) => {
         const isAdmin = req.user.role === 'admin';
 
         let query = `
-      SELECT ar.*, al.name as location_name, u.name as user_name, u.employee_id
+      SELECT ar.*, al.name as location_name, u.name as user_name, u.employee_id, u.photo as user_photo
       FROM attendance_records ar
       LEFT JOIN attendance_locations al ON ar.location_id = al.id
       LEFT JOIN users u ON ar.user_id = u.id

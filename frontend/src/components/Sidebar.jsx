@@ -28,7 +28,7 @@ export default function Sidebar() {
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
         { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
         ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
-        { path: '/change-password', icon: '🔑', label: 'Ubah Password' },
+        { path: '/change-password', icon: '👤', label: 'Profil Saya' },
     ];
 
     // Master submenu items
@@ -209,9 +209,13 @@ export default function Sidebar() {
                 </nav>
 
                 <div className="sidebar-user">
-                    <div className="sidebar-user-avatar">
-                        {user?.name?.charAt(0) || '?'}
-                    </div>
+                    {user?.photo ? (
+                        <img src={user.photo} alt="Profile" className="sidebar-user-avatar" style={{ objectFit: 'cover', padding: 0, border: '2px solid rgba(255,255,255,0.2)' }} />
+                    ) : (
+                        <div className="sidebar-user-avatar">
+                            {user?.name?.charAt(0) || '?'}
+                        </div>
+                    )}
                     <div className="sidebar-user-info">
                         <div className="sidebar-user-name">{user?.name}</div>
                         <div className="sidebar-user-role">

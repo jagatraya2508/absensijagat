@@ -386,6 +386,13 @@ export default function History() {
                                                             isOpen: true
                                                         })}
                                                     />
+                                                ) : (record.user_photo || user?.photo) ? (
+                                                    <img
+                                                        src={record.user_photo || user?.photo}
+                                                        alt="Fallback Profile"
+                                                        className="photo-thumb-lg"
+                                                        style={{ objectFit: 'cover' }}
+                                                    />
                                                 ) : (
                                                     <div 
                                                         className="photo-thumb-lg"

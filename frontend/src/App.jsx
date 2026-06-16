@@ -78,19 +78,35 @@ function AppLayout({ children }) {
             <Sidebar />
             <main className="main-content" style={{ position: 'relative' }}>
                 <div className="global-logo-container">
-                    <div 
-                        className="sidebar-user-avatar" 
-                        style={{ 
-                            width: '40px', 
-                            height: '40px', 
-                            fontSize: '1.2rem', 
-                            margin: 0,
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                        }}
-                        title={user?.name || 'User'}
-                    >
-                        {user?.name?.charAt(0) || '?'}
-                    </div>
+                    {user?.photo ? (
+                        <img 
+                            src={user.photo} 
+                            alt="Profile" 
+                            className="sidebar-user-avatar"
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                cursor: 'pointer',
+                                objectFit: 'cover',
+                                padding: 0,
+                                border: '2px solid rgba(255,255,255,0.2)'
+                            }}
+                            title={user?.name || 'User'}
+                        />
+                    ) : (
+                        <div
+                            className="sidebar-user-avatar"
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                fontSize: '14px',
+                                cursor: 'pointer'
+                            }}
+                            title={user?.name || 'User'}
+                        >
+                            {user?.name?.charAt(0) || '?'}
+                        </div>
+                    )}
                 </div>
                 {children}
             </main>

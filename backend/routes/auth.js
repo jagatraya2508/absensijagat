@@ -6,6 +6,36 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../db');
 const { JWT_SECRET, authenticateToken, isAdmin } = require('../middleware/auth');
+const multer = require('multer');
+
+// Configure multer for profile photo uploads
+const profileStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '../uploads/profiles');
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'profile-' + req.user.id + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const uploadProfile = multer({
+    storage: profileStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('Hanya file gambar (JPG/PNG) yang diperbolehkan!'));
+    }
+});
 
 function logError(error) {
     const logPath = path.join(__dirname, '../error.log');
@@ -69,6 +99,7 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 off_day: user.off_day,
+                photo: user.photo,
                 is_driver: user.is_driver,
                 is_collector: user.is_collector,
                 use_tracking: user.use_tracking
@@ -100,6 +131,40 @@ router.put('/profile', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Update profile error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Update Profile Photo (Self)
+router.put('/profile/photo', authenticateToken, uploadProfile.single('photo'), async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'Tidak ada file foto yang diupload' });
+        }
+
+        const photoPath = '/uploads/profiles/' + req.file.filename;
+
+        // Optionally, delete the old photo here if it exists (for brevity keeping it simple)
+        const oldUser = await pool.query('SELECT photo FROM users WHERE id = $1', [userId]);
+        if (oldUser.rows.length > 0 && oldUser.rows[0].photo) {
+            try {
+                const oldPath = path.join(__dirname, '..', oldUser.rows[0].photo);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            } catch (err) {
+                console.error('Failed to delete old photo', err);
+            }
+        }
+
+        const result = await pool.query(
+            'UPDATE users SET photo = $1 WHERE id = $2 RETURNING id, employee_id, name, email, role, off_day, photo',
+            [photoPath, userId]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Upload profile photo error:', error);
+        res.status(500).json({ error: error.message || 'Terjadi kesalahan server' });
     }
 });
 
@@ -146,7 +211,7 @@ router.post('/register', authenticateToken, isAdmin, async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, u.off_day,
+            `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, u.off_day, u.photo,
                     COALESCE(ed.is_driver, false) as is_driver,
                     COALESCE(ed.is_collector, false) as is_collector,
                     COALESCE(ed.use_tracking, false) as use_tracking
@@ -188,7 +253,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.get('/users', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, r.label as role_label 
+            `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, u.photo, r.label as role_label 
              FROM users u 
              LEFT JOIN roles r ON u.role = r.name 
              ORDER BY u.created_at DESC`

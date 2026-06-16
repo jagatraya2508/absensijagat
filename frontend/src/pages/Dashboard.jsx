@@ -425,6 +425,13 @@ export default function Dashboard() {
                                             isOpen: true
                                         })}
                                     />
+                                ) : user?.photo ? (
+                                    <img
+                                        src={user.photo}
+                                        alt="Check-in Fallback"
+                                        className="photo-thumb-lg"
+                                        style={{ objectFit: 'cover' }}
+                                    />
                                 ) : (
                                     <div 
                                         className="photo-thumb-lg"
@@ -469,6 +476,13 @@ export default function Dashboard() {
                                             caption: `Check-out - ${formatDate(todayStatus.check_out.recorded_at)} ${formatTime(todayStatus.check_out.recorded_at)}`,
                                             isOpen: true
                                         })}
+                                    />
+                                ) : user?.photo ? (
+                                    <img
+                                        src={user.photo}
+                                        alt="Check-out Fallback"
+                                        className="photo-thumb-lg"
+                                        style={{ objectFit: 'cover' }}
                                     />
                                 ) : (
                                     <div 
