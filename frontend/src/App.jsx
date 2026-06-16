@@ -72,6 +72,7 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
 
 function AppLayout({ children }) {
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     return (
         <div className="app-container">
@@ -92,6 +93,7 @@ function AppLayout({ children }) {
                                 border: '2px solid rgba(255,255,255,0.2)'
                             }}
                             title={user?.name || 'User'}
+                            onClick={() => navigate('/change-password')}
                         />
                     ) : (
                         <div
@@ -103,6 +105,7 @@ function AppLayout({ children }) {
                                 cursor: 'pointer'
                             }}
                             title={user?.name || 'User'}
+                            onClick={() => navigate('/change-password')}
                         >
                             {user?.name?.charAt(0) || '?'}
                         </div>
