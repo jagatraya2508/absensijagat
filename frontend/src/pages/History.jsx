@@ -375,16 +375,34 @@ export default function History() {
                                                     borderRadius: 'var(--radius-lg)'
                                                 }}
                                             >
-                                                <img
-                                                    src={record.photo_path}
-                                                    alt={record.type}
-                                                    className="photo-thumb-lg"
-                                                    onClick={() => setSelectedImg({
-                                                        src: record.photo_path,
-                                                        caption: `${record.user_name || user?.name} - ${formatDate(record.recorded_at)} ${formatTime(record.recorded_at)}`,
-                                                        isOpen: true
-                                                    })}
-                                                />
+                                                {record.photo_path ? (
+                                                    <img
+                                                        src={record.photo_path}
+                                                        alt={record.type}
+                                                        className="photo-thumb-lg"
+                                                        onClick={() => setSelectedImg({
+                                                            src: record.photo_path,
+                                                            caption: `${record.user_name || user?.name} - ${formatDate(record.recorded_at)} ${formatTime(record.recorded_at)}`,
+                                                            isOpen: true
+                                                        })}
+                                                    />
+                                                ) : (
+                                                    <div 
+                                                        className="photo-thumb-lg"
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            background: 'var(--primary-500)',
+                                                            color: 'white',
+                                                            fontSize: '1.5rem',
+                                                            fontWeight: 'bold',
+                                                            textTransform: 'uppercase'
+                                                        }}
+                                                    >
+                                                        {(record.user_name || user?.name || '?').charAt(0)}
+                                                    </div>
+                                                )}
                                                             <div style={{ flex: 1 }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                                                         <span className={`badge ${record.type === 'check_in' ? 'badge-primary' : 'badge-warning'}`}>

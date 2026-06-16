@@ -414,16 +414,34 @@ export default function Dashboard() {
                     <div className="grid grid-2">
                         {todayStatus?.check_in && (
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                                <img
-                                    src={todayStatus.check_in.photo_path}
-                                    alt="Check-in"
-                                    className="photo-thumb-lg"
-                                    onClick={() => setSelectedImg({
-                                        src: todayStatus.check_in.photo_path,
-                                        caption: `Check-in - ${formatDate(todayStatus.check_in.recorded_at)} ${formatTime(todayStatus.check_in.recorded_at)}`,
-                                        isOpen: true
-                                    })}
-                                />
+                                {todayStatus.check_in.photo_path ? (
+                                    <img
+                                        src={todayStatus.check_in.photo_path}
+                                        alt="Check-in"
+                                        className="photo-thumb-lg"
+                                        onClick={() => setSelectedImg({
+                                            src: todayStatus.check_in.photo_path,
+                                            caption: `Check-in - ${formatDate(todayStatus.check_in.recorded_at)} ${formatTime(todayStatus.check_in.recorded_at)}`,
+                                            isOpen: true
+                                        })}
+                                    />
+                                ) : (
+                                    <div 
+                                        className="photo-thumb-lg"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            background: 'var(--primary-500)',
+                                            color: 'white',
+                                            fontSize: '1.5rem',
+                                            fontWeight: 'bold',
+                                            textTransform: 'uppercase'
+                                        }}
+                                    >
+                                        {(user?.name || '?').charAt(0)}
+                                    </div>
+                                )}
                                 <div>
                                     <div className="text-muted" style={{ fontSize: '0.75rem' }}>Check-in</div>
                                     <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
@@ -441,16 +459,34 @@ export default function Dashboard() {
 
                         {todayStatus?.check_out && (
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                                <img
-                                    src={todayStatus.check_out.photo_path}
-                                    alt="Check-out"
-                                    className="photo-thumb-lg"
-                                    onClick={() => setSelectedImg({
-                                        src: todayStatus.check_out.photo_path,
-                                        caption: `Check-out - ${formatDate(todayStatus.check_out.recorded_at)} ${formatTime(todayStatus.check_out.recorded_at)}`,
-                                        isOpen: true
-                                    })}
-                                />
+                                {todayStatus.check_out.photo_path ? (
+                                    <img
+                                        src={todayStatus.check_out.photo_path}
+                                        alt="Check-out"
+                                        className="photo-thumb-lg"
+                                        onClick={() => setSelectedImg({
+                                            src: todayStatus.check_out.photo_path,
+                                            caption: `Check-out - ${formatDate(todayStatus.check_out.recorded_at)} ${formatTime(todayStatus.check_out.recorded_at)}`,
+                                            isOpen: true
+                                        })}
+                                    />
+                                ) : (
+                                    <div 
+                                        className="photo-thumb-lg"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            background: 'var(--primary-500)',
+                                            color: 'white',
+                                            fontSize: '1.5rem',
+                                            fontWeight: 'bold',
+                                            textTransform: 'uppercase'
+                                        }}
+                                    >
+                                        {(user?.name || '?').charAt(0)}
+                                    </div>
+                                )}
                                 <div>
                                     <div className="text-muted" style={{ fontSize: '0.75rem' }}>Check-out</div>
                                     <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
