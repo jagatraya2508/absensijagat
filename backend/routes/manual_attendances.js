@@ -168,7 +168,8 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
         // If cancelling an approved request, delete the attendance_records that were created
         if (status === 'cancelled' && request.status === 'approved') {
             const userId = request.user_id;
-            const targetDateStr = new Date(request.date).toISOString().split('T')[0];
+            const d = new Date(request.date);
+            const targetDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
             // Delete attendance records created by this manual attendance approval
             await client.query(
@@ -192,7 +193,8 @@ router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
         // If approved, insert into attendance_records
         if (status === 'approved') {
             const userId = request.user_id;
-            const targetDateStr = new Date(request.date).toISOString().split('T')[0]; // YYYY-MM-DD
+            const d = new Date(request.date);
+            const targetDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // YYYY-MM-DD
 
             // Insert Time In
             if (request.time_in) {
