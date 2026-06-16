@@ -247,14 +247,33 @@ export default function AdminManualAttendance() {
 
             {/* Process Modal */}
             {showProcessModal && selectedRequest && (
-                <div className="card mb-4" style={{ border: '2px solid var(--primary-500)', marginTop: '1rem' }}>
-                    <div className="card-header">
-                        <h2 className="card-title">{processStatus === 'approved' ? '✅ Setujui Pengajuan' : '❌ Tolak Pengajuan'}</h2>
-                        <button className="btn btn-outline" onClick={() => setShowProcessModal(false)} style={{ padding: '0.5rem 1rem' }}>
-                            ✕
-                        </button>
-                    </div>
-                    <form onSubmit={handleProcess}>
+                <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '1rem'
+                }}>
+                    <div className="card" style={{ 
+                        border: '2px solid var(--primary-500)', 
+                        width: '100%', 
+                        maxWidth: '500px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        background: 'var(--theme-card-bg)',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }}>
+                        <div className="card-header" style={{ position: 'sticky', top: 0, background: 'var(--theme-card-bg)', zIndex: 1, paddingBottom: '1rem', borderBottom: '1px solid var(--gray-200)', marginBottom: '1rem' }}>
+                            <h2 className="card-title" style={{ margin: 0 }}>{processStatus === 'approved' ? '✅ Setujui Pengajuan' : '❌ Tolak Pengajuan'}</h2>
+                            <button type="button" className="btn btn-outline" onClick={() => setShowProcessModal(false)} style={{ padding: '0.4rem 0.8rem' }}>
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleProcess}>
                         <div style={{
                             padding: '1rem',
                             background: 'rgba(255,255,255,0.03)',
@@ -305,6 +324,7 @@ export default function AdminManualAttendance() {
                             </button>
                         </div>
                     </form>
+                    </div>
                 </div>
             )}
         </div>
