@@ -226,93 +226,113 @@ export default function ManualAttendance() {
 
             {/* Modal Form */}
             {showModal && (
-                <div className="card mb-4" style={{ border: '2px solid var(--primary-500)', marginTop: '1rem' }}>
-                    <div className="card-header">
-                        <h2 className="card-title">⏰ Buat Pengajuan Absen Manual</h2>
-                        <button
-                            className="btn btn-outline"
-                            onClick={() => setShowModal(false)}
-                            style={{ padding: '0.5rem 1rem' }}
-                        >
-                            ✕
-                        </button>
+                <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '1rem'
+                }}>
+                    <div className="card" style={{ 
+                        border: '2px solid var(--primary-500)', 
+                        width: '100%', 
+                        maxWidth: '600px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        background: 'var(--theme-card-bg)',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }}>
+                        <div className="card-header" style={{ position: 'sticky', top: 0, background: 'var(--theme-card-bg)', zIndex: 1, paddingBottom: '1rem', borderBottom: '1px solid var(--gray-200)', marginBottom: '1rem' }}>
+                            <h2 className="card-title" style={{ margin: 0 }}>⏰ Buat Pengajuan Absen Manual</h2>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => setShowModal(false)}
+                                style={{ padding: '0.4rem 0.8rem' }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} style={{ padding: '0 1rem 1rem' }}>
+                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                <label className="form-label">Tanggal Absen <span className="text-danger">*</span></label>
+                                <input
+                                    type="date"
+                                    name="date"
+                                    value={formData.date}
+                                    onChange={handleInputChange}
+                                    required
+                                    className="form-input"
+                                />
+                            </div>
+
+                            <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Jam Masuk</label>
+                                    <input
+                                        type="time"
+                                        name="time_in"
+                                        value={formData.time_in}
+                                        onChange={handleInputChange}
+                                        className="form-input"
+                                    />
+                                    <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>Kosongkan jika tidak perlu</small>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Jam Pulang</label>
+                                    <input
+                                        type="time"
+                                        name="time_out"
+                                        value={formData.time_out}
+                                        onChange={handleInputChange}
+                                        className="form-input"
+                                    />
+                                    <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>Kosongkan jika tidak perlu</small>
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                <label className="form-label">Alasan / Keterangan <span className="text-danger">*</span></label>
+                                <textarea
+                                    name="reason"
+                                    value={formData.reason}
+                                    onChange={handleInputChange}
+                                    required
+                                    className="form-input"
+                                    rows="3"
+                                    placeholder="Contoh: Lupa absen masuk karena terburu-buru meeting"
+                                ></textarea>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                <label className="form-label">Bukti Foto / Dokumen (Opsional)</label>
+                                <input
+                                    type="file"
+                                    name="attachment"
+                                    accept="image/*,.pdf"
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    style={{ padding: '0.5rem' }}
+                                />
+                                <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>
+                                    Format: JPG, PNG, atau PDF (maks. 5MB)
+                                </small>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid var(--gray-200)', paddingTop: '1rem' }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>
+                                    Batal
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                    {submitting ? '⏳ Menyimpan...' : '📤 Ajukan Absen'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group" style={{ marginBottom: '1rem' }}>
-                            <label className="form-label">Tanggal Absen <span className="text-danger">*</span></label>
-                            <input
-                                type="date"
-                                name="date"
-                                value={formData.date}
-                                onChange={handleInputChange}
-                                required
-                                className="form-input"
-                            />
-                        </div>
-
-                        <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                            <div className="form-group">
-                                <label className="form-label">Jam Masuk</label>
-                                <input
-                                    type="time"
-                                    name="time_in"
-                                    value={formData.time_in}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                />
-                                <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>Kosongkan jika tidak perlu</small>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Jam Pulang</label>
-                                <input
-                                    type="time"
-                                    name="time_out"
-                                    value={formData.time_out}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                />
-                                <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>Kosongkan jika tidak perlu</small>
-                            </div>
-                        </div>
-
-                        <div className="form-group" style={{ marginBottom: '1rem' }}>
-                            <label className="form-label">Alasan / Keterangan <span className="text-danger">*</span></label>
-                            <textarea
-                                name="reason"
-                                value={formData.reason}
-                                onChange={handleInputChange}
-                                required
-                                className="form-input"
-                                rows="3"
-                                placeholder="Contoh: Lupa absen masuk karena terburu-buru meeting"
-                            ></textarea>
-                        </div>
-
-                        <div className="form-group" style={{ marginBottom: '1rem' }}>
-                            <label className="form-label">Bukti Foto / Dokumen (Opsional)</label>
-                            <input
-                                type="file"
-                                name="attachment"
-                                accept="image/*,.pdf"
-                                onChange={handleInputChange}
-                                className="form-input"
-                                style={{ padding: '0.5rem' }}
-                            />
-                            <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>
-                                Format: JPG, PNG, atau PDF (maks. 5MB)
-                            </small>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                            <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>
-                                Batal
-                            </button>
-                            <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                {submitting ? '⏳ Menyimpan...' : '📤 Ajukan Absen'}
-                            </button>
-                        </div>
-                    </form>
                 </div>
             )}
         </div>
