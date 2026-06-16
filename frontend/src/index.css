@@ -2576,7 +2576,6 @@ body {
   top: 2rem;
   right: 2rem;
   z-index: 50;
-  pointer-events: none; 
 }
 
 .global-logo {
