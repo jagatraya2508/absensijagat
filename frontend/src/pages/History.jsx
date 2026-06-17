@@ -295,7 +295,7 @@ export default function History() {
                                                 </div>
                                             )}
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
-                                                {userData.records.map((record) => (
+                                                {[...userData.records].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at)).map((record) => (
                                                     record.type === 'off_day' ? (
                                                         <div
                                                             key={record.id}

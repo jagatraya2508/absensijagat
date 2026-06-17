@@ -22,12 +22,14 @@ export default function Sidebar() {
     const menuItems = [
         { path: '/', icon: '🏠', label: 'Dashboard' },
         { path: '/attendance', icon: '📸', label: 'Absensi' },
+        ...(hasPermission('admin.kiosk') ? [{ path: '/kiosk', icon: '🖥️', label: 'Mode Kiosk' }] : []),
         { path: '/manual-attendance', icon: '📝', label: 'Pengajuan Absen' },
         { path: '/history', icon: '📋', label: 'Riwayat' },
         { path: '/schedule', icon: '🗓️', label: 'Kalender' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
         { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
         ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
+        ...(hasPermission('admin.assets') ? [{ path: '/admin/assets', icon: '📦', label: 'Manajemen Aset' }] : []),
         { path: '/change-password', icon: '👤', label: 'Profil Saya' },
     ];
 
@@ -43,23 +45,25 @@ export default function Sidebar() {
         { path: '/admin/customers', icon: '🏪', label: 'Master Customer', permissionKey: 'admin.customers' },
     ].filter(item => hasPermission(item.permissionKey));
 
-    // Other admin items (flat)
-    const adminItems = [
+    const pimpinanItems = [
+        { path: '/approvals', icon: '✅', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals' },
+        { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
+        { path: '/admin/manual-attendance', icon: '📋', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
         { path: '/off-days', icon: '📅', label: 'Atur Libur', permissionKey: 'admin.off_days' },
         { path: '/admin/announcements', icon: '📢', label: 'Kelola Pengumuman', permissionKey: 'admin.announcements' },
         { path: '/admin/driver-activities', icon: '🚛', label: 'Aktivitas Driver', permissionKey: 'admin.driver_activities' },
         { path: '/admin/driver-tracking', icon: '📍', label: 'Tracking Kunjungan', permissionKey: 'admin.driver_tracking' },
-        { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
-        { path: '/admin/manual-attendance', icon: '📋', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
         { path: '/admin/loans', icon: '💰', label: 'Pinjaman', permissionKey: 'admin.loans' },
         { path: '/admin/payroll', icon: '💵', label: 'Payroll', permissionKey: 'admin.payroll' },
         { path: '/admin/assessments', icon: '📋', label: 'Penilaian', permissionKey: 'admin.assessments' },
         { path: '/admin/recruitment', icon: '🧑‍💼', label: 'Recruitment', permissionKey: 'admin.recruitment' },
-        { path: '/admin/assets', icon: '📦', label: 'Manajemen Aset', permissionKey: 'admin.assets' },
         { path: '/admin/reports', icon: '📊', label: 'Laporan', permissionKey: 'admin.reports' },
+    ].filter(item => hasPermission(item.permissionKey));
+
+    // Other admin items (flat)
+    const adminItems = [
         { path: '/admin/users', icon: '👥', label: 'Kelola User', permissionKey: 'admin.users' },
         { path: '/admin/roles', icon: '🔑', label: 'Kelola Role', permissionKey: 'admin.roles' },
-        { path: '/kiosk', icon: '🖥️', label: 'Mode Kiosk', permissionKey: 'admin.kiosk' },
         { path: '/admin/settings', icon: '⚙️', label: 'Pengaturan', permissionKey: 'admin.settings' },
         { path: '/admin/license', icon: '🔑', label: 'License', permissionKey: 'admin.license' },
     ].filter(item => hasPermission(item.permissionKey));
@@ -91,7 +95,7 @@ export default function Sidebar() {
                         </NavLink>
                     ))}
 
-                    {hasPermission('manager.approvals') && (
+                    {pimpinanItems.length > 0 && (
                         <>
                             <div style={{
                                 margin: '1.25rem 0 0.5rem 0',
@@ -108,10 +112,19 @@ export default function Sidebar() {
                                 <span>Task Pimpinan</span>
                                 <span style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
                             </div>
-                            <NavLink to="/approvals" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-                                <span className="sidebar-link-icon">✅</span>
-                                Persetujuan Lembur
-                            </NavLink>
+                            
+                            {pimpinanItems.map((item) => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    className={({ isActive }) =>
+                                        `sidebar-link ${isActive ? 'active' : ''}`
+                                    }
+                                >
+                                    <span className="sidebar-link-icon">{item.icon}</span>
+                                    {item.label}
+                                </NavLink>
+                            ))}
                         </>
                     )}
 

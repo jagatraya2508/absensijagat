@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { pool } = require('../db');
 const { JWT_SECRET, authenticateToken, isAdmin } = require('../middleware/auth');
 const multer = require('multer');
@@ -403,6 +405,69 @@ router.put('/reset-password/:id', authenticateToken, isAdmin, async (req, res) =
         res.json({ message: `Password ${userCheck.rows[0].name} berhasil direset` });
     } catch (error) {
         console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Forgot password
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { employee_id } = req.body;
+
+        if (!employee_id) {
+            return res.status(400).json({ error: 'Employee ID harus diisi' });
+        }
+
+        const result = await pool.query('SELECT id, name, email FROM users WHERE employee_id = $1', [employee_id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User tidak ditemukan' });
+        }
+
+        const user = result.rows[0];
+        if (!user.email) {
+            return res.status(400).json({ error: 'User ini tidak memiliki alamat email yang terdaftar. Hubungi Admin.' });
+        }
+
+        // Generate random password (8 chars)
+        const newPassword = crypto.randomBytes(4).toString('hex');
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Setup Nodemailer
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: process.env.SMTP_PORT === '465',
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
+            },
+        });
+
+        const mailOptions = {
+            from: `"Sistem Absensi" <${process.env.SMTP_USER}>`,
+            to: user.email,
+            subject: 'Reset Password Sistem Absensi',
+            text: `Halo ${user.name},\n\nPassword Anda telah direset. Berikut adalah password baru Anda: ${newPassword}\n\nSilakan login menggunakan password ini dan segera ubah password Anda di menu Profil Saya.\n\nTerima kasih.`,
+            html: `<p>Halo <b>${user.name}</b>,</p><p>Password Anda telah direset. Berikut adalah password baru Anda: <b>${newPassword}</b></p><p>Silakan login menggunakan password ini dan segera ubah password Anda di menu Profil Saya.</p><p>Terima kasih.</p>`
+        };
+
+        try {
+            await transporter.sendMail(mailOptions);
+        } catch (emailErr) {
+            console.error('Email send error:', emailErr);
+            return res.status(500).json({ 
+                error: 'Gagal mengirim email. Pastikan konfigurasi SMTP di server sudah benar. ' + emailErr.message,
+                // Fallback for development/testing if SMTP is missing
+                fallback_password: newPassword
+            });
+        }
+
+        // Update password in DB
+        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, user.id]);
+
+        res.json({ message: 'Password baru telah dikirim ke email Anda' });
+    } catch (error) {
+        console.error('Forgot password error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });

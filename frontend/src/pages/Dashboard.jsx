@@ -168,6 +168,13 @@ export default function Dashboard() {
                         <div className="menu-icon bg-blue-100 text-blue-600">📸</div>
                         <span className="menu-label">Absensi</span>
                     </Link>
+                    {/* Kiosk Mode */}
+                    {hasPermission('admin.kiosk') && (
+                        <Link to="/kiosk" className="menu-item">
+                            <div className="menu-icon bg-blue-100 text-blue-600">🖥️</div>
+                            <span className="menu-label">Mode Kiosk</span>
+                        </Link>
+                    )}
                     <Link to="/manual-attendance" className="menu-item">
                         <div className="menu-icon bg-amber-100 text-amber-600">📝</div>
                         <span className="menu-label">Pengajuan Absen</span>
@@ -188,11 +195,6 @@ export default function Dashboard() {
                         <div className="menu-icon bg-orange-100 text-orange-600">⏰</div>
                         <span className="menu-label">Lembur</span>
                     </Link>
-                    <Link to="/change-password" className="menu-item">
-                        <div className="menu-icon bg-slate-100 text-slate-600">🔑</div>
-                        <span className="menu-label">Ubah Password</span>
-                    </Link>
-
                     {/* Tracking - hanya jika user adalah driver */}
                     {(user?.use_tracking || user?.role === 'admin') && (
                         <Link to="/driver-tracking" className="menu-item">
@@ -200,6 +202,18 @@ export default function Dashboard() {
                             <span className="menu-label">Tracking</span>
                         </Link>
                     )}
+
+                    {hasPermission('admin.assets') && (
+                        <Link to="/admin/assets" className="menu-item">
+                            <div className="menu-icon bg-slate-100 text-slate-600">📦</div>
+                            <span className="menu-label">Manajemen Aset</span>
+                        </Link>
+                    )}
+
+                    <Link to="/change-password" className="menu-item">
+                        <div className="menu-icon bg-slate-100 text-slate-600">🔑</div>
+                        <span className="menu-label">Ubah Password</span>
+                    </Link>
 
                     {/* Logout button for mobile */}
                     <button
@@ -213,17 +227,85 @@ export default function Dashboard() {
                 </div>
 
                 {/* ===== MENU MANAGER ===== */}
-                {hasPermission('manager.approvals') && (
+                {(hasPermission('manager.approvals') || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title">✅ Task Pimpinan</span>
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
-                            <Link to="/approvals" className="menu-item">
-                                <div className="menu-icon bg-emerald-100 text-emerald-600">✅</div>
-                                <span className="menu-label">Persetujuan Lembur</span>
-                            </Link>
+                            {hasPermission('manager.approvals') && (
+                                <Link to="/approvals" className="menu-item">
+                                    <div className="menu-icon bg-emerald-100 text-emerald-600">✅</div>
+                                    <span className="menu-label">Persetujuan Lembur</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.leaves') && (
+                                <Link to="/admin/leaves" className="menu-item">
+                                    <div className="menu-icon bg-green-100 text-green-600">📝</div>
+                                    <span className="menu-label">Kelola Izin</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.manual_attendance') && (
+                                <Link to="/admin/manual-attendance" className="menu-item">
+                                    <div className="menu-icon bg-cyan-100 text-cyan-600">📋</div>
+                                    <span className="menu-label">Persetujuan Absen</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.off_days') && (
+                                <Link to="/off-days" className="menu-item">
+                                    <div className="menu-icon bg-red-100 text-red-600">📅</div>
+                                    <span className="menu-label">Atur Libur</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.announcements') && (
+                                <Link to="/admin/announcements" className="menu-item">
+                                    <div className="menu-icon bg-yellow-100 text-yellow-600">📢</div>
+                                    <span className="menu-label">Pengumuman</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.driver_activities') && (
+                                <Link to="/admin/driver-activities" className="menu-item">
+                                    <div className="menu-icon bg-orange-100 text-orange-600">🚛</div>
+                                    <span className="menu-label">Aktivitas Driver</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.driver_tracking') && (
+                                <Link to="/admin/driver-tracking" className="menu-item">
+                                    <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
+                                    <span className="menu-label">Tracking Kunjungan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.loans') && (
+                                <Link to="/admin/loans" className="menu-item">
+                                    <div className="menu-icon bg-amber-100 text-amber-600">💰</div>
+                                    <span className="menu-label">Pinjaman</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.payroll') && (
+                                <Link to="/admin/payroll" className="menu-item">
+                                    <div className="menu-icon bg-emerald-100 text-emerald-600">💵</div>
+                                    <span className="menu-label">Payroll</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.assessments') && (
+                                <Link to="/admin/assessments" className="menu-item">
+                                    <div className="menu-icon bg-indigo-100 text-indigo-600">📋</div>
+                                    <span className="menu-label">Penilaian</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.recruitment') && (
+                                <Link to="/admin/recruitment" className="menu-item">
+                                    <div className="menu-icon bg-purple-100 text-purple-600">🧑‍💼</div>
+                                    <span className="menu-label">Recruitment</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.reports') && (
+                                <Link to="/admin/reports" className="menu-item">
+                                    <div className="menu-icon bg-orange-100 text-orange-600">📊</div>
+                                    <span className="menu-label">Laporan</span>
+                                </Link>
+                            )}
                         </div>
                     </>
                 )}
@@ -289,85 +371,13 @@ export default function Dashboard() {
                 )}
 
                 {/* ===== MENU ADMIN - OPERASIONAL ===== */}
-                {(hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.users') || hasPermission('admin.roles') || hasPermission('admin.kiosk') || hasPermission('admin.settings') || hasPermission('admin.license')) && (
+                {(hasPermission('admin.users') || hasPermission('admin.roles') || hasPermission('admin.settings') || hasPermission('admin.license')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title">⚙️ Admin Panel</span>
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
-                            {hasPermission('admin.off_days') && (
-                                <Link to="/off-days" className="menu-item">
-                                    <div className="menu-icon bg-red-100 text-red-600">📅</div>
-                                    <span className="menu-label">Atur Libur</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.announcements') && (
-                                <Link to="/admin/announcements" className="menu-item">
-                                    <div className="menu-icon bg-yellow-100 text-yellow-600">📢</div>
-                                    <span className="menu-label">Pengumuman</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.driver_activities') && (
-                                <Link to="/admin/driver-activities" className="menu-item">
-                                    <div className="menu-icon bg-orange-100 text-orange-600">🚛</div>
-                                    <span className="menu-label">Aktivitas Driver</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.driver_tracking') && (
-                                <Link to="/admin/driver-tracking" className="menu-item">
-                                    <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
-                                    <span className="menu-label">Tracking Kunjungan</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.leaves') && (
-                                <Link to="/admin/leaves" className="menu-item">
-                                    <div className="menu-icon bg-green-100 text-green-600">📝</div>
-                                    <span className="menu-label">Kelola Izin</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.manual_attendance') && (
-                                <Link to="/admin/manual-attendance" className="menu-item">
-                                    <div className="menu-icon bg-cyan-100 text-cyan-600">📋</div>
-                                    <span className="menu-label">Persetujuan Absen</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.loans') && (
-                                <Link to="/admin/loans" className="menu-item">
-                                    <div className="menu-icon bg-amber-100 text-amber-600">💰</div>
-                                    <span className="menu-label">Pinjaman</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.payroll') && (
-                                <Link to="/admin/payroll" className="menu-item">
-                                    <div className="menu-icon bg-emerald-100 text-emerald-600">💵</div>
-                                    <span className="menu-label">Payroll</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.assessments') && (
-                                <Link to="/admin/assessments" className="menu-item">
-                                    <div className="menu-icon bg-indigo-100 text-indigo-600">📋</div>
-                                    <span className="menu-label">Penilaian</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.recruitment') && (
-                                <Link to="/admin/recruitment" className="menu-item">
-                                    <div className="menu-icon bg-purple-100 text-purple-600">🧑‍💼</div>
-                                    <span className="menu-label">Recruitment</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.assets') && (
-                                <Link to="/admin/assets" className="menu-item">
-                                    <div className="menu-icon bg-slate-100 text-slate-600">📦</div>
-                                    <span className="menu-label">Manajemen Aset</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.reports') && (
-                                <Link to="/admin/reports" className="menu-item">
-                                    <div className="menu-icon bg-orange-100 text-orange-600">📊</div>
-                                    <span className="menu-label">Laporan</span>
-                                </Link>
-                            )}
                             {hasPermission('admin.users') && (
                                 <Link to="/admin/users" className="menu-item">
                                     <div className="menu-icon bg-pink-100 text-pink-600">👥</div>
@@ -378,12 +388,6 @@ export default function Dashboard() {
                                 <Link to="/admin/roles" className="menu-item">
                                     <div className="menu-icon bg-rose-100 text-rose-600">🔑</div>
                                     <span className="menu-label">Kelola Role</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.kiosk') && (
-                                <Link to="/kiosk" className="menu-item">
-                                    <div className="menu-icon bg-blue-100 text-blue-600">🖥️</div>
-                                    <span className="menu-label">Mode Kiosk</span>
                                 </Link>
                             )}
                             {hasPermission('admin.settings') && (

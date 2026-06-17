@@ -2,12 +2,20 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { authAPI } from '../utils/api';
 
 export default function Login() {
     const [employeeId, setEmployeeId] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Forgot Password State
+    const [showForgot, setShowForgot] = useState(false);
+    const [forgotId, setForgotId] = useState('');
+    const [forgotErr, setForgotErr] = useState('');
+    const [forgotMsg, setForgotMsg] = useState('');
+    const [forgotLoading, setForgotLoading] = useState(false);
 
     const { login } = useAuth();
     const { settings, companyName } = useSettings();
@@ -87,6 +95,16 @@ export default function Login() {
                             />
                         </div>
 
+                        <div style={{ textAlign: 'right', marginTop: '-0.5rem', marginBottom: '1rem' }}>
+                            <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: 'var(--primary-300)', fontSize: '0.85rem', cursor: 'pointer', padding: 0 }}
+                                onClick={() => { setShowForgot(true); setForgotErr(''); setForgotMsg(''); setForgotId(''); }}
+                            >
+                                Lupa Password?
+                            </button>
+                        </div>
+
                         <button
                             type="submit"
                             className="btn btn-primary btn-block btn-lg"
@@ -127,6 +145,65 @@ export default function Login() {
                     © 2024 {companyName || 'Absensi Karyawan'}. All rights reserved.
                 </p>
             </div>
+
+            {/* Forgot Password Modal */}
+            {showForgot && (
+                <div className="modal-overlay" style={{ zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-content" style={{ maxWidth: '400px', width: '90%', padding: '2rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--bg-secondary)', boxShadow: 'var(--shadow-xl)' }}>
+                        <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: '1.25rem', color: 'var(--text-primary)' }}>Lupa Password</h2>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--gray-400)', marginBottom: '1.5rem' }}>
+                            Masukkan Employee ID Anda. Password baru akan dikirimkan ke email Anda yang terdaftar.
+                        </p>
+                        
+                        {forgotErr && <div className="alert alert-danger" style={{ marginBottom: '1rem', padding: '0.75rem', fontSize: '0.85rem' }}>{forgotErr}</div>}
+                        {forgotMsg && <div className="alert alert-success" style={{ marginBottom: '1rem', padding: '0.75rem', fontSize: '0.85rem' }}>{forgotMsg}</div>}
+
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            setForgotErr('');
+                            setForgotMsg('');
+                            setForgotLoading(true);
+                            try {
+                                const res = await authAPI.forgotPassword(forgotId);
+                                setForgotMsg(res.message || 'Password baru berhasil dikirim!');
+                                setForgotId('');
+                            } catch (err) {
+                                // Provide helpful feedback if SMTP isn't set up yet
+                                if (err.message && err.message.includes('fallback_password')) {
+                                    // Not strictly possible to get fallback_password from err object usually unless backend sends it in the error response body and the request wrapper passes it.
+                                    // Our wrapper `throw new Error(data.error)` so we only get the string. We modified the backend to send it, but `request` might not expose it.
+                                    setForgotErr(err.message);
+                                } else {
+                                    setForgotErr(err.message || 'Gagal mereset password');
+                                }
+                            } finally {
+                                setForgotLoading(false);
+                            }
+                        }}>
+                            <div className="form-group">
+                                <label className="form-label" style={{ color: 'var(--text-primary)' }}>Employee ID</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={forgotId}
+                                    onChange={(e) => setForgotId(e.target.value)}
+                                    required
+                                    placeholder="Masukkan Employee ID"
+                                    disabled={forgotLoading}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setShowForgot(false)} disabled={forgotLoading}>
+                                    Tutup
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={forgotLoading}>
+                                    {forgotLoading ? 'Mengirim...' : 'Kirim Email'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

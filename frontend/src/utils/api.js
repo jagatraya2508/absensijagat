@@ -95,6 +95,13 @@ export const authAPI = {
             body: JSON.stringify({ new_password: newPassword }),
         }),
 
+    // Forgot password (trigger email)
+    forgotPassword: (employee_id) =>
+        request('/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify({ employee_id }),
+        }),
+
     // Update own profile (off_day)
     updateProfile: (data) =>
         request('/auth/profile', {
