@@ -39,6 +39,8 @@ import LicenseSettings from './pages/LicenseSettings';
 import AdminAssets from './pages/AdminAssets';
 import AdminCustomers from './pages/AdminCustomers';
 import Kiosk from './pages/Kiosk';
+import DailyWorkReport from './pages/DailyWorkReport';
+import AdminDailyWorkReport from './pages/AdminDailyWorkReport';
 
 function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, permission = null }) {
     const { user, loading, hasPermission } = useAuth();
@@ -266,6 +268,17 @@ function AppRoutes() {
                     <ProtectedRoute>
                         <AppLayout>
                             <Overtime />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/daily-work-report"
+                element={
+                    <ProtectedRoute>
+                        <AppLayout>
+                            <DailyWorkReport />
                         </AppLayout>
                     </ProtectedRoute>
                 }
@@ -520,6 +533,17 @@ function AppRoutes() {
                 element={
                     <ProtectedRoute permission="admin.kiosk">
                         <Kiosk />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/daily-work-report"
+                element={
+                    <ProtectedRoute permission="admin.daily_work_report">
+                        <AppLayout>
+                            <AdminDailyWorkReport />
+                        </AppLayout>
                     </ProtectedRoute>
                 }
             />

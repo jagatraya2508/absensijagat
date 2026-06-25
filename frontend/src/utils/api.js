@@ -715,6 +715,51 @@ export const rolesAPI = {
     delete: (id) => request(`/roles/${id}`, { method: 'DELETE' }),
 };
 
+// Daily Work Report API
+export const dailyWorkReportAPI = {
+    // Employee endpoints
+    getAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/daily-work-reports${query ? `?${query}` : ''}`);
+    },
+    getById: (id) => request(`/daily-work-reports/${id}`),
+    create: (data) => request('/daily-work-reports', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/daily-work-reports/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/daily-work-reports/${id}`, { method: 'DELETE' }),
+
+    // Items
+    addItem: (reportId, data) => request(`/daily-work-reports/${reportId}/items`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    updateItem: (itemId, data) => request(`/daily-work-reports/items/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    deleteItem: (itemId) => request(`/daily-work-reports/items/${itemId}`, { method: 'DELETE' }),
+
+    // Pending & Schedule
+    getPending: () => request('/daily-work-reports/pending/all'),
+    getSchedule: (days = 30) => request(`/daily-work-reports/schedule/upcoming?days=${days}`),
+
+    // Admin endpoints
+    adminGetAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/daily-work-reports/admin/all${query ? `?${query}` : ''}`);
+    },
+    adminGetStats: (date) => request(`/daily-work-reports/admin/stats${date ? `?date=${date}` : ''}`),
+    adminReview: (id, data) => request(`/daily-work-reports/admin/${id}/review`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -738,5 +783,6 @@ export default {
     licenseAPI,
     vehicleTypesAPI,
     manualAttendanceAPI,
-    rolesAPI
+    rolesAPI,
+    dailyWorkReportAPI
 };

@@ -28,6 +28,7 @@ export default function Sidebar() {
         { path: '/schedule', icon: '🗓️', label: 'Kalender' },
         { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
         { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
+        { path: '/daily-work-report', icon: '📝', label: 'Laporan Harian' },
         ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
         ...(hasPermission('admin.assets') ? [{ path: '/admin/assets', icon: '📦', label: 'Manajemen Aset' }] : []),
         { path: '/change-password', icon: '👤', label: 'Profil Saya' },
@@ -57,6 +58,7 @@ export default function Sidebar() {
         { path: '/admin/payroll', icon: '💵', label: 'Payroll', permissionKey: 'admin.payroll' },
         { path: '/admin/assessments', icon: '📋', label: 'Penilaian', permissionKey: 'admin.assessments' },
         { path: '/admin/recruitment', icon: '🧑‍💼', label: 'Recruitment', permissionKey: 'admin.recruitment' },
+        { path: '/admin/daily-work-report', icon: '📊', label: 'Review Laporan Harian', permissionKey: 'admin.daily_work_report' },
         { path: '/admin/reports', icon: '📊', label: 'Laporan', permissionKey: 'admin.reports' },
     ].filter(item => hasPermission(item.permissionKey));
 
