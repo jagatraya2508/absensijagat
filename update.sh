@@ -38,6 +38,8 @@ node migrate_license.js
 echo "Running migration: migrate_roles.js"
 node migrate_roles.js
 cd ..
+echo "Running migration: migrate_daily_work_reports.js"
+node migrate_daily_work_reports.js
 
 # 3. Build Frontend
 echo "[3/4] Building Frontend..."
