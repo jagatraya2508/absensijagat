@@ -63,6 +63,7 @@ app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/manual-attendances', require('./routes/manual_attendances'));
 app.use('/api/roles', require('./routes/roles'));
 app.use('/api/daily-work-reports', require('./routes/dailyWorkReports'));
+app.use('/api/backup', require('./routes/backup'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

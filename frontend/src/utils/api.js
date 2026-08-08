@@ -428,6 +428,40 @@ export const settingsAPI = {
     }),
 };
 
+// Database backup & restore (admin only)
+export const backupAPI = {
+    download: async () => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/backup/download`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+            let message = 'Gagal membuat backup';
+            try {
+                const data = await response.json();
+                message = data.error || message;
+            } catch (_) { /* ignore */ }
+            throw new Error(message);
+        }
+
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const filename = match?.[1] || `absensi-backup-${new Date().toISOString().slice(0, 10)}.sql`;
+
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    },
+    restore: (formData) => request('/backup/restore', {
+        method: 'POST',
+        body: formData,
+    }),
+};
+
 // Schedule API
 export const scheduleAPI = {
     getOffDays: () => request('/schedule/off-days'),
@@ -769,6 +803,7 @@ export default {
     faceAPI,
     announcementsAPI,
     settingsAPI,
+    backupAPI,
     scheduleAPI,
     offDaysAPI,
     employeesAPI,

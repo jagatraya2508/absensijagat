@@ -168,6 +168,14 @@ export default function AdminSettings() {
     const [smtpLoading, setSmtpLoading] = useState(false);
     const [smtpMessage, setSmtpMessage] = useState({ type: '', text: '' });
 
+    // Backup & Restore state
+    const [backupLoading, setBackupLoading] = useState(false);
+    const [restoreLoading, setRestoreLoading] = useState(false);
+    const [backupMessage, setBackupMessage] = useState({ type: '', text: '' });
+    const [restoreFile, setRestoreFile] = useState(null);
+    const [restoreConfirm, setRestoreConfirm] = useState('');
+    const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
+
     // Sync when themeColors change (e.g. after save)
     useEffect(() => {
         setSelectedPrimary(themeColors.primary);
@@ -322,6 +330,54 @@ export default function AdminSettings() {
             setSmtpMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan SMTP' });
         } finally {
             setSmtpLoading(false);
+        }
+    };
+
+    const handleBackupDownload = async () => {
+        setBackupLoading(true);
+        setBackupMessage({ type: '', text: '' });
+        try {
+            const { backupAPI } = await import('../utils/api');
+            await backupAPI.download();
+            setBackupMessage({ type: 'success', text: 'Backup berhasil diunduh.' });
+        } catch (error) {
+            setBackupMessage({ type: 'danger', text: error.message || 'Gagal membuat backup' });
+        } finally {
+            setBackupLoading(false);
+        }
+    };
+
+    const handleRestore = async (e) => {
+        e.preventDefault();
+        if (!restoreFile) {
+            setRestoreMessage({ type: 'danger', text: 'Pilih file backup terlebih dahulu' });
+            return;
+        }
+        if (restoreConfirm.trim().toUpperCase() !== 'TIMPA') {
+            setRestoreMessage({ type: 'danger', text: 'Ketik TIMPA untuk konfirmasi restore' });
+            return;
+        }
+
+        const ok = window.confirm(
+            'PERINGATAN: Restore akan menimpa SELURUH data database saat ini dengan isi file backup.\n\nLanjutkan?'
+        );
+        if (!ok) return;
+
+        setRestoreLoading(true);
+        setRestoreMessage({ type: '', text: '' });
+        try {
+            const { backupAPI } = await import('../utils/api');
+            const formData = new FormData();
+            formData.append('backup', restoreFile);
+            formData.append('confirm', 'TIMPA');
+            const result = await backupAPI.restore(formData);
+            setRestoreMessage({ type: 'success', text: result.message || 'Restore berhasil.' });
+            setRestoreFile(null);
+            setRestoreConfirm('');
+        } catch (error) {
+            setRestoreMessage({ type: 'danger', text: error.message || 'Gagal restore database' });
+        } finally {
+            setRestoreLoading(false);
         }
     };
 
@@ -942,6 +998,126 @@ export default function AdminSettings() {
                                 )}
                             </button>
                         </form>
+                    </div>
+                </div>
+
+                {/* ============ BACKUP & RESTORE SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title">💾 Backup & Restore Database</h2>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem' }}>
+                            Unduh salinan database atau restore dari file backup. Restore akan menimpa seluruh data database.
+                            File upload di folder server (foto absensi, logo, dll.) tidak ikut ter-backup.
+                        </p>
+
+                        {/* Backup */}
+                        <div style={{
+                            padding: '1.25rem',
+                            border: '1px solid var(--gray-200)',
+                            borderRadius: 'var(--radius-md)',
+                            marginBottom: '1.25rem',
+                            background: 'var(--gray-50)'
+                        }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
+                                Backup Database
+                            </h3>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+                                Menghasilkan file SQL data lengkap (siap dipakai untuk restore di aplikasi ini).
+                            </p>
+                            {backupMessage.text && (
+                                <div className={`alert alert-${backupMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                    <span className="alert-icon">{backupMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                    {backupMessage.text}
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleBackupDownload}
+                                disabled={backupLoading || restoreLoading}
+                            >
+                                {backupLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                        <span>Membuat backup...</span>
+                                    </>
+                                ) : (
+                                    '⬇️ Unduh Backup (.sql)'
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Restore */}
+                        <div style={{
+                            padding: '1.25rem',
+                            border: '1px solid #fecaca',
+                            borderRadius: 'var(--radius-md)',
+                            background: '#fff5f5'
+                        }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: '#991b1b' }}>
+                                Restore Database (Menimpa Data)
+                            </h3>
+                            <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginBottom: '1rem' }}>
+                                Perhatian: semua data saat ini akan diganti dengan isi file backup. Tindakan ini tidak bisa dibatalkan.
+                            </p>
+                            {restoreMessage.text && (
+                                <div className={`alert alert-${restoreMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                    <span className="alert-icon">{restoreMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                    {restoreMessage.text}
+                                </div>
+                            )}
+                            <form onSubmit={handleRestore}>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="form-label">File Backup (.sql / .dump)</label>
+                                    <input
+                                        type="file"
+                                        className="form-input"
+                                        accept=".sql,.dump,.backup"
+                                        disabled={restoreLoading || backupLoading}
+                                        onChange={(e) => {
+                                            setRestoreFile(e.target.files?.[0] || null);
+                                            setRestoreMessage({ type: '', text: '' });
+                                        }}
+                                    />
+                                    {restoreFile && (
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.35rem' }}>
+                                            Dipilih: {restoreFile.name} ({Math.round(restoreFile.size / 1024)} KB)
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="form-label">
+                                        Ketik <strong>TIMPA</strong> untuk konfirmasi
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={restoreConfirm}
+                                        onChange={(e) => setRestoreConfirm(e.target.value)}
+                                        placeholder="TIMPA"
+                                        disabled={restoreLoading || backupLoading}
+                                        autoComplete="off"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="btn btn-danger"
+                                    disabled={restoreLoading || backupLoading || !restoreFile || restoreConfirm.trim().toUpperCase() !== 'TIMPA'}
+                                >
+                                    {restoreLoading ? (
+                                        <>
+                                            <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                            <span>Merestore...</span>
+                                        </>
+                                    ) : (
+                                        '⚠️ Restore & Timpa Database'
+                                    )}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
 
