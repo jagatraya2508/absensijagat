@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const CATEGORY_MAP = {
     task: { label: 'Task', icon: '📋', color: '#3b82f6' },
@@ -249,6 +252,229 @@ export default function DailyWorkReport() {
         return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
     }
 
+    async function handleExportExcel() {
+        if (!currentReport || !currentReport.items) return;
+        try {
+            const pendingDataRaw = await dailyWorkReportAPI.getPending();
+            const todayItemIds = new Set(currentReport.items.map(i => i.id));
+            const pendingData = pendingDataRaw.filter(item => !todayItemIds.has(item.id));
+            
+            const department = user?.department || '-';
+            
+            const wsData = [];
+            wsData.push([`Activity Daily Divisi ${department}`]);
+            wsData.push(['Date', formatShortDate(selectedDate)]);
+            wsData.push([]); 
+            
+            const headers = ['No', 'Jam Mulai', 'Jam Selesai', 'Pekerjaan', 'Kategori', 'Status', 'Prioritas', 'Progress (%)'];
+            wsData.push(headers);
+            
+            currentReport.items.forEach((item, index) => {
+                wsData.push([
+                    index + 1,
+                    item.start_time ? item.start_time.substring(0, 5) : '-',
+                    item.end_time ? item.end_time.substring(0, 5) : '-',
+                    item.title + (item.description ? `\n${item.description}` : ''),
+                    CATEGORY_MAP[item.category]?.label || item.category,
+                    STATUS_MAP[item.status]?.label || item.status,
+                    PRIORITY_MAP[item.priority]?.label || item.priority,
+                    item.completion_percentage
+                ]);
+            });
+            
+            wsData.push([]);
+            wsData.push(['Pekerjaan Pending']);
+            wsData.push(headers);
+            
+            pendingData.forEach((item, index) => {
+                wsData.push([
+                    index + 1,
+                    item.start_time ? item.start_time.substring(0, 5) : '-',
+                    item.end_time ? item.end_time.substring(0, 5) : '-',
+                    item.title + (item.description ? `\n${item.description}` : ''),
+                    CATEGORY_MAP[item.category]?.label || item.category,
+                    STATUS_MAP[item.status]?.label || item.status,
+                    PRIORITY_MAP[item.priority]?.label || item.priority,
+                    item.completion_percentage
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            if(!ws['!merges']) ws['!merges'] = [];
+            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }); 
+            ws['!merges'].push({ s: { r: currentReport.items.length + 5, c: 0 }, e: { r: currentReport.items.length + 5, c: 7 } }); 
+            
+            ws['!cols'] = [ { wch: 5 }, { wch: 10 }, { wch: 10 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 } ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Report');
+            XLSX.writeFile(wb, `Laporan_Harian_Saya_${selectedDate}.xlsx`);
+        } catch (error) {
+            console.error('Failed to export Excel:', error);
+            alert('Gagal export Excel');
+        }
+    }
+
+    async function handleExportPDF() {
+        if (!currentReport || !currentReport.items) return;
+        try {
+            const pendingDataRaw = await dailyWorkReportAPI.getPending();
+            const todayItemIds = new Set(currentReport.items.map(i => i.id));
+            const pendingData = pendingDataRaw.filter(item => !todayItemIds.has(item.id));
+            
+            const doc = new jsPDF('landscape', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const department = user?.department || '-';
+
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(`Activity Daily Divisi ${department}`, pageWidth / 2, 15, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Date: ${formatShortDate(selectedDate)}`, 15, 22);
+
+            const tableColumn = ['No', 'Jam Mulai', 'Jam Selesai', 'Pekerjaan', 'Kategori', 'Status', 'Prioritas', 'Progress'];
+            
+            const formatRow = (item, i) => [
+                i + 1, 
+                item.start_time ? item.start_time.substring(0, 5) : '-',
+                item.end_time ? item.end_time.substring(0, 5) : '-',
+                item.title + (item.description ? `\n(${item.description})` : ''), 
+                CATEGORY_MAP[item.category]?.label || item.category,
+                STATUS_MAP[item.status]?.label || item.status, 
+                PRIORITY_MAP[item.priority]?.label || item.priority,
+                `${item.completion_percentage}%`
+            ];
+
+            const table1Rows = currentReport.items.map(formatRow);
+
+            doc.autoTable({
+                head: [tableColumn],
+                body: table1Rows,
+                startY: 28,
+                theme: 'grid',
+                styles: { fontSize: 8, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1 },
+                headStyles: { fillColor: [200, 200, 200], textColor: 20, fontStyle: 'bold', halign: 'center' },
+                columnStyles: { 0: { halign: 'center', cellWidth: 10 } }
+            });
+
+            const finalY = doc.lastAutoTable.finalY || 30;
+
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text('Pekerjaan Pending', pageWidth / 2, finalY + 12, { align: 'center' });
+
+            const table2Rows = pendingData.map(formatRow);
+
+            doc.autoTable({
+                head: [tableColumn],
+                body: table2Rows,
+                startY: finalY + 18,
+                theme: 'grid',
+                styles: { fontSize: 8, cellPadding: 3, lineColor: [0, 0, 0], lineWidth: 0.1 },
+                headStyles: { fillColor: [200, 200, 200], textColor: 20, fontStyle: 'bold', halign: 'center' },
+                columnStyles: { 0: { halign: 'center', cellWidth: 10 } }
+            });
+
+            doc.save(`Laporan_Harian_Saya_${selectedDate}.pdf`);
+        } catch (error) {
+            console.error('Failed to export PDF:', error);
+            alert('Gagal export PDF');
+        }
+    }
+
+    async function handlePrint() {
+        if (!currentReport || !currentReport.items) return;
+        try {
+            const pendingDataRaw = await dailyWorkReportAPI.getPending();
+            const todayItemIds = new Set(currentReport.items.map(i => i.id));
+            const pendingData = pendingDataRaw.filter(item => !todayItemIds.has(item.id));
+            
+            const department = user?.department || '-';
+            
+            const formatRowHtml = (item, i) => `
+                <tr>
+                    <td class="text-center">${i + 1}</td>
+                    <td class="text-center">${item.start_time ? item.start_time.substring(0, 5) : '-'}</td>
+                    <td class="text-center">${item.end_time ? item.end_time.substring(0, 5) : '-'}</td>
+                    <td>${item.title}${item.description ? '<br><small style="color:#666">' + item.description + '</small>' : ''}</td>
+                    <td class="text-center">${CATEGORY_MAP[item.category]?.label || item.category}</td>
+                    <td class="text-center">${STATUS_MAP[item.status]?.label || item.status}</td>
+                    <td class="text-center">${PRIORITY_MAP[item.priority]?.label || item.priority}</td>
+                    <td class="text-center">${item.completion_percentage}%</td>
+                </tr>
+            `;
+
+            const tableHeaders = `
+                <tr>
+                    <th style="width: 40px;">No</th>
+                    <th style="width: 70px;">Jam Mulai</th>
+                    <th style="width: 70px;">Jam Selesai</th>
+                    <th>Pekerjaan</th>
+                    <th style="width: 90px;">Kategori</th>
+                    <th style="width: 90px;">Status</th>
+                    <th style="width: 80px;">Prioritas</th>
+                    <th style="width: 70px;">Progress</th>
+                </tr>
+            `;
+
+            let html = `
+                <html>
+                <head>
+                    <title>Print Laporan Harian</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h3 { text-align: center; margin-bottom: 5px; }
+                        .date { margin-bottom: 20px; font-weight: bold; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                        th, td { border: 1px solid black; padding: 6px; text-align: left; font-size: 13px; }
+                        th { background-color: #d1d5db; text-align: center; font-weight: bold; }
+                        .text-center { text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <h3>Activity Daily Divisi ${department}</h3>
+                    <div class="date">Date: ${formatShortDate(selectedDate)}</div>
+                    
+                    <table>
+                        <thead>${tableHeaders}</thead>
+                        <tbody>
+            `;
+            
+            currentReport.items.forEach((item, i) => { html += formatRowHtml(item, i); });
+            
+            html += `
+                        </tbody>
+                    </table>
+
+                    <h3 style="margin-top: 40px;">Pekerjaan Pending</h3>
+                    <table>
+                        <thead>${tableHeaders}</thead>
+                        <tbody>
+            `;
+            
+            pendingData.forEach((item, i) => { html += formatRowHtml(item, i); });
+            
+            html += `
+                        </tbody>
+                    </table>
+                    <script>
+                        window.onload = function() { window.print(); setTimeout(() => window.close(), 500); }
+                    </script>
+                </body>
+                </html>
+            `;
+            
+            const printWin = window.open('', '_blank');
+            printWin.document.write(html);
+            printWin.document.close();
+        } catch (e) {
+            console.error(e);
+            alert('Gagal menyiapkan print');
+        }
+    }
+
     function isOverdue(dueDate) {
         if (!dueDate) return false;
         return new Date(dueDate) < new Date(new Date().toISOString().split('T')[0]);
@@ -331,8 +557,8 @@ export default function DailyWorkReport() {
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                 {formatDate(selectedDate)}
                             </div>
-                            {currentReport && (
-                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                {currentReport && (
                                     <span style={{
                                         padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600,
                                         background: REPORT_STATUS_MAP[currentReport.status]?.bg,
@@ -340,8 +566,19 @@ export default function DailyWorkReport() {
                                     }}>
                                         {REPORT_STATUS_MAP[currentReport.status]?.label}
                                     </span>
+                                )}
+                                <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                                    <button className="btn btn-outline" onClick={handleExportPDF} style={{ fontSize: '0.8rem', padding: '4px 10px' }} title="Export PDF" disabled={!currentReport || !currentReport.items}>
+                                        📄 PDF
+                                    </button>
+                                    <button className="btn btn-outline" onClick={handleExportExcel} style={{ fontSize: '0.8rem', padding: '4px 10px' }} title="Export Excel" disabled={!currentReport || !currentReport.items}>
+                                        📊 Excel
+                                    </button>
+                                    <button className="btn btn-outline" onClick={handlePrint} style={{ fontSize: '0.8rem', padding: '4px 10px' }} title="Print / Cetak">
+                                        🖨️ Cetak
+                                    </button>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 
