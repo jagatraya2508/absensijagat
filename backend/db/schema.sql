@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_date ON leave_requests(start_date);
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (employee_id, name, email, password, role) 
-VALUES ('ADMIN001', 'Administrator', 'admin@company.com', '$2b$10$rQZ5QH2V5Y1vX8W6x9Y8/.O7kJ6H5F4G3D2C1B0A9N8M7L6K5J4I3', 'admin')
+VALUES ('ADMIN001', 'Administrator', 'admin@company.com', '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O', 'admin')
 ON CONFLICT (employee_id) DO NOTHING;
 
 -- Tabel Announcements (Pengumuman)
@@ -695,4 +695,7 @@ ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS no_kk VARCHAR(20);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_driver BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_tracking BOOLEAN DEFAULT FALSE;
+
+-- Fix admin password if old dummy hash exists
+UPDATE users SET password = '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O' WHERE employee_id = 'ADMIN001' AND password LIKE '$2b$10$rQZ5%';
 
