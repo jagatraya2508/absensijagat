@@ -35,6 +35,8 @@ npm run build
 # 4. Update & Restart Service Docker
 echo "🐳 [4/4] Menyalakan & Merestart Docker Containers..."
 cd "$CD_DIR"
+# Bersihkan container lama jika ada bentrok nama
+docker rm -f absensi-postgres absensi-backend absensi-frontend 2>/dev/null || true
 docker compose up -d
 docker compose restart backend
 
