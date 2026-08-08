@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, "absensi-runner"]
 
     steps:
       - name: Git Pull di Folder Production
@@ -16,7 +16,7 @@ jobs:
           echo "Menarik kode terbaru (git pull) di server..."
           git fetch --all
           git reset --hard origin/main
-          git clean -fd
+          git clean -fd -e backend/uploads/ -e .env
           git pull origin main
 
       - name: Build & Install di Host Server
@@ -24,10 +24,21 @@ jobs:
           echo "Instalasi dependensi backend..."
           cd /srv/docker/absensi/backend
           npm install
-          
+
           echo "Instalasi dependensi dan compile frontend..."
           cd /srv/docker/absensi/frontend
           npm install
           npm run build
-          
-          echo "🎉 Deployment V2 (Nginx + Self-Hosted Runner) BERUNTUN SUKSES!"
+
+      - name: Update & Restart Docker Containers
+        run: |
+          cd /srv/docker/absensi
+          if git diff --name-only HEAD@{1} HEAD | grep -q 'docker-compose.yml'; then
+            echo "Terdeteksi perubahan konfigurasi Docker Compose. Re-up container..."
+            docker compose up -d
+          else
+            echo "Memastikan container aktif & restart backend Node.js..."
+            docker compose up -d
+            docker compose restart backend
+          fi
+          echo "🎉 Deployment V2 BERHASIL!"
