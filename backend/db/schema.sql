@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'employee',
     face_descriptor TEXT,
+    photo VARCHAR(255),
+    off_day VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -94,7 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_date ON leave_requests(start_date);
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (employee_id, name, email, password, role) 
-VALUES ('ADMIN001', 'Administrator', 'admin@company.com', '$2b$10$rQZ5QH2V5Y1vX8W6x9Y8/.O7kJ6H5F4G3D2C1B0A9N8M7L6K5J4I3', 'admin')
+VALUES ('ADMIN001', 'Administrator', 'admin@company.com', '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O', 'admin')
 ON CONFLICT (employee_id) DO NOTHING;
 
 -- Tabel Announcements (Pengumuman)
@@ -168,6 +170,10 @@ CREATE TABLE IF NOT EXISTS employee_details (
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
     vehicle_type_id INTEGER REFERENCES vehicle_types(id) ON DELETE SET NULL,
+    no_kk VARCHAR(20),
+    is_driver BOOLEAN DEFAULT FALSE,
+    is_collector BOOLEAN DEFAULT FALSE,
+    use_tracking BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -551,3 +557,145 @@ CREATE INDEX IF NOT EXISTS idx_wri_report ON work_report_items(report_id);
 CREATE INDEX IF NOT EXISTS idx_wri_status ON work_report_items(status);
 CREATE INDEX IF NOT EXISTS idx_wri_due ON work_report_items(due_date);
 CREATE INDEX IF NOT EXISTS idx_wri_priority ON work_report_items(priority);
+
+-- ============================================
+-- MODUL SETTINGS, LICENSE, ROLES & EXTRA TABLES
+-- ============================================
+
+-- Tabel Settings (Pengaturan Aplikasi & Logo)
+CREATE TABLE IF NOT EXISTS settings (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(50) UNIQUE NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO settings (key, value) VALUES ('app_logo', '/logo.png') ON CONFLICT DO NOTHING;
+
+-- Tabel License Info
+CREATE TABLE IF NOT EXISTS license_info (
+    id SERIAL PRIMARY KEY,
+    license_key TEXT NOT NULL,
+    company_name VARCHAR(200),
+    max_users INTEGER NOT NULL DEFAULT 10,
+    expires_at DATE,
+    activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabel Roles & Permissions
+CREATE TABLE IF NOT EXISTS roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    is_system BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+    id SERIAL PRIMARY KEY,
+    role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+    permission_key VARCHAR(100) NOT NULL,
+    UNIQUE(role_id, permission_key)
+);
+
+INSERT INTO roles (name, label, is_system) 
+VALUES 
+    ('admin', 'Administrator', true),
+    ('employee', 'Karyawan', true),
+    ('manager', 'Pimpinan / Manager', true)
+ON CONFLICT (name) DO NOTHING;
+
+-- Tabel Manual Attendances
+CREATE TABLE IF NOT EXISTS manual_attendances (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    time_in TIME,
+    time_out TIME,
+    reason TEXT NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    admin_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabel Customers
+CREATE TABLE IF NOT EXISTS customers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    address TEXT,
+    phone VARCHAR(30),
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name)
+);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_customers_active ON customers(is_active);
+
+-- Tabel Assets
+CREATE TABLE IF NOT EXISTS asset_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS assets (
+    id SERIAL PRIMARY KEY,
+    asset_code VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    category_id INTEGER REFERENCES asset_categories(id) ON DELETE SET NULL,
+    brand VARCHAR(100),
+    purchase_date DATE,
+    price DECIMAL(15,2),
+    description TEXT,
+    photo_path VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'maintenance', 'retired')),
+    current_assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS asset_assignments (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    assigned_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    returned_date DATE,
+    returned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabel Employee Documents
+CREATE TABLE IF NOT EXISTS employee_documents (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doc_type VARCHAR(50) NOT NULL,
+    doc_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    mime_type VARCHAR(100),
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_employee_documents_user_id ON employee_documents(user_id);
+
+-- ============================================
+-- AUTO-PATCH MISSING COLUMNS (FOR EXISTING DBs)
+-- ============================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS photo VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS off_day VARCHAR(20);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS no_kk VARCHAR(20);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_driver BOOLEAN DEFAULT FALSE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAULT FALSE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_tracking BOOLEAN DEFAULT FALSE;
+
+-- Fix admin password if old dummy hash exists
+UPDATE users SET password = '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O' WHERE employee_id = 'ADMIN001' AND password LIKE '$2b$10$rQZ5%';
+

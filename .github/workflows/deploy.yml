@@ -7,27 +7,10 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, "absensi-runner"]
 
     steps:
-      - name: Git Pull di Folder Production
+      - name: Run Deployment Script
         run: |
-          cd /srv/docker/absensi
-          echo "Menarik kode terbaru (git pull) di server..."
-          git fetch --all
-          git reset --hard origin/main
-          git clean -fd
-          git pull origin main
-
-      - name: Build & Install di Host Server
-        run: |
-          echo "Instalasi dependensi backend..."
-          cd /srv/docker/absensi/backend
-          npm install
-          
-          echo "Instalasi dependensi dan compile frontend..."
-          cd /srv/docker/absensi/frontend
-          npm install
-          npm run build
-          
-          echo "🎉 Deployment V2 (Nginx + Self-Hosted Runner) BERUNTUN SUKSES!"
+          cd /srv/docker/absensigudang
+          bash ./deploy.sh

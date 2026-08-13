@@ -9,6 +9,7 @@ export default defineConfig({
         port: 3012,
         host: true, // Listen on all addresses
         allowedHosts: [
+            'absensigudang.sahabatjayasukses.com',
             'absenancol.tri.jagatrayasolusindo.com',
             'localhost',
             ...(process.env.FRONTEND_ALLOWED_HOSTS ? process.env.FRONTEND_ALLOWED_HOSTS.split(',').map(h => h.trim()) : [])
