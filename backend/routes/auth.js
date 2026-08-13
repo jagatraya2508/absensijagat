@@ -9,6 +9,7 @@ const nodemailer = require('nodemailer');
 const { pool } = require('../db');
 const { JWT_SECRET, authenticateToken, isAdmin } = require('../middleware/auth');
 const multer = require('multer');
+const ExcelJS = require('exceljs');
 
 // Configure multer for profile photo uploads
 const profileStorage = multer.diskStorage({
@@ -38,6 +39,92 @@ const uploadProfile = multer({
         cb(new Error('Hanya file gambar (JPG/PNG) yang diperbolehkan!'));
     }
 });
+
+const excelUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const allowedMimes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/octet-stream'
+        ];
+        if (ext === '.xlsx' || allowedMimes.includes(file.mimetype)) {
+            return cb(null, true);
+        }
+        cb(new Error('Hanya file Excel (.xlsx) yang diizinkan'));
+    }
+});
+
+const EXCEL_HEADER_MAP = {
+    'employee id': 'employee_id',
+    'employee_id': 'employee_id',
+    'id karyawan': 'employee_id',
+    'id pegawai': 'employee_id',
+    'nama': 'name',
+    'nama lengkap': 'name',
+    'name': 'name',
+    'email': 'email',
+    'password': 'password',
+    'kata sandi': 'password',
+    'role': 'role',
+    'peran': 'role'
+};
+
+function normalizeExcelHeader(value) {
+    return String(value || '').trim().toLowerCase().replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function cellToString(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') {
+        if (value.text) return String(value.text).trim();
+        if (value.result !== undefined && value.result !== null) return String(value.result).trim();
+        if (value.richText) return value.richText.map(t => t.text).join('').trim();
+        if (value.hyperlink) return String(value.text || value.hyperlink).trim();
+    }
+    return String(value).trim();
+}
+
+function normalizeRoleName(value, roles) {
+    const raw = String(value || '').trim();
+    if (!raw) return 'employee';
+    const lower = raw.toLowerCase();
+    const aliases = {
+        karyawan: 'employee',
+        pegawai: 'employee',
+        employee: 'employee',
+        admin: 'admin',
+        administrator: 'admin',
+        manager: 'manager',
+        pimpinan: 'manager',
+        'pimpinan / manager': 'manager',
+        'pimpinan/manager': 'manager'
+    };
+    const mapped = aliases[lower] || lower;
+    const byName = roles.find(r => r.name.toLowerCase() === mapped);
+    if (byName) return byName.name;
+    const byLabel = roles.find(r => (r.label || '').toLowerCase() === lower);
+    if (byLabel) return byLabel.name;
+    return null;
+}
+
+const DEFAULT_ROLES = [
+    { name: 'admin', label: 'Admin' },
+    { name: 'manager', label: 'Pimpinan / Manager' },
+    { name: 'employee', label: 'Karyawan' }
+];
+
+async function getImportRoles() {
+    try {
+        const rolesResult = await pool.query('SELECT name, label FROM roles ORDER BY id ASC');
+        if (rolesResult.rows.length) return rolesResult.rows;
+    } catch (err) {
+        console.error('Failed to load roles for user import:', err.message);
+    }
+    return DEFAULT_ROLES;
+}
 
 function logError(error) {
     const logPath = path.join(__dirname, '../error.log');
@@ -264,6 +351,298 @@ router.get('/users', authenticateToken, isAdmin, async (req, res) => {
     } catch (error) {
         console.error('Get users error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Download Excel template for bulk user import (Admin only)
+router.get('/users/template', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const roles = await getImportRoles();
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Absensi Jagat';
+        workbook.created = new Date();
+
+        const sheet = workbook.addWorksheet('Data User', {
+            views: [{ state: 'frozen', ySplit: 1 }]
+        });
+
+        sheet.columns = [
+            { header: 'Employee ID *', key: 'employee_id', width: 18 },
+            { header: 'Nama *', key: 'name', width: 28 },
+            { header: 'Email', key: 'email', width: 28 },
+            { header: 'Password *', key: 'password', width: 18 },
+            { header: 'Role', key: 'role', width: 16 }
+        ];
+        sheet.getColumn(1).numFmt = '@';
+        sheet.getColumn(3).numFmt = '@';
+        sheet.getColumn(4).numFmt = '@';
+
+        const headerRow = sheet.getRow(1);
+        headerRow.height = 22;
+        headerRow.eachCell((cell) => {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FF1E3A8A' } },
+                left: { style: 'thin', color: { argb: 'FF1E3A8A' } },
+                bottom: { style: 'thin', color: { argb: 'FF1E3A8A' } },
+                right: { style: 'thin', color: { argb: 'FF1E3A8A' } }
+            };
+        });
+
+        const sampleRows = [
+            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', 'employee'],
+            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', 'employee']
+        ];
+        sampleRows.forEach((values, idx) => {
+            const row = sheet.addRow(values);
+            row.eachCell((cell) => {
+                cell.alignment = { vertical: 'middle' };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+                };
+                if (idx % 2 === 1) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                }
+            });
+        });
+
+        for (let i = 4; i <= 50; i++) {
+            const row = sheet.getRow(i);
+            for (let col = 1; col <= 5; col++) {
+                row.getCell(col).border = {
+                    top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+                };
+            }
+        }
+
+        const refSheet = workbook.addWorksheet('Referensi');
+        refSheet.getCell('A1').value = 'Role (isi kolom Role dengan nilai name)';
+        refSheet.getCell('A1').font = { bold: true };
+        refSheet.getCell('B1').value = 'Label';
+        refSheet.getCell('B1').font = { bold: true };
+        roles.forEach((role, i) => {
+            refSheet.getCell(i + 2, 1).value = role.name;
+            refSheet.getCell(i + 2, 2).value = role.label;
+        });
+        refSheet.columns = [{ width: 38 }, { width: 24 }];
+
+        const roleCount = Math.max(roles.length, 1);
+        sheet.dataValidations.add('E2:E1000', {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`Referensi!$A$2:$A$${roleCount + 1}`],
+            showErrorMessage: true,
+            errorTitle: 'Role tidak valid',
+            error: 'Pilih role dari daftar yang tersedia'
+        });
+
+        const guide = workbook.addWorksheet('Petunjuk');
+        guide.columns = [{ width: 28 }, { width: 80 }];
+        guide.mergeCells('A1:B1');
+        guide.getCell('A1').value = 'PETUNJUK IMPORT USER DARI EXCEL';
+        guide.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF1E3A8A' } };
+
+        const instructions = [
+            ['Sheet yang diisi', 'Isi data hanya pada sheet "Data User". Jangan ubah nama kolom header.'],
+            ['Kolom wajib', 'Employee ID, Nama, dan Password wajib diisi. Email dan Role opsional.'],
+            ['Employee ID', 'Harus unik. Tidak boleh sama dengan user yang sudah terdaftar.'],
+            ['Email', 'Opsional. Jika diisi, harus format email yang valid dan belum terdaftar.'],
+            ['Password', 'Minimal 6 karakter.'],
+            ['Role', `Isi dengan: ${roles.map(r => r.name).join(', ')}. Kosong = employee.`],
+            ['Baris contoh', 'Hapus atau ganti baris contoh (EMP001 / EMP002) sebelum diunggah.'],
+            ['Batas lisensi', 'Jumlah user baru tidak boleh melebihi sisa kuota lisensi.'],
+            ['Format file', 'Simpan sebagai .xlsx (Excel 2007 atau lebih baru).']
+        ];
+        instructions.forEach((item, i) => {
+            const row = guide.getRow(i + 3);
+            row.getCell(1).value = item[0];
+            row.getCell(1).font = { bold: true };
+            row.getCell(2).value = item[1];
+            row.getCell(2).alignment = { wrapText: true };
+            row.height = 22;
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=template-import-user.xlsx');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        logError(error);
+        console.error('Download user template error:', error);
+        res.status(500).json({ error: 'Gagal membuat template Excel' });
+    }
+});
+
+// Import users from Excel (Admin only)
+router.post('/users/import', authenticateToken, isAdmin, (req, res, next) => {
+    excelUpload.single('file')(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ error: err.message || 'Gagal mengunggah file' });
+        }
+        next();
+    });
+}, async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'File Excel wajib diunggah' });
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const sheet = workbook.getWorksheet('Data User') || workbook.worksheets[0];
+        if (!sheet) {
+            return res.status(400).json({ error: 'File Excel tidak memiliki sheet data' });
+        }
+
+        const headerRow = sheet.getRow(1);
+        const columnMap = {};
+        headerRow.eachCell((cell, colNumber) => {
+            const key = EXCEL_HEADER_MAP[normalizeExcelHeader(cell.value)];
+            if (key) columnMap[key] = colNumber;
+        });
+
+        if (!columnMap.employee_id || !columnMap.name || !columnMap.password) {
+            return res.status(400).json({
+                error: 'Header Excel tidak valid. Wajib ada kolom: Employee ID, Nama, dan Password. Unduh template resmi.'
+            });
+        }
+
+        const roles = await getImportRoles();
+
+        const existing = await pool.query('SELECT employee_id, LOWER(email) as email FROM users');
+        const existingIds = new Set(existing.rows.map(r => String(r.employee_id).toLowerCase()));
+        const existingEmails = new Set(existing.rows.filter(r => r.email).map(r => r.email));
+
+        const limitCheck = await checkUserLimit();
+        let remainingSlots = Math.max(0, limitCheck.max - limitCheck.current);
+
+        const results = [];
+        let imported = 0;
+        let failed = 0;
+        let skipped = 0;
+        const seenIds = new Set();
+        const seenEmails = new Set();
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
+            const row = sheet.getRow(rowNumber);
+            const employeeId = cellToString(row.getCell(columnMap.employee_id).value);
+            const name = cellToString(row.getCell(columnMap.name).value);
+            const email = columnMap.email ? cellToString(row.getCell(columnMap.email).value) : '';
+            const password = cellToString(row.getCell(columnMap.password).value);
+            const roleRaw = columnMap.role ? cellToString(row.getCell(columnMap.role).value) : '';
+
+            if (!employeeId && !name && !email && !password) {
+                continue;
+            }
+
+            const pushError = (message) => {
+                failed++;
+                results.push({ row: rowNumber, employee_id: employeeId || '-', status: 'error', message });
+            };
+
+            if (!employeeId || !name || !password) {
+                pushError('Employee ID, Nama, dan Password wajib diisi');
+                continue;
+            }
+
+            if (password.length < 6) {
+                pushError('Password minimal 6 karakter');
+                continue;
+            }
+
+            const idKey = employeeId.toLowerCase();
+            if (existingIds.has(idKey) || seenIds.has(idKey)) {
+                pushError(existingIds.has(idKey)
+                    ? 'Employee ID sudah terdaftar'
+                    : 'Employee ID duplikat di file Excel');
+                continue;
+            }
+
+            if (email) {
+                if (!emailRegex.test(email)) {
+                    pushError('Format email tidak valid');
+                    continue;
+                }
+                const emailKey = email.toLowerCase();
+                if (existingEmails.has(emailKey) || seenEmails.has(emailKey)) {
+                    pushError(existingEmails.has(emailKey)
+                        ? 'Email sudah terdaftar'
+                        : 'Email duplikat di file Excel');
+                    continue;
+                }
+            }
+
+            const role = normalizeRoleName(roleRaw, roles);
+            if (!role) {
+                pushError(`Role "${roleRaw}" tidak valid`);
+                continue;
+            }
+
+            if (remainingSlots <= 0) {
+                skipped++;
+                results.push({
+                    row: rowNumber,
+                    employee_id: employeeId,
+                    status: 'skipped',
+                    message: limitCheck.active
+                        ? `Batas lisensi tercapai (${limitCheck.max} pengguna)`
+                        : 'Batas trial 5 pengguna tercapai'
+                });
+                continue;
+            }
+
+            try {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await pool.query(
+                    `INSERT INTO users (employee_id, name, email, password, role)
+                     VALUES ($1, $2, $3, $4, $5)`,
+                    [employeeId, name, email || null, hashedPassword, role]
+                );
+                imported++;
+                remainingSlots--;
+                seenIds.add(idKey);
+                if (email) seenEmails.add(email.toLowerCase());
+                results.push({
+                    row: rowNumber,
+                    employee_id: employeeId,
+                    status: 'success',
+                    message: 'Berhasil ditambahkan'
+                });
+            } catch (insertError) {
+                if (insertError.code === '23505') {
+                    pushError('Employee ID atau email sudah terdaftar');
+                } else {
+                    pushError(insertError.message || 'Gagal menyimpan user');
+                }
+            }
+        }
+
+        if (imported === 0 && failed === 0 && skipped === 0) {
+            return res.status(400).json({ error: 'Tidak ada data user pada file Excel' });
+        }
+
+        res.json({
+            imported,
+            failed,
+            skipped,
+            remaining_slots: remainingSlots,
+            results
+        });
+    } catch (error) {
+        logError(error);
+        console.error('Import users error:', error);
+        res.status(500).json({ error: 'Gagal mengimpor user dari Excel' });
     }
 });
 

@@ -1141,6 +1141,43 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   outline: none;
 }
 
+.login-card .password-input-wrap {
+  position: relative;
+}
+
+.login-card .password-input-wrap .form-input {
+  padding-right: 2.85rem;
+}
+
+.login-card .password-toggle {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  border-radius: 0.4rem;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.login-card .password-toggle:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.login-card .password-toggle:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 1px;
+}
+
 .login-card .btn-primary {
   width: 100%;
   padding: 0.9rem 2rem;

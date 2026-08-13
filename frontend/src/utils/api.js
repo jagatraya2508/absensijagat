@@ -115,6 +115,34 @@ export const authAPI = {
             method: 'PUT',
             body: formData,
         }),
+
+    downloadUserTemplate: () => {
+        const token = getToken();
+        return fetch(`${API_BASE}/auth/users/template`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(async (res) => {
+            if (!res.ok) {
+                let message = 'Gagal mengunduh template';
+                try {
+                    const data = await res.json();
+                    message = data.error || message;
+                } catch (_) { /* ignore */ }
+                throw new Error(message);
+            }
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template-import-user.xlsx';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    },
+
+    importUsers: (formData) =>
+        request('/auth/users/import', {
+            method: 'POST',
+            body: formData,
+        }),
 };
 
 // Attendance API

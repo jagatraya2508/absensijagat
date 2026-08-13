@@ -23,6 +23,11 @@ export default function AdminUsers() {
     const [changingRole, setChangingRole] = useState(null); // track which user's role is being changed
     const [search, setSearch] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState(null);
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false);
 
     // License state
     const [licenseInfo, setLicenseInfo] = useState(null);
@@ -113,7 +118,8 @@ export default function AdminUsers() {
                 setSuccess('User berhasil ditambahkan');
             }
             setShowModal(false);
-            fetchUsers();
+            fetchData();
+            fetchLicenseInfo();
         } catch (err) {
             setError(err.message || 'Gagal menyimpan user');
         } finally {
@@ -126,7 +132,8 @@ export default function AdminUsers() {
 
         try {
             await authAPI.deleteUser(id);
-            fetchUsers();
+            fetchData();
+            fetchLicenseInfo();
         } catch (error) {
             alert(error.message || 'Gagal menghapus user');
         }
@@ -257,6 +264,51 @@ export default function AdminUsers() {
         XLSX.writeFile(wb, `Data_User_${new Date().toISOString().slice(0, 10)}.xlsx`);
     }
 
+    function openImportModal() {
+        setImportFile(null);
+        setImportResult(null);
+        setShowImportModal(true);
+        setError('');
+    }
+
+    async function handleDownloadTemplate() {
+        setDownloadingTemplate(true);
+        try {
+            await authAPI.downloadUserTemplate();
+        } catch (err) {
+            alert(err.message || 'Gagal mengunduh template');
+        } finally {
+            setDownloadingTemplate(false);
+        }
+    }
+
+    async function handleImportUsers() {
+        if (!importFile) {
+            setError('Pilih file Excel terlebih dahulu');
+            return;
+        }
+
+        setImporting(true);
+        setError('');
+        setImportResult(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', importFile);
+            const result = await authAPI.importUsers(formData);
+            setImportResult(result);
+            if (result.imported > 0) {
+                setSuccess(`${result.imported} user berhasil diimpor`);
+                fetchData();
+                fetchLicenseInfo();
+            }
+        } catch (err) {
+            setError(err.message || 'Gagal mengimpor user');
+        } finally {
+            setImporting(false);
+        }
+    }
+
     // Export to PDF
     function handleExportPDF() {
         const doc = new jsPDF('landscape', 'mm', 'a4');
@@ -369,6 +421,37 @@ export default function AdminUsers() {
                             }}
                         >
                             📊 Excel
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={handleDownloadTemplate}
+                            disabled={downloadingTemplate}
+                            title="Unduh template Excel untuk import user"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                transition: 'all 0.2s', cursor: downloadingTemplate ? 'wait' : 'pointer',
+                                opacity: downloadingTemplate ? 0.7 : 1
+                            }}
+                        >
+                            {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={openImportModal}
+                            disabled={licenseInfo && users.length >= licenseInfo.max_users}
+                            title="Upload user dari Excel"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                transition: 'all 0.2s', cursor: 'pointer'
+                            }}
+                        >
+                            📤 Upload Excel
                         </button>
                         <button 
                             className="btn btn-primary" 
@@ -585,6 +668,129 @@ export default function AdminUsers() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Excel Modal */}
+            {showImportModal && (
+                <div className="modal-overlay">
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680 }}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">Upload User dari Excel</h3>
+                            <button className="modal-close" onClick={() => setShowImportModal(false)}>×</button>
+                        </div>
+
+                        <div className="modal-body">
+                            {error && (
+                                <div className="alert alert-danger mb-3">
+                                    <span className="alert-icon">⚠️</span>
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="alert alert-info mb-3">
+                                <span className="alert-icon">ℹ️</span>
+                                <div>
+                                    Unduh template resmi, isi data user, lalu unggah file .xlsx.
+                                    Kolom wajib: <strong>Employee ID</strong>, <strong>Nama</strong>, dan <strong>Password</strong> (minimal 6 karakter).
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">File Excel (.xlsx)</label>
+                                <input
+                                    type="file"
+                                    className="form-input"
+                                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    onChange={(e) => {
+                                        setImportFile(e.target.files?.[0] || null);
+                                        setImportResult(null);
+                                        setError('');
+                                    }}
+                                />
+                                {importFile && (
+                                    <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>
+                                        File dipilih: {importFile.name}
+                                    </p>
+                                )}
+                            </div>
+
+                            {importResult && (
+                                <div style={{ marginTop: '0.5rem' }}>
+                                    <div className={`alert mb-3 ${importResult.imported > 0 ? 'alert-success' : 'alert-warning'}`}>
+                                        <span className="alert-icon">{importResult.imported > 0 ? '✓' : '⚠️'}</span>
+                                        <div>
+                                            Berhasil: <strong>{importResult.imported}</strong>
+                                            {' · '}Gagal: <strong>{importResult.failed}</strong>
+                                            {importResult.skipped > 0 && (
+                                                <> {' · '}Dilewati (lisensi): <strong>{importResult.skipped}</strong></>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {importResult.results?.length > 0 && (
+                                        <div className="table-container" style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                            <table className="table" style={{ fontSize: '0.8rem' }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Baris</th>
+                                                        <th>Employee ID</th>
+                                                        <th>Status</th>
+                                                        <th>Keterangan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {importResult.results.map((item) => (
+                                                        <tr key={`${item.row}-${item.employee_id}`}>
+                                                            <td>{item.row}</td>
+                                                            <td>{item.employee_id}</td>
+                                                            <td>
+                                                                <span style={{
+                                                                    fontWeight: 600,
+                                                                    color: item.status === 'success'
+                                                                        ? 'var(--success-500, #10b981)'
+                                                                        : item.status === 'skipped'
+                                                                            ? 'var(--warning-500, #f59e0b)'
+                                                                            : 'var(--danger-500)'
+                                                                }}>
+                                                                    {item.status === 'success' ? 'Berhasil' : item.status === 'skipped' ? 'Dilewati' : 'Gagal'}
+                                                                </span>
+                                                            </td>
+                                                            <td>{item.message}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-footer" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={handleDownloadTemplate}
+                                disabled={downloadingTemplate}
+                            >
+                                {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                            </button>
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>
+                                    Tutup
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleImportUsers}
+                                    disabled={importing || !importFile}
+                                >
+                                    {importing ? 'Mengimpor...' : 'Unggah & Import'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
