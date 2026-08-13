@@ -709,6 +709,34 @@ export const customersAPI = {
         body: JSON.stringify(data),
     }),
     delete: (id) => request(`/customers/${id}`, { method: 'DELETE' }),
+
+    downloadTemplate: () => {
+        const token = getToken();
+        return fetch(`${API_BASE}/customers/template`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(async (res) => {
+            if (!res.ok) {
+                let message = 'Gagal mengunduh template';
+                try {
+                    const data = await res.json();
+                    message = data.error || message;
+                } catch (_) { /* ignore */ }
+                throw new Error(message);
+            }
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template-import-customer.xlsx';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    },
+
+    import: (formData) =>
+        request('/customers/import', {
+            method: 'POST',
+            body: formData,
+        }),
 };
 
 // License API

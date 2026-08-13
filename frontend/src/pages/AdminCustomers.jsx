@@ -16,6 +16,14 @@ export default function AdminCustomers() {
     const [showCodeSettings, setShowCodeSettings] = useState(false);
     const [codeSettings, setCodeSettings] = useState({ prefix: 'CUST', next_number: '1', digits: '4' });
 
+    // Import Excel
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState(null);
+    const [importError, setImportError] = useState('');
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
     const fetchCustomers = useCallback(async () => {
         try {
             setLoading(true);
@@ -116,6 +124,51 @@ export default function AdminCustomers() {
         }
     }
 
+    function openImportModal() {
+        setImportFile(null);
+        setImportResult(null);
+        setImportError('');
+        setShowImportModal(true);
+    }
+
+    async function handleDownloadTemplate() {
+        setDownloadingTemplate(true);
+        try {
+            await customersAPI.downloadTemplate();
+        } catch (err) {
+            alert(err.message || 'Gagal mengunduh template');
+        } finally {
+            setDownloadingTemplate(false);
+        }
+    }
+
+    async function handleImportCustomers() {
+        if (!importFile) {
+            setImportError('Pilih file Excel terlebih dahulu');
+            return;
+        }
+
+        setImporting(true);
+        setImportError('');
+        setImportResult(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', importFile);
+            const result = await customersAPI.import(formData);
+            setImportResult(result);
+            if (result.imported > 0) {
+                showMsg('success', `${result.imported} customer berhasil diimpor`);
+                fetchCustomers();
+                fetchCodeSettings();
+            }
+        } catch (err) {
+            setImportError(err.message || 'Gagal mengimpor customer');
+        } finally {
+            setImporting(false);
+        }
+    }
+
     // Preview code format
     const previewCode = codeSettings.prefix + String(parseInt(codeSettings.next_number) || 1).padStart(parseInt(codeSettings.digits) || 4, '0');
 
@@ -153,9 +206,39 @@ export default function AdminCustomers() {
                             style={{ flex: 1 }}
                         />
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button className="btn btn-outline" onClick={() => { fetchCodeSettings(); setShowCodeSettings(true); }}>
                             ⚙️ Pengaturan Kode
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={handleDownloadTemplate}
+                            disabled={downloadingTemplate}
+                            title="Unduh template Excel untuk import customer"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                cursor: downloadingTemplate ? 'wait' : 'pointer',
+                                opacity: downloadingTemplate ? 0.7 : 1
+                            }}
+                        >
+                            {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                        </button>
+                        <button
+                            className="btn"
+                            onClick={openImportModal}
+                            title="Upload customer dari Excel"
+                            style={{
+                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#fff',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            📤 Upload Excel
                         </button>
                         <button className="btn btn-primary" onClick={openAdd}>
                             + Tambah Customer
@@ -355,6 +438,117 @@ export default function AdminCustomers() {
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                                 <button className="btn btn-outline" onClick={() => setShowCodeSettings(false)}>Batal</button>
                                 <button className="btn btn-primary" onClick={saveCodeSettings}>💾 Simpan Pengaturan</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Excel Modal */}
+            {showImportModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '680px' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Upload Customer dari Excel</h2>
+                            <button className="modal-close" onClick={() => setShowImportModal(false)}>×</button>
+                        </div>
+                        <div style={{ padding: '1.5rem' }}>
+                            {importError && (
+                                <div className="alert alert-danger mb-3">
+                                    ⚠️ {importError}
+                                </div>
+                            )}
+
+                            <div className="alert alert-info mb-3">
+                                ℹ️ Unduh template resmi, isi data customer, lalu unggah file .xlsx.
+                                Kolom wajib: <strong>Nama</strong>. Kode dikosongkan akan dibuat otomatis.
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">File Excel (.xlsx)</label>
+                                <input
+                                    type="file"
+                                    className="form-input"
+                                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    onChange={(e) => {
+                                        setImportFile(e.target.files?.[0] || null);
+                                        setImportResult(null);
+                                        setImportError('');
+                                    }}
+                                />
+                                {importFile && (
+                                    <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>
+                                        File dipilih: {importFile.name}
+                                    </p>
+                                )}
+                            </div>
+
+                            {importResult && (
+                                <div style={{ marginTop: '0.5rem' }}>
+                                    <div className={`alert mb-3 ${importResult.imported > 0 ? 'alert-success' : 'alert-warning'}`}>
+                                        {importResult.imported > 0 ? '✅' : '⚠️'}{' '}
+                                        Berhasil: <strong>{importResult.imported}</strong>
+                                        {' · '}Gagal: <strong>{importResult.failed}</strong>
+                                    </div>
+
+                                    {importResult.results?.length > 0 && (
+                                        <div className="table-container" style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                            <table className="table" style={{ fontSize: '0.8rem' }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Baris</th>
+                                                        <th>Nama</th>
+                                                        <th>Status</th>
+                                                        <th>Keterangan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {importResult.results.map((item) => (
+                                                        <tr key={`${item.row}-${item.name}`}>
+                                                            <td>{item.row}</td>
+                                                            <td>{item.name}</td>
+                                                            <td>
+                                                                <span style={{
+                                                                    fontWeight: 600,
+                                                                    color: item.status === 'success'
+                                                                        ? 'var(--success-500, #10b981)'
+                                                                        : 'var(--danger-500)'
+                                                                }}>
+                                                                    {item.status === 'success' ? 'Berhasil' : 'Gagal'}
+                                                                </span>
+                                                            </td>
+                                                            <td>{item.message}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={handleDownloadTemplate}
+                                    disabled={downloadingTemplate}
+                                >
+                                    {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                </button>
+                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>
+                                        Tutup
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={handleImportCustomers}
+                                        disabled={importing || !importFile}
+                                    >
+                                        {importing ? 'Mengimpor...' : 'Unggah & Import'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
