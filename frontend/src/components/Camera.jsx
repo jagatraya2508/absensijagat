@@ -1,59 +1,121 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
+const IS_MOBILE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+function cameraErrorMessage(err) {
+    const name = err?.name || '';
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        return 'Akses kamera ditolak. Klik ikon gembok di address bar, izinkan Kamera, lalu tekan Coba Lagi.';
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        return 'Webcam tidak ditemukan. Pastikan kamera PC terpasang, driver aktif, dan tidak dimatikan di pengaturan Windows.';
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+        return 'Kamera sedang dipakai aplikasi lain (Zoom, Teams, Skype, dll). Tutup aplikasi tersebut, lalu coba lagi.';
+    }
+    if (name === 'SecurityError' || name === 'NotSupportedError') {
+        return 'Browser memblokir kamera. Gunakan HTTPS dan izinkan akses kamera.';
+    }
+    if (name === 'OverconstrainedError') {
+        return 'Webcam PC tidak mendukung pengaturan kamera ini. Coba lagi untuk memakai kamera default.';
+    }
+    return err?.message ? `Gagal membuka kamera: ${err.message}` : 'Gagal membuka kamera. Periksa izin browser dan webcam PC.';
+}
+
+async function getCameraStream(preferredFacing = 'user') {
+    if (!window.isSecureContext) {
+        const err = new Error('Kamera hanya bisa digunakan di HTTPS atau localhost.');
+        err.name = 'SecurityError';
+        throw err;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+        const err = new Error('Browser ini tidak mendukung kamera.');
+        err.name = 'NotSupportedError';
+        throw err;
+    }
+
+    const attempts = [
+        { video: { facingMode: { ideal: preferredFacing }, width: { ideal: 640 }, height: { ideal: 480 } } },
+        { video: { facingMode: { ideal: preferredFacing } } },
+        { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
+        { video: true }
+    ];
+
+    let lastError;
+    for (const constraints of attempts) {
+        try {
+            return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+            lastError = err;
+            if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+                throw err;
+            }
+        }
+    }
+    throw lastError;
+}
+
 export default function Camera({ onCapture, onReset }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+    const streamRef = useRef(null);
     const [stream, setStream] = useState(null);
     const [photo, setPhoto] = useState(null);
     const [error, setError] = useState(null);
-    const [facingMode, setFacingMode] = useState('user'); // 'user' for front camera
+    const [facingMode, setFacingMode] = useState('user');
     const [useFallback, setUseFallback] = useState(false);
+    const [starting, setStarting] = useState(false);
+
+    const stopStream = useCallback(() => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
+        setStream(null);
+    }, []);
 
     const startCamera = useCallback(async () => {
         try {
             setError(null);
-
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                console.warn('getUserMedia is not supported, switching to fallback');
-                setUseFallback(true);
-                return;
-            }
-
-            // Stop existing stream
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode,
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                }
-            });
-
-            setStream(mediaStream);
             setUseFallback(false);
+            setStarting(true);
+            stopStream();
 
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream;
-            }
+            const mediaStream = await getCameraStream(facingMode);
+            streamRef.current = mediaStream;
+            setStream(mediaStream);
         } catch (err) {
             console.error('Camera error:', err);
-            // Switch to fallback automatically
-            setUseFallback(true);
+            setError(cameraErrorMessage(err));
+        } finally {
+            setStarting(false);
         }
-    }, [facingMode, stream]);
+    }, [facingMode, stopStream]);
 
     useEffect(() => {
         startCamera();
-
         return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
             }
         };
     }, []);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !stream) return;
+        video.srcObject = stream;
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch((err) => {
+                console.warn('Video play failed:', err);
+            });
+        }
+    }, [stream]);
 
     const capturePhoto = useCallback(() => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -61,12 +123,16 @@ export default function Camera({ onCapture, onReset }) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
+        if (!video.videoWidth || !video.videoHeight) {
+            setError('Kamera belum siap. Tunggu preview muncul, lalu ambil foto.');
+            return;
+        }
+
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
         const ctx = canvas.getContext('2d');
 
-        // Mirror the image for front camera
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0);
@@ -74,18 +140,14 @@ export default function Camera({ onCapture, onReset }) {
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         setPhoto(dataUrl);
 
-        // Convert to blob for upload
         canvas.toBlob((blob) => {
             if (onCapture) {
                 onCapture(blob, dataUrl);
             }
         }, 'image/jpeg', 0.8);
 
-        // Stop camera after capture
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-    }, [stream, onCapture]);
+        stopStream();
+    }, [onCapture, stopStream]);
 
     const retakePhoto = useCallback(() => {
         setPhoto(null);
@@ -93,10 +155,24 @@ export default function Camera({ onCapture, onReset }) {
         startCamera();
     }, [onReset, startCamera]);
 
-    const switchCamera = useCallback(() => {
-        setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
-        startCamera();
-    }, [startCamera]);
+    const switchCamera = useCallback(async () => {
+        const next = facingMode === 'user' ? 'environment' : 'user';
+        setFacingMode(next);
+        try {
+            setError(null);
+            setUseFallback(false);
+            setStarting(true);
+            stopStream();
+            const mediaStream = await getCameraStream(next);
+            streamRef.current = mediaStream;
+            setStream(mediaStream);
+        } catch (err) {
+            console.error('Camera switch error:', err);
+            setError(cameraErrorMessage(err));
+        } finally {
+            setStarting(false);
+        }
+    }, [facingMode, stopStream]);
 
     const handleFallbackCapture = useCallback(async (e) => {
         const file = e.target.files[0];
@@ -186,6 +262,21 @@ export default function Camera({ onCapture, onReset }) {
         reader.readAsDataURL(file);
     }, [onCapture]);
 
+    const filePicker = (
+        <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+            <button type="button" className="btn btn-outline" style={{ pointerEvents: 'none' }}>
+                {IS_MOBILE ? '📸 Ambil dari Kamera HP' : '📁 Pilih Foto dari Komputer'}
+            </button>
+            <input
+                type="file"
+                accept="image/*"
+                {...(IS_MOBILE ? { capture: 'user' } : {})}
+                onChange={handleFallbackCapture}
+                style={{ position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 10 }}
+            />
+        </div>
+    );
+
     if (useFallback && !photo) {
         return (
             <div className="camera-container">
@@ -206,20 +297,15 @@ export default function Camera({ onCapture, onReset }) {
                 }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
                     <p style={{ marginBottom: '1.25rem', fontSize: '0.85rem', lineHeight: '1.4' }}>
-                        Tekan tombol di bawah untuk membuka kamera selfie.
+                        Webcam live tidak tersedia. {IS_MOBILE ? 'Ambil foto selfie dari kamera HP.' : 'Pilih foto dari komputer, atau izinkan kamera di browser lalu coba lagi.'}
                     </p>
-                    <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
-                        <button type="button" className="btn btn-primary" style={{ pointerEvents: 'none' }}>
-                            📸 Buka Kamera Selfie
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+                        <button type="button" className="btn btn-primary" onClick={startCamera}>
+                            🔄 Coba Buka Webcam
                         </button>
-                        <input 
-                            type="file" 
-                            accept="image/*" 
-                            capture="user"
-                            onChange={handleFallbackCapture} 
-                            style={{ position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 10 }}
-                        />
-                    </div>                </div>
+                        {filePicker}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -230,9 +316,12 @@ export default function Camera({ onCapture, onReset }) {
                 <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
                     <p className="text-danger" style={{ marginBottom: '1rem' }}>{error}</p>
-                    <button className="btn btn-primary" onClick={startCamera}>
-                        Coba Lagi
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
+                        <button className="btn btn-primary" onClick={startCamera} disabled={starting}>
+                            {starting ? 'Membuka kamera...' : 'Coba Lagi'}
+                        </button>
+                        {filePicker}
+                    </div>
                 </div>
             </div>
         );
@@ -245,6 +334,21 @@ export default function Camera({ onCapture, onReset }) {
             {!photo ? (
                 <>
                     <div className="camera-view-wrapper">
+                        {starting && !stream && (
+                            <div style={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                zIndex: 2,
+                                background: 'rgba(0,0,0,0.45)',
+                                borderRadius: 'var(--radius-lg)'
+                            }}>
+                                Membuka kamera...
+                            </div>
+                        )}
                         <video
                             ref={videoRef}
                             autoPlay

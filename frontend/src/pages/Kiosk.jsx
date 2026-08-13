@@ -220,8 +220,9 @@ export default function Kiosk() {
                 {/* Overlay Guide */}
                 <div style={{ 
                     position: 'absolute', 
-                    width: '350px', 
-                    height: '450px', 
+                    width: 'min(72vw, 560px)', 
+                    height: 'min(78vh, 720px)', 
+                    maxWidth: '90vw',
                     border: status === 'success' ? '4px solid #10b981' : (status === 'error' ? '4px solid #ef4444' : '4px dashed rgba(255,255,255,0.5)'), 
                     borderRadius: '50%',
                     boxShadow: '0 0 0 9999px rgba(0,0,0,0.7)',

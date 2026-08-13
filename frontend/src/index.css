@@ -859,6 +859,10 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   margin: 0 auto;
 }
 
+.camera-view-wrapper {
+  position: relative;
+}
+
 .camera-video {
   width: 100%;
   border-radius: var(--radius-xl);
@@ -879,10 +883,10 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 180px;
-  height: 220px;
+  width: min(72%, 280px);
+  height: min(78%, 340px);
   border: 3px dashed rgba(255, 255, 255, 0.5);
-  border-radius: var(--radius-xl);
+  border-radius: 50%;
   pointer-events: none;
 }
 
@@ -1907,17 +1911,15 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   }
 
   .camera-overlay {
-    width: 180px;
-    height: 240px;
+    width: min(78%, 240px);
+    height: min(82%, 320px);
     border-width: 2px;
-    border-radius: var(--radius-lg);
-    /* Absolute center over video */
+    border-radius: 50%;
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    /* Allow clicks to pass through */
   }
 
   /* Position controls over the bottom of the video or just cleaner below */
