@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, "absensigudang-runner"]
+    runs-on: [self-hosted, "absensi-runner"]
 
     steps:
       - name: Run Deployment Script
