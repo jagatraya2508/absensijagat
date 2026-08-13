@@ -103,6 +103,48 @@ export default function Dashboard() {
             </div>
 
 
+            {/* Riwayat Absensi Terbaru */}
+            {Array.isArray(history) && history.length > 0 && (
+                <div className="card mb-4">
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                        <h2 className="card-title" style={{ margin: 0 }}>📋 Riwayat Absensi</h2>
+                        <Link to="/history" className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}>
+                            Lihat Semua
+                        </Link>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        {history.slice(0, 8).map((record) => (
+                            <div
+                                key={record.id}
+                                className="history-record-item"
+                                style={{
+                                    display: 'flex',
+                                    gap: '0.75rem',
+                                    alignItems: 'center',
+                                    padding: '0.65rem 0.25rem',
+                                    borderBottom: '1px solid rgba(0,0,0,0.05)'
+                                }}
+                            >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                        <span className={`badge ${record.type === 'check_out' ? 'badge-warning' : record.type === 'leave' ? 'badge-primary' : record.type === 'off_day' ? 'badge-secondary' : 'badge-primary'}`}>
+                                            {record.type === 'check_in' ? '📥 Masuk' : record.type === 'check_out' ? '📤 Pulang' : record.type === 'leave' ? '📝 Izin' : record.type === 'off_day' ? '🏖️ Libur' : record.type}
+                                        </span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                            {record.recorded_at ? formatTime(record.recorded_at) : ''}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        {record.recorded_at ? formatDate(record.recorded_at) : ''}
+                                        {record.location_name ? ` · ${record.location_name}` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Quick Actions & Menus (Talenta Style) */}
             <div className="mb-4">
                 {/* Attendance Buttons - Compact & Side by Side */}

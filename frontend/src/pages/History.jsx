@@ -271,7 +271,7 @@ export default function History() {
                     .map((date) => {
                         const dayUsers = groupedRecords[date];
                         return (
-                            <div key={date} className="card mb-3">
+                            <div key={date} className="card mb-3 history-day-card">
                                 <div className="card-header">
                                     <h3 className="card-title" style={{ fontSize: '1rem' }}>
                                         {formatDate(new Date(date))}
@@ -294,11 +294,12 @@ export default function History() {
                                                     </span>
                                                 </div>
                                             )}
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
+                                            <div className="history-record-grid">
                                                 {[...userData.records].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at)).map((record) => (
                                                     record.type === 'off_day' ? (
                                                         <div
                                                             key={record.id}
+                                                            className="history-record-item"
                                                             style={{
                                                                 display: 'flex',
                                                                 gap: '1rem',
@@ -328,6 +329,7 @@ export default function History() {
                                         ) : record.type === 'leave' ? (
                                             <div
                                                 key={record.id}
+                                                className="history-record-item"
                                                 style={{
                                                     display: 'flex',
                                                     gap: '1rem',
@@ -366,6 +368,7 @@ export default function History() {
                                         ) : (
                                             <div
                                                 key={record.id}
+                                                className="history-record-item"
                                                 style={{
                                                     display: 'flex',
                                                     gap: '1rem',

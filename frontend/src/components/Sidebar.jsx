@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onNavigate }) {
     const { user, logout, hasPermission } = useAuth();
     const { settings, companyName } = useSettings();
     const navigate = useNavigate();
@@ -74,7 +74,7 @@ export default function Sidebar() {
 
     return (
         <>
-            <aside className="sidebar">
+            <aside className={`sidebar${isOpen ? ' open' : ''}`}>
                 <div className="sidebar-logo">
                     <div>
                         <h1>{companyName || 'Absensi'}</h1>
@@ -87,6 +87,7 @@ export default function Sidebar() {
                         <NavLink
                             key={item.path}
                             to={item.path}
+                            onClick={onNavigate}
                             className={({ isActive }) =>
                                 `sidebar-link ${isActive ? 'active' : ''}`
                             }
@@ -119,6 +120,7 @@ export default function Sidebar() {
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
+                                    onClick={onNavigate}
                                     className={({ isActive }) =>
                                         `sidebar-link ${isActive ? 'active' : ''}`
                                     }
@@ -193,6 +195,7 @@ export default function Sidebar() {
                                             <NavLink
                                                 key={item.path}
                                                 to={item.path}
+                                                onClick={onNavigate}
                                                 className={({ isActive }) =>
                                                     `sidebar-link ${isActive ? 'active' : ''}`
                                                 }
@@ -211,6 +214,7 @@ export default function Sidebar() {
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
+                                    onClick={onNavigate}
                                     className={({ isActive }) =>
                                         `sidebar-link ${isActive ? 'active' : ''}`
                                     }

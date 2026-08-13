@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Sidebar from './components/Sidebar';
@@ -75,10 +76,27 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
 function AppLayout({ children }) {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [location.pathname]);
 
     return (
-        <div className="app-container">
-            <Sidebar />
+        <div className={`app-container${sidebarOpen ? ' sidebar-open' : ''}`}>
+            <button
+                type="button"
+                className="mobile-menu-btn"
+                onClick={() => setSidebarOpen((open) => !open)}
+                aria-label={sidebarOpen ? 'Tutup menu' : 'Buka menu'}
+            >
+                {sidebarOpen ? '✕' : '☰'}
+            </button>
+            {sidebarOpen && (
+                <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+            )}
+            <Sidebar isOpen={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
             <main className="main-content" style={{ position: 'relative' }}>
                 <div className="global-logo-container">
                     {user?.photo ? (

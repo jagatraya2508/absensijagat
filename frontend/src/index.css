@@ -167,8 +167,17 @@ body {
   .main-content {
     margin-left: 0;
     padding: 1rem;
+    padding-top: 3.75rem;
     padding-bottom: 1.5rem;
   }
+}
+
+.mobile-menu-btn {
+  display: none;
+}
+
+.sidebar-overlay {
+  display: none;
 }
 
 /* ========================================
@@ -381,12 +390,47 @@ body {
 
 @media (max-width: 768px) {
   .sidebar {
-    display: none;
+    display: flex;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    width: min(280px, 86vw);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.28);
+  }
+
+  .sidebar.open,
+  .sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0.7rem;
+    left: 0.7rem;
+    z-index: 120;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 12px;
+    background: var(--theme-primary, #6d0000);
+    color: #fff;
+    font-size: 1.25rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 90;
   }
 
   .mobile-nav {
-    display: flex;
-    justify-content: space-around;
+    display: none;
   }
 }
 
@@ -475,6 +519,18 @@ body {
   font-size: 0.8rem;
   color: var(--gray-500);
   margin-top: 0.25rem;
+}
+
+.history-record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+.history-record-item {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Status Cards */
@@ -1717,6 +1773,7 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   .page-header {
     margin-bottom: 1rem;
     padding-right: 70px; /* Prevent text overlapping with logo */
+    padding-left: 0;
   }
 
   .page-title {
@@ -1962,13 +2019,17 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   }
 
   /* History cards on mobile */
-  .card.mb-3>div {
-    gap: 0.75rem !important;
+  .history-record-grid {
+    grid-template-columns: 1fr !important;
   }
 
-  .card.mb-3>div>div {
-    flex-direction: column !important;
+  .history-record-item {
+    flex-wrap: wrap !important;
     align-items: flex-start !important;
+  }
+
+  .history-day-card {
+    overflow: visible;
   }
 }
 
@@ -2695,7 +2756,7 @@ body {
 
 @media print {
   .hide-on-print { display: none !important; }
-  .sidebar, .mobile-nav, .page-header { display: none !important; }
+  .sidebar, .mobile-nav, .mobile-menu-btn, .page-header { display: none !important; }
   .main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
   
   .print-spl-only {
