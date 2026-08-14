@@ -1,107 +1,82 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+const {
+    ensureLicenseSchema,
+    verifyLicenseKey,
+    getActiveLicenseInfo,
+    getMachineId,
+    normalizeMachineId,
+    formatMachineId,
+    machineIdsMatch
+} = require('../utils/licenseCheck');
 
-// This must exactly match the secret in generate-license.js
-const LICENSE_SECRET = 'ABSENSI_LICENSE_SECRET_KEY_2026_XYZ_SECURE!';
-
-// Helper to verify and parse license key
-function verifyLicenseKey(licenseKey) {
-    try {
-        const parts = licenseKey.split('.');
-        if (parts.length !== 2) throw new Error('Format license tidak valid');
-        
-        const [payloadBase64, signature] = parts;
-        
-        const hmac = crypto.createHmac('sha256', LICENSE_SECRET);
-        hmac.update(payloadBase64);
-        const expectedSignature = hmac.digest('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        
-        if (signature !== expectedSignature) {
-            throw new Error('Signature license tidak valid. License mungkin dipalsukan.');
-        }
-        
-        const payloadStr = Buffer.from(payloadBase64, 'base64').toString('utf8');
-        const payload = JSON.parse(payloadStr);
-        
-        return payload;
-    } catch (error) {
-        throw new Error(`Validasi license gagal: ${error.message}`);
-    }
-}
-
-// Helper to get active license from DB
-async function getActiveLicenseInfo() {
-    // Only fetch the most recently activated license
-    const result = await pool.query(
-        'SELECT * FROM license_info ORDER BY activated_at DESC LIMIT 1'
-    );
-    
-    if (result.rows.length === 0) {
-        return { active: false, error: 'Tidak ada license yang terpasang' };
-    }
-    
-    const license = result.rows[0];
-    const expiresAt = new Date(license.expires_at);
-    
-    if (expiresAt < new Date()) {
-        return { 
-            active: false, 
-            expired: true,
-            company: license.company_name,
-            max_users: license.max_users,
-            expires_at: license.expires_at,
-            error: 'License sudah kadaluarsa' 
-        };
-    }
-    
-    return {
-        active: true,
-        expired: false,
-        id: license.id,
-        company: license.company_name,
-        max_users: license.max_users,
-        expires_at: license.expires_at,
-        activated_at: license.activated_at
-    };
-}
-
-// 1. Activate License (Admin only)
 router.post('/activate', authenticateToken, isAdmin, async (req, res) => {
     try {
+        await ensureLicenseSchema();
         const { license_key } = req.body;
         if (!license_key) {
             return res.status(400).json({ error: 'License key harus diisi' });
         }
-        
-        // Validate signature and parse payload
+
         let payload;
         try {
             payload = verifyLicenseKey(license_key);
         } catch (e) {
             return res.status(400).json({ error: e.message });
         }
-        
-        // Validate expiry
+
         if (new Date(payload.expires_at) < new Date()) {
             return res.status(400).json({ error: 'License key sudah kadaluarsa' });
         }
-        
-        // Save to database
-        const result = await pool.query(
-            `INSERT INTO license_info (license_key, company_name, max_users, expires_at) 
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-            [license_key, payload.company, payload.max_users, payload.expires_at]
+
+        const boundId = normalizeMachineId(payload.machine_id);
+        if (!boundId || boundId.length !== 16) {
+            return res.status(400).json({
+                error: 'License ini tidak terikat ke mesin. Minta license baru dengan ID Mesin dari halaman License.'
+            });
+        }
+
+        const currentMachineId = getMachineId();
+        if (!machineIdsMatch(boundId, currentMachineId)) {
+            return res.status(400).json({
+                error: `License ini hanya berlaku untuk mesin ${formatMachineId(boundId)}. ID mesin server ini: ${formatMachineId(currentMachineId)}`
+            });
+        }
+
+        const existingKey = await pool.query(
+            'SELECT id, machine_id FROM license_info WHERE license_key = $1 ORDER BY activated_at DESC LIMIT 1',
+            [license_key]
         );
-        
+        if (existingKey.rows.length > 0) {
+            const existingBound = normalizeMachineId(existingKey.rows[0].machine_id);
+            if (existingBound && !machineIdsMatch(existingBound, currentMachineId)) {
+                return res.status(400).json({
+                    error: 'License key ini sudah diaktifkan di mesin lain'
+                });
+            }
+            await pool.query(
+                `UPDATE license_info
+                 SET company_name = $1, max_users = $2, expires_at = $3, machine_id = $4, activated_at = CURRENT_TIMESTAMP
+                 WHERE id = $5`,
+                [payload.company, payload.max_users, payload.expires_at, currentMachineId, existingKey.rows[0].id]
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO license_info (license_key, company_name, max_users, expires_at, machine_id)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [license_key, payload.company, payload.max_users, payload.expires_at, currentMachineId]
+            );
+        }
+
         res.json({
-            message: 'License berhasil diaktifkan',
+            message: 'License berhasil diaktifkan untuk mesin ini',
             info: {
                 company: payload.company,
                 max_users: payload.max_users,
-                expires_at: payload.expires_at
+                expires_at: payload.expires_at,
+                machine_id: formatMachineId(currentMachineId)
             }
         });
     } catch (error) {
@@ -110,15 +85,12 @@ router.post('/activate', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
-// 2. Get License Info (Admin only)
 router.get('/info', authenticateToken, isAdmin, async (req, res) => {
     try {
         const info = await getActiveLicenseInfo();
-        
-        // Get current user count
         const userCountQuery = await pool.query('SELECT COUNT(*) FROM users');
         const currentUsers = parseInt(userCountQuery.rows[0].count);
-        
+
         res.json({
             ...info,
             current_users: currentUsers
@@ -129,13 +101,13 @@ router.get('/info', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
-// 3. Get Public Status (For login page or app initialization)
 router.get('/status', async (req, res) => {
     try {
         const info = await getActiveLicenseInfo();
         res.json({
             active: info.active,
             expired: info.expired || false,
+            wrong_machine: info.wrong_machine || false,
             company: info.company || null
         });
     } catch (error) {
@@ -144,28 +116,24 @@ router.get('/status', async (req, res) => {
     }
 });
 
-// Helper that other routes can use to check user limits
 router.checkUserLimit = async () => {
     const info = await getActiveLicenseInfo();
-    
-    // If no license is installed, we might enforce a strict default (e.g. max 5 users)
-    // or just let it be. Let's enforce a default of 5 users.
     const maxUsers = info.active ? info.max_users : 5;
-    
+
     const userCountQuery = await pool.query('SELECT COUNT(*) FROM users');
     const currentUsers = parseInt(userCountQuery.rows[0].count);
-    
+
     if (currentUsers >= maxUsers) {
         return {
             allowed: false,
             current: currentUsers,
             max: maxUsers,
-            error: info.active 
-                ? `Batas pengguna pada license tercapai (${maxUsers} pengguna).` 
-                : 'Tidak ada licenseaktif. Mode trial dibatasi 5 pengguna.'
+            error: info.active
+                ? `Batas pengguna pada license tercapai (${maxUsers} pengguna).`
+                : 'Tidak ada license aktif. Mode trial dibatasi 5 pengguna.'
         };
     }
-    
+
     return { allowed: true, current: currentUsers, max: maxUsers };
 };
 

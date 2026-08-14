@@ -78,6 +78,50 @@ export default function LicenseSettings() {
                 </div>
             )}
 
+            {licenseInfo?.wrong_machine && (
+                <div className="alert alert-danger mb-3">
+                    <span className="alert-icon">⚠️</span>
+                    License terpasang terikat ke mesin lain, jadi tidak berlaku di server ini. Aktifkan license yang dibuat untuk ID Mesin di bawah.
+                </div>
+            )}
+
+            <div className="card mb-4">
+                <div className="card-header">
+                    <h2 className="card-title">ID Mesin Server Ini</h2>
+                </div>
+                <div className="card-body">
+                    <p style={{ marginBottom: '0.75rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                        Kirim ID ini ke developer saat minta license. Key hanya berlaku di mesin ini dan tidak bisa disalin ke server lain.
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <code style={{
+                            background: 'var(--surface-300, #f1f5f9)',
+                            padding: '0.55rem 0.8rem',
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            letterSpacing: '0.04em',
+                            fontWeight: 700
+                        }}>
+                            {licenseInfo?.machine_id || '-'}
+                        </code>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={async () => {
+                                try {
+                                    await navigator.clipboard.writeText(licenseInfo?.machine_id || '');
+                                    setSuccess('ID Mesin disalin');
+                                } catch (_) {
+                                    setError('Gagal menyalin ID Mesin');
+                                }
+                            }}
+                        >
+                            Salin ID Mesin
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 {/* Info Card */}
                 <div className="card">
@@ -112,6 +156,12 @@ export default function LicenseSettings() {
                                         })}
                                     </span>
                                 </div>
+                                {licenseInfo.bound_machine_id && (
+                                    <div className="detail-row">
+                                        <span className="detail-label">Terikat ke Mesin:</span>
+                                        <span className="detail-value"><code>{licenseInfo.bound_machine_id}</code></span>
+                                    </div>
+                                )}
                                 
                                 {/* Progress bar usage */}
                                 <div style={{ marginTop: '1rem' }}>
@@ -149,7 +199,7 @@ export default function LicenseSettings() {
                     <div className="card-body">
                         <form onSubmit={handleActivate}>
                             <p style={{ marginBottom: '1.5rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                                Masukkan kode license yang Anda dapatkan dari developer untuk mengaktifkan atau memperpanjang paket aplikasi Anda.
+                                Tempel license key yang dibuat khusus untuk ID Mesin server ini. Key dari mesin lain akan ditolak.
                             </p>
                             <div className="form-group">
                                 <label className="form-label">License Key</label>

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>License Generator</title>
+    <style>
+        :root {
+            --navy: #1e3a8a;
+            --navy-dark: #172554;
+            --sky: #0ea5e9;
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --success: #059669;
+            --danger: #dc2626;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+        body { min-height: 100vh; }
+        .top {
+            background: linear-gradient(135deg, var(--navy-dark), var(--navy));
+            color: #fff;
+            padding: 1.25rem 1.5rem 1.1rem;
+        }
+        .top h1 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+        .top p {
+            margin: 0.35rem 0 0;
+            font-size: 0.82rem;
+            opacity: 0.85;
+        }
+        .wrap { padding: 1.25rem 1.5rem 1.5rem; }
+        label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 0.35rem;
+        }
+        input, select {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: #fff;
+        }
+        input:focus, select:focus {
+            outline: 2px solid rgba(14, 165, 233, 0.35);
+            border-color: var(--sky);
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+        .field { margin-bottom: 0.9rem; }
+        .btn {
+            width: 100%;
+            border: none;
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+            color: #fff;
+        }
+        .btn-primary:hover { filter: brightness(1.05); }
+        .btn-ghost {
+            background: #fff;
+            color: var(--navy);
+            border: 1px solid var(--border);
+        }
+        .actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .error {
+            display: none;
+            background: #fef2f2;
+            color: var(--danger);
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 0.7rem 0.85rem;
+            font-size: 0.85rem;
+            margin-bottom: 0.9rem;
+        }
+        .result {
+            display: none;
+            margin-top: 1.1rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .result-head {
+            background: #ecfdf5;
+            color: var(--success);
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 0.7rem 1rem;
+        }
+        .meta {
+            padding: 0.85rem 1rem 0.2rem;
+            font-size: 0.85rem;
+        }
+        .meta div { margin-bottom: 0.4rem; }
+        .meta span { color: var(--muted); display: inline-block; min-width: 110px; }
+        textarea {
+            width: calc(100% - 2rem);
+            margin: 0.5rem 1rem 0.4rem;
+            min-height: 120px;
+            resize: vertical;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.78rem;
+            padding: 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .hint {
+            margin: 1rem 0 0;
+            font-size: 0.75rem;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="top">
+        <h1>🔑 License Generator</h1>
+        <p>Absensi Jagat — buat license key tanpa Command Prompt</p>
+    </div>
+    <div class="wrap">
+        <div class="error" id="error"></div>
+        <div class="field">
+            <label>Nama perusahaan</label>
+            <input id="company" type="text" placeholder="Contoh: Jagat Raya" value="Jagat Raya" />
+        </div>
+        <div class="field">
+            <label>ID Mesin (wajib)</label>
+            <input id="machineId" type="text" placeholder="Contoh: ABCD-EF01-2345-6789" />
+        </div>
+        <div class="row">
+            <div class="field">
+                <label>Maksimal user</label>
+                <input id="maxUsers" type="number" min="1" value="50" />
+            </div>
+            <div class="field">
+                <label>Durasi (bulan)</label>
+                <input id="months" type="number" min="1" value="12" />
+            </div>
+        </div>
+        <button class="btn btn-primary" id="generateBtn" type="button">Buat License Key</button>
+
+        <div class="result" id="result">
+            <div class="result-head">License berhasil dibuat</div>
+            <div class="meta">
+                <div><span>Perusahaan</span><strong id="outCompany"></strong></div>
+                <div><span>Max user</span><strong id="outUsers"></strong></div>
+                <div><span>ID Mesin</span><strong id="outMachine"></strong></div>
+                <div><span>Berlaku sampai</span><strong id="outExpiry"></strong></div>
+            </div>
+            <textarea id="outKey" readonly></textarea>
+            <div class="actions" style="padding: 0 1rem 1rem;">
+                <button class="btn btn-primary" id="copyBtn" type="button">Salin Key</button>
+                <button class="btn btn-ghost" id="saveBtn" type="button">Simpan .txt</button>
+            </div>
+        </div>
+        <p class="hint">
+            Tempel key ini di menu <strong>License</strong> pada aplikasi absensi (akun admin).
+            Key hanya berlaku di mesin dengan ID yang diisi di atas.
+        </p>
+    </div>
+
+    <script>
+        const LICENSE_SECRET = 'ABSENSI_LICENSE_SECRET_KEY_2026_XYZ_SECURE!';
+
+        function utf8ToBase64(str) {
+            const bytes = new TextEncoder().encode(str);
+            let binary = '';
+            bytes.forEach((b) => { binary += String.fromCharCode(b); });
+            return btoa(binary);
+        }
+
+        function bytesToBase64Url(bytes) {
+            let binary = '';
+            bytes.forEach((b) => { binary += String.fromCharCode(b); });
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function toHex(bytes) {
+            return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function showError(message) {
+            const el = document.getElementById('error');
+            el.textContent = message;
+            el.style.display = 'block';
+        }
+
+        function clearError() {
+            const el = document.getElementById('error');
+            el.style.display = 'none';
+            el.textContent = '';
+        }
+
+        function formatMachineId(value) {
+            const hex = String(value || '').toUpperCase().replace(/[^A-F0-9]/g, '').slice(0, 16);
+            if (hex.length !== 16) return hex;
+            return hex.match(/.{1,4}/g).join('-');
+        }
+
+        async function generateLicense(companyName, maxUsers, durationMonths, machineId) {
+            const boundId = String(machineId || '').toUpperCase().replace(/[^A-F0-9]/g, '').slice(0, 16);
+            if (boundId.length !== 16) {
+                throw new Error('ID Mesin wajib diisi. Salin dari halaman License di aplikasi.');
+            }
+
+            const expiresAt = new Date();
+            expiresAt.setMonth(expiresAt.getMonth() + parseInt(durationMonths, 10));
+
+            const idBytes = new Uint8Array(4);
+            crypto.getRandomValues(idBytes);
+
+            const payload = {
+                company: companyName,
+                max_users: parseInt(maxUsers, 10),
+                expires_at: expiresAt.toISOString(),
+                issued_at: new Date().toISOString(),
+                id: toHex(idBytes),
+                machine_id: boundId
+            };
+
+            const payloadBase64 = utf8ToBase64(JSON.stringify(payload));
+            const key = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(LICENSE_SECRET),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+            const sigBuf = await crypto.subtle.sign(
+                'HMAC',
+                key,
+                new TextEncoder().encode(payloadBase64)
+            );
+            const signature = bytesToBase64Url(new Uint8Array(sigBuf));
+            return {
+                licenseKey: payloadBase64 + '.' + signature,
+                payload
+            };
+        }
+
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            clearError();
+            const company = document.getElementById('company').value.trim();
+            const machineId = document.getElementById('machineId').value.trim();
+            const maxUsers = document.getElementById('maxUsers').value;
+            const months = document.getElementById('months').value;
+
+            if (!company) {
+                showError('Nama perusahaan wajib diisi.');
+                return;
+            }
+            if (!machineId) {
+                showError('ID Mesin wajib diisi. Salin dari halaman License di aplikasi.');
+                return;
+            }
+            if (!maxUsers || parseInt(maxUsers, 10) < 1) {
+                showError('Maksimal user minimal 1.');
+                return;
+            }
+            if (!months || parseInt(months, 10) < 1) {
+                showError('Durasi minimal 1 bulan.');
+                return;
+            }
+
+            try {
+                const { licenseKey, payload } = await generateLicense(company, maxUsers, months, machineId);
+                document.getElementById('outCompany').textContent = payload.company;
+                document.getElementById('outUsers').textContent = payload.max_users + ' users';
+                document.getElementById('outMachine').textContent = formatMachineId(payload.machine_id);
+                document.getElementById('outExpiry').textContent = new Date(payload.expires_at).toLocaleString('id-ID');
+                document.getElementById('outKey').value = licenseKey;
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('copyBtn').textContent = 'Salin Key';
+            } catch (err) {
+                showError(err.message || 'Gagal membuat license.');
+            }
+        });
+
+        document.getElementById('copyBtn').addEventListener('click', async () => {
+            const key = document.getElementById('outKey').value;
+            try {
+                await navigator.clipboard.writeText(key);
+            } catch (_) {
+                document.getElementById('outKey').select();
+                document.execCommand('copy');
+            }
+            document.getElementById('copyBtn').textContent = 'Tersalin';
+            setTimeout(() => {
+                document.getElementById('copyBtn').textContent = 'Salin Key';
+            }, 1500);
+        });
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            const key = document.getElementById('outKey').value;
+            const company = document.getElementById('outCompany').textContent || 'license';
+            const blob = new Blob([key + '\n'], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'license-' + company.replace(/[^\w\-]+/g, '_').toLowerCase() + '.txt';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    </script>
+</body>
+</html>

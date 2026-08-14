@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { pool } = require('../db');
+const { getActiveLicenseInfo } = require('../utils/licenseCheck');
 const { JWT_SECRET, authenticateToken, isAdmin } = require('../middleware/auth');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
@@ -133,16 +134,14 @@ function logError(error) {
     fs.appendFileSync(logPath, logMessage);
 }
 
-// Helper to check user limit
 async function checkUserLimit() {
-    const result = await pool.query('SELECT * FROM license_info ORDER BY activated_at DESC LIMIT 1');
-    const license = result.rows[0];
-    const maxUsers = (license && new Date(license.expires_at) > new Date()) ? license.max_users : 5;
-    
+    const info = await getActiveLicenseInfo();
+    const maxUsers = info.active ? info.max_users : 5;
+
     const userCountQuery = await pool.query('SELECT COUNT(*) FROM users');
     const currentUsers = parseInt(userCountQuery.rows[0].count);
-    
-    return { allowed: currentUsers < maxUsers, current: currentUsers, max: maxUsers, active: !!license };
+
+    return { allowed: currentUsers < maxUsers, current: currentUsers, max: maxUsers, active: !!info.active };
 }
 
 // Login

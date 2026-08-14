@@ -578,6 +578,7 @@ CREATE TABLE IF NOT EXISTS license_info (
     company_name VARCHAR(200),
     max_users INTEGER NOT NULL DEFAULT 10,
     expires_at DATE,
+    machine_id VARCHAR(32),
     activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -818,6 +819,7 @@ ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(100)
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS collection_status VARCHAR(20);
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkin_photo_path VARCHAR(255);
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkout_photo_path VARCHAR(255);
+ALTER TABLE license_info ADD COLUMN IF NOT EXISTS machine_id VARCHAR(32);
 
 -- Fix admin password if old dummy hash exists
 UPDATE users SET password = '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O' WHERE employee_id = 'ADMIN001' AND password LIKE '$2b$10$rQZ5%';
