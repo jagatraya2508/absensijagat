@@ -77,6 +77,15 @@ export default function DriverTracking() {
     const [customerMode, setCustomerMode] = useState('existing'); // 'existing' | 'new'
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerSearch, setCustomerSearch] = useState('');
+    const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+    const [pickerCustomers, setPickerCustomers] = useState([]);
+    const [pickerPage, setPickerPage] = useState(1);
+    const [pickerTotalPages, setPickerTotalPages] = useState(1);
+    const [pickerTotal, setPickerTotal] = useState(0);
+    const [pickerQuery, setPickerQuery] = useState('');
+    const [pickerLoading, setPickerLoading] = useState(false);
+    const pickerSearchTimeout = useRef(null);
+    const PICKER_PAGE_SIZE = 8;
 
     useEffect(() => {
         fetchToday();
@@ -194,6 +203,38 @@ export default function DriverTracking() {
         setSelectedCustomer(customer);
         setCustomerSearch(customer.name);
         setShowDropdown(false);
+        setShowCustomerPicker(false);
+    }
+
+    async function fetchCustomerDirectory(page = 1, q = pickerQuery) {
+        setPickerLoading(true);
+        try {
+            const result = await customersAPI.getDirectory({ page, limit: PICKER_PAGE_SIZE, q });
+            setPickerCustomers(result.data || []);
+            setPickerPage(result.page || 1);
+            setPickerTotalPages(result.totalPages || 1);
+            setPickerTotal(result.total || 0);
+        } catch (e) {
+            console.error('Directory error:', e);
+            setPickerCustomers([]);
+        } finally {
+            setPickerLoading(false);
+        }
+    }
+
+    function openCustomerPicker() {
+        setPickerQuery('');
+        setPickerPage(1);
+        setShowCustomerPicker(true);
+        fetchCustomerDirectory(1, '');
+    }
+
+    function handlePickerSearch(value) {
+        setPickerQuery(value);
+        if (pickerSearchTimeout.current) clearTimeout(pickerSearchTimeout.current);
+        pickerSearchTimeout.current = setTimeout(() => {
+            fetchCustomerDirectory(1, value);
+        }, 300);
     }
 
     // Close dropdown on outside click
@@ -267,6 +308,8 @@ export default function DriverTracking() {
             setNotes('');
             setInvoiceNumber('');
             setAmountBilled('');
+            setSelectedCustomer(null);
+            setCustomerSearch('');
             setShowCamera(false);
             resetPhoto();
             fetchToday();
@@ -579,17 +622,34 @@ export default function DriverTracking() {
                             {customerMode === 'existing' && (
                                 <div className="form-group" ref={dropdownRef} style={{ position: 'relative' }}>
                                     <label className="form-label">Cari & Pilih Customer *</label>
-                                    <input type="text" className="form-input"
-                                        placeholder="🔍 Ketik nama atau kode customer..."
-                                        value={customerSearch}
-                                        onChange={e => {
-                                            setCustomerSearch(e.target.value);
-                                            setSelectedCustomer(null);
-                                            setCustomerName('');
-                                            handleCustomerSearch(e.target.value);
-                                        }}
-                                        onFocus={() => { if (customerSearch.length >= 1) setShowDropdown(true); }}
-                                    />
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
+                                        <input type="text" className="form-input"
+                                            placeholder="🔍 Ketik nama atau kode customer..."
+                                            value={customerSearch}
+                                            onChange={e => {
+                                                setCustomerSearch(e.target.value);
+                                                setSelectedCustomer(null);
+                                                setCustomerName('');
+                                                handleCustomerSearch(e.target.value);
+                                            }}
+                                            onFocus={() => { if (customerSearch.length >= 1) setShowDropdown(true); }}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            onClick={openCustomerPicker}
+                                            title="Pilih dari Master Customer"
+                                            style={{
+                                                whiteSpace: 'nowrap',
+                                                padding: '0.55rem 0.75rem',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            📋 Daftar
+                                        </button>
+                                    </div>
                                     {showDropdown && customers.length > 0 && (
                                         <div style={{
                                             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
@@ -942,6 +1002,126 @@ export default function DriverTracking() {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Master Customer Picker */}
+            {showCustomerPicker && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 10000,
+                    background: 'var(--bg, #f8fafc)',
+                    display: 'flex', flexDirection: 'column'
+                }}>
+                    <div style={{
+                        padding: '0.9rem 1rem',
+                        background: 'linear-gradient(135deg, var(--theme-primary, #b91c1c), #dc2626)',
+                        color: '#fff',
+                        display: 'flex', alignItems: 'center', gap: '0.75rem',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.15)'
+                    }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowCustomerPicker(false)}
+                            style={{
+                                background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+                                width: 36, height: 36, borderRadius: 8, fontSize: '1.1rem', cursor: 'pointer'
+                            }}
+                        >
+                            ←
+                        </button>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>Master Customer</div>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>{pickerTotal} customer aktif</div>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '0.85rem 1rem 0.5rem' }}>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="🔍 Cari nama, kode, alamat, atau telepon..."
+                            value={pickerQuery}
+                            onChange={(e) => handlePickerSearch(e.target.value)}
+                        />
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem 1rem 1rem' }}>
+                        {pickerLoading ? (
+                            <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                <div className="loading-spinner" style={{ margin: '0 auto' }} />
+                            </div>
+                        ) : pickerCustomers.length === 0 ? (
+                            <div className="empty-state" style={{ padding: '2rem 1rem' }}>
+                                <div className="empty-state-icon">🏪</div>
+                                <p className="empty-state-text">Customer tidak ditemukan</p>
+                            </div>
+                        ) : (
+                            pickerCustomers.map((c) => (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => selectCustomer(c)}
+                                    style={{
+                                        width: '100%', textAlign: 'left',
+                                        background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+                                        borderRadius: 12, padding: '0.85rem 1rem', marginBottom: '0.6rem',
+                                        display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: 'pointer'
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                                        background: 'rgba(185, 28, 28, 0.08)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}>🏪</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{c.name}</div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginTop: 2 }}>
+                                            {c.customer_code && <span style={{ fontFamily: 'monospace', fontWeight: 600, marginRight: 8 }}>{c.customer_code}</span>}
+                                            {c.phone && <span>{c.phone}</span>}
+                                        </div>
+                                        {c.address && (
+                                            <div style={{
+                                                fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2,
+                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                            }}>
+                                                📍 {c.address}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span style={{ color: 'var(--gray-400)', fontSize: '1.1rem' }}>›</span>
+                                </button>
+                            ))
+                        )}
+                    </div>
+
+                    <div style={{
+                        padding: '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom))',
+                        borderTop: '1px solid rgba(0,0,0,0.08)',
+                        background: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem'
+                    }}>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={pickerLoading || pickerPage <= 1}
+                            onClick={() => fetchCustomerDirectory(pickerPage - 1, pickerQuery)}
+                            style={{ minWidth: 88 }}
+                        >
+                            ← Kiri
+                        </button>
+                        <div style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
+                            Halaman {pickerPage} / {pickerTotalPages}
+                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={pickerLoading || pickerPage >= pickerTotalPages}
+                            onClick={() => fetchCustomerDirectory(pickerPage + 1, pickerQuery)}
+                            style={{ minWidth: 88 }}
+                        >
+                            Kanan →
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* Map Modal */}

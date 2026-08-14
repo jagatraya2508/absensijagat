@@ -5,6 +5,7 @@ const multer = require('multer');
 const ExcelJS = require('exceljs');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { generateCustomerCode, advanceCounterIfNeeded } = require('../utils/customerCode');
 
 const excelUpload = multer({
     storage: multer.memoryStorage(),
@@ -70,47 +71,6 @@ function parseActiveStatus(value) {
     return null;
 }
 
-// Helper: generate next customer code
-async function generateCustomerCode(client) {
-    const prefixRes = await client.query(`SELECT value FROM app_settings WHERE key = 'customer_code_prefix'`);
-    const digitsRes = await client.query(`SELECT value FROM app_settings WHERE key = 'customer_code_digits'`);
-    const nextRes = await client.query(`SELECT value FROM app_settings WHERE key = 'customer_code_next'`);
-
-    const prefix = prefixRes.rows[0]?.value || 'CUST';
-    const digits = parseInt(digitsRes.rows[0]?.value || '4');
-    const next = parseInt(nextRes.rows[0]?.value || '1');
-
-    const code = prefix + String(next).padStart(digits, '0');
-
-    // Increment counter
-    await client.query(
-        `UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'customer_code_next'`,
-        [String(next + 1)]
-    );
-
-    return code;
-}
-
-async function advanceCounterIfNeeded(client, code) {
-    if (!code) return;
-    const prefixRes = await client.query(`SELECT value FROM app_settings WHERE key = 'customer_code_prefix'`);
-    const nextRes = await client.query(`SELECT value FROM app_settings WHERE key = 'customer_code_next'`);
-    const prefix = prefixRes.rows[0]?.value || 'CUST';
-    if (!code.toUpperCase().startsWith(String(prefix).toUpperCase())) return;
-
-    const numPart = code.slice(prefix.length);
-    if (!/^\d+$/.test(numPart)) return;
-
-    const n = parseInt(numPart, 10);
-    const next = parseInt(nextRes.rows[0]?.value || '1', 10);
-    if (n >= next) {
-        await client.query(
-            `UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'customer_code_next'`,
-            [String(n + 1)]
-        );
-    }
-}
-
 // GET /search — Search customers (for driver autocomplete)
 router.get('/search', authenticateToken, async (req, res) => {
     try {
@@ -124,6 +84,52 @@ router.get('/search', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('Search customers error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// GET /directory — Paginated active customers (driver/collector picker)
+router.get('/directory', authenticateToken, async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(50, Math.max(5, parseInt(req.query.limit, 10) || 10));
+        const q = String(req.query.q || '').trim();
+
+        const params = [];
+        let where = 'WHERE is_active = true';
+        if (q) {
+            params.push(`%${q}%`);
+            where += ` AND (name ILIKE $1 OR customer_code ILIKE $1 OR COALESCE(address, '') ILIKE $1 OR COALESCE(phone, '') ILIKE $1)`;
+        }
+
+        const countResult = await pool.query(
+            `SELECT COUNT(*)::int AS total FROM customers ${where}`,
+            params
+        );
+        const total = countResult.rows[0].total;
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        const safePage = Math.min(page, totalPages);
+
+        const dataParams = [...params, limit, (safePage - 1) * limit];
+        const limitIdx = params.length + 1;
+        const offsetIdx = params.length + 2;
+        const dataResult = await pool.query(
+            `SELECT id, customer_code, name, address, phone
+             FROM customers ${where}
+             ORDER BY name ASC
+             LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+            dataParams
+        );
+
+        res.json({
+            data: dataResult.rows,
+            page: safePage,
+            limit,
+            total,
+            totalPages
+        });
+    } catch (error) {
+        console.error('Customer directory error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });

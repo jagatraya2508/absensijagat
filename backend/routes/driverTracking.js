@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { generateCustomerCode } = require('../utils/customerCode');
 
 // Configure multer for photo uploads
 const storage = multer.diskStorage({
@@ -128,33 +129,40 @@ router.post('/checkin', authenticateToken, isTrackingUser, upload.single('photo'
         }
 
         const photoPath = req.file ? `/uploads/tracking/${req.file.filename}` : null;
+        const customerName = String(customer_name).trim();
 
-        // Auto-save customer to master table (with auto-code for new ones)
+        // Auto-save customer to master table (with unique auto-code for new ones)
         try {
-            const existingCust = await pool.query(`SELECT id FROM customers WHERE LOWER(name) = LOWER($1)`, [customer_name]);
+            const existingCust = await pool.query(
+                `SELECT id FROM customers WHERE LOWER(name) = LOWER($1)`,
+                [customerName]
+            );
             if (existingCust.rows.length === 0) {
-                // Generate auto-code
-                let code = null;
+                const client = await pool.connect();
                 try {
-                    const prefixRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'customer_code_prefix'`);
-                    const digitsRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'customer_code_digits'`);
-                    const nextRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'customer_code_next'`);
-                    const prefix = prefixRes.rows[0]?.value || 'CUST';
-                    const digits = parseInt(digitsRes.rows[0]?.value || '4');
-                    const next = parseInt(nextRes.rows[0]?.value || '1');
-                    code = prefix + String(next).padStart(digits, '0');
-                    await pool.query(`UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'customer_code_next'`, [String(next + 1)]);
-                } catch (codeErr) {
-                    console.warn('Could not generate customer code:', codeErr.message);
+                    await client.query('BEGIN');
+                    const code = await generateCustomerCode(client);
+                    await client.query(
+                        `INSERT INTO customers (customer_code, name, address)
+                         VALUES ($1, $2, $3)
+                         ON CONFLICT (name) DO UPDATE SET
+                            address = COALESCE(EXCLUDED.address, customers.address),
+                            updated_at = NOW()`,
+                        [code, customerName, address || null]
+                    );
+                    await client.query('COMMIT');
+                } catch (saveErr) {
+                    await client.query('ROLLBACK');
+                    throw saveErr;
+                } finally {
+                    client.release();
                 }
+            } else if (address) {
                 await pool.query(
-                    `INSERT INTO customers (customer_code, name, address) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET address = COALESCE(EXCLUDED.address, customers.address), updated_at = NOW()`,
-                    [code, customer_name, address || null]
+                    `UPDATE customers SET address = COALESCE($1, address), updated_at = NOW()
+                     WHERE LOWER(name) = LOWER($2)`,
+                    [address, customerName]
                 );
-            } else {
-                if (address) {
-                    await pool.query(`UPDATE customers SET address = COALESCE($1, address), updated_at = NOW() WHERE LOWER(name) = LOWER($2)`, [address, customer_name]);
-                }
             }
         } catch (custErr) {
             console.warn('Auto-save customer warning (non-fatal):', custErr.message);
@@ -165,7 +173,7 @@ router.post('/checkin', authenticateToken, isTrackingUser, upload.single('photo'
              (user_id, tracking_date, customer_name, address, checkin_time, checkin_latitude, checkin_longitude, checkin_photo_path, notes, status, tracking_type, amount_billed, invoice_number)
              VALUES ($1, CURRENT_DATE, $2, $3, NOW(), $4, $5, $6, $7, 'checked_in', $8, $9, $10)
              RETURNING *`,
-            [req.user.id, customer_name, address || null, latitude, longitude, photoPath, notes || null, tracking_type, amount_billed || null, invoice_number || null]
+            [req.user.id, customerName, address || null, latitude, longitude, photoPath, notes || null, tracking_type, amount_billed || null, invoice_number || null]
         );
 
         res.status(201).json({

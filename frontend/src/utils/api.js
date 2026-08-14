@@ -761,6 +761,14 @@ export const driverTrackingAPI = {
 // Customers API
 export const customersAPI = {
     search: (q = '') => request(`/customers/search?q=${encodeURIComponent(q)}`),
+    getDirectory: (params = {}) => {
+        const query = new URLSearchParams({
+            page: params.page || 1,
+            limit: params.limit || 10,
+            q: params.q || '',
+        }).toString();
+        return request(`/customers/directory?${query}`);
+    },
     getAll: () => request('/customers'),
     getCodeSettings: () => request('/customers/code-settings'),
     updateCodeSettings: (data) => request('/customers/code-settings', {
