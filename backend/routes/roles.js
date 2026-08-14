@@ -586,9 +586,9 @@ router.delete('/:id', async (req, res) => {
 
         const role = roleResult.rows[0];
 
-        if (role.is_system) {
+        if (role.name === 'admin') {
             await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Role sistem tidak dapat dihapus' });
+            return res.status(403).json({ error: 'Role admin tidak dapat dihapus' });
         }
 
         const usersResult = await client.query('SELECT id FROM users WHERE role = $1 LIMIT 1', [role.name]);

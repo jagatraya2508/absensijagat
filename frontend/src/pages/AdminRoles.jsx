@@ -267,7 +267,7 @@ export default function AdminRoles() {
                                             >
                                                 ✏️ Edit
                                             </button>
-                                            {!role.is_system && (
+                                            {role.name !== 'admin' && (
                                                 <button
                                                     className="btn btn-outline"
                                                     style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', color: 'var(--danger-500)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
