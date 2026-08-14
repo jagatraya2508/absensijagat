@@ -48,6 +48,12 @@ export default function AdminEmployees() {
     const [uploadingDoc, setUploadingDoc] = useState(false);
     const [docType, setDocType] = useState('KTP');
     const [docNotes, setDocNotes] = useState('');
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState(null);
+    const [importError, setImportError] = useState('');
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false);
     const [formData, setFormData] = useState({
         nik: '', no_kk: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
@@ -299,6 +305,51 @@ export default function AdminEmployees() {
         XLSX.writeFile(wb, `Data_Karyawan_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
+    function openImportModal() {
+        setImportFile(null);
+        setImportResult(null);
+        setImportError('');
+        setShowImportModal(true);
+    }
+
+    async function handleDownloadTemplate() {
+        setDownloadingTemplate(true);
+        try {
+            await employeesAPI.downloadTemplate();
+        } catch (err) {
+            alert(err.message || 'Gagal mengunduh template');
+        } finally {
+            setDownloadingTemplate(false);
+        }
+    }
+
+    async function handleImportEmployees() {
+        if (!importFile) {
+            setImportError('Pilih file Excel terlebih dahulu');
+            return;
+        }
+
+        setImporting(true);
+        setImportError('');
+        setImportResult(null);
+
+        try {
+            const upload = new FormData();
+            upload.append('file', importFile);
+            const result = await employeesAPI.import(upload);
+            setImportResult(result);
+            const saved = (result.imported || 0) + (result.updated || 0);
+            if (saved > 0) {
+                setSuccess(`${result.imported || 0} karyawan ditambahkan, ${result.updated || 0} karyawan diperbarui`);
+                fetchEmployees();
+            }
+        } catch (err) {
+            setImportError(err.message || 'Gagal mengimpor data karyawan');
+        } finally {
+            setImporting(false);
+        }
+    }
+
     // Export to PDF
     function handleExportPDF() {
         const doc = new jsPDF('landscape', 'mm', 'a4');
@@ -448,6 +499,36 @@ export default function AdminEmployees() {
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
                                 className="btn"
+                                onClick={handleDownloadTemplate}
+                                disabled={downloadingTemplate}
+                                title="Unduh template Excel untuk import karyawan"
+                                style={{
+                                    padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)', color: '#fff',
+                                    border: 'none', borderRadius: 'var(--radius-md)',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    cursor: downloadingTemplate ? 'wait' : 'pointer',
+                                    opacity: downloadingTemplate ? 0.7 : 1
+                                }}
+                            >
+                                {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                            </button>
+                            <button
+                                className="btn"
+                                onClick={openImportModal}
+                                title="Upload data karyawan dari Excel"
+                                style={{
+                                    padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', color: '#fff',
+                                    border: 'none', borderRadius: 'var(--radius-md)',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                📤 Upload Excel
+                            </button>
+                            <button
+                                className="btn"
                                 onClick={handlePrint}
                                 title="Print Data Karyawan"
                                 style={{
@@ -554,6 +635,118 @@ export default function AdminEmployees() {
             </div>
 
             {/* Detail Modal */}
+            {showImportModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '680px' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Upload Data Karyawan dari Excel</h2>
+                            <button className="modal-close" onClick={() => setShowImportModal(false)}>&times;</button>
+                        </div>
+                        <div style={{ padding: '1.5rem' }}>
+                            {importError && (
+                                <div className="alert alert-danger mb-3">
+                                    ⚠️ {importError}
+                                </div>
+                            )}
+
+                            <div className="alert alert-info mb-3">
+                                ℹ️ Unduh template resmi, isi data, lalu unggah file .xlsx.
+                                Kolom wajib: <strong>Employee ID</strong> dan <strong>Nama</strong>.
+                                Password wajib hanya untuk karyawan baru (minimal 6 karakter).
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">File Excel (.xlsx)</label>
+                                <input
+                                    type="file"
+                                    className="form-input"
+                                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    onChange={(e) => {
+                                        setImportFile(e.target.files?.[0] || null);
+                                        setImportResult(null);
+                                        setImportError('');
+                                    }}
+                                />
+                                {importFile && (
+                                    <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-500)' }}>
+                                        File dipilih: {importFile.name}
+                                    </p>
+                                )}
+                            </div>
+
+                            {importResult && (
+                                <div style={{ marginTop: '0.5rem' }}>
+                                    <div className={`alert mb-3 ${(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'alert-success' : 'alert-warning'}`}>
+                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? '✅' : '⚠️'}{' '}
+                                        Ditambah: <strong>{importResult.imported || 0}</strong>
+                                        {' · '}Diperbarui: <strong>{importResult.updated || 0}</strong>
+                                        {' · '}Gagal: <strong>{importResult.failed || 0}</strong>
+                                    </div>
+
+                                    {importResult.results?.length > 0 && (
+                                        <div className="table-container" style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                            <table className="table" style={{ fontSize: '0.8rem' }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Baris</th>
+                                                        <th>ID</th>
+                                                        <th>Status</th>
+                                                        <th>Keterangan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {importResult.results.map((item) => (
+                                                        <tr key={`${item.row}-${item.name}`}>
+                                                            <td>{item.row}</td>
+                                                            <td>{item.name}</td>
+                                                            <td>
+                                                                <span style={{
+                                                                    fontWeight: 600,
+                                                                    color: item.status === 'success'
+                                                                        ? 'var(--success-500, #10b981)'
+                                                                        : 'var(--danger-500)'
+                                                                }}>
+                                                                    {item.status === 'success' ? 'Berhasil' : 'Gagal'}
+                                                                </span>
+                                                            </td>
+                                                            <td>{item.message}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={handleDownloadTemplate}
+                                    disabled={downloadingTemplate}
+                                >
+                                    {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                </button>
+                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>
+                                        Tutup
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={handleImportEmployees}
+                                        disabled={importing || !importFile}
+                                    >
+                                        {importing ? 'Mengimpor...' : 'Unggah & Import'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showModal && selectedEmployee && (
                 <div className="modal-overlay">
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>

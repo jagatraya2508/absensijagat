@@ -532,6 +532,34 @@ export const employeesAPI = {
     deleteDocument: (id, docId) => request(`/employees/${id}/documents/${docId}`, {
         method: 'DELETE',
     }),
+
+    downloadTemplate: () => {
+        const token = getToken();
+        return fetch(`${API_BASE}/employees/template`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(async (res) => {
+            if (!res.ok) {
+                let message = 'Gagal mengunduh template';
+                try {
+                    const data = await res.json();
+                    message = data.error || message;
+                } catch (_) { /* ignore */ }
+                throw new Error(message);
+            }
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template-import-karyawan.xlsx';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    },
+
+    import: (formData) =>
+        request('/employees/import', {
+            method: 'POST',
+            body: formData,
+        }),
 };
 
 export const organizationAPI = {
@@ -627,6 +655,34 @@ export const positionsAPI = {
         body: JSON.stringify(data),
     }),
     delete: (id) => request(`/positions/${id}`, { method: 'DELETE' }),
+
+    downloadTemplate: () => {
+        const token = getToken();
+        return fetch(`${API_BASE}/positions/template`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(async (res) => {
+            if (!res.ok) {
+                let message = 'Gagal mengunduh template';
+                try {
+                    const data = await res.json();
+                    message = data.error || message;
+                } catch (_) { /* ignore */ }
+                throw new Error(message);
+            }
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template-import-jabatan.xlsx';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    },
+
+    import: (formData) =>
+        request('/positions/import', {
+            method: 'POST',
+            body: formData,
+        }),
 };
 
 // Driver Activities API
