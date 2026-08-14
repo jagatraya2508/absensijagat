@@ -373,13 +373,15 @@ export const leavesAPI = {
         return request(`/leaves/all?${params}`);
     },
 
-    // Get pending count (admin)
+    // Get pending count (admin / approver)
     getPendingCount: () => request('/leaves/pending-count'),
 
-    // Approve/reject leave request (admin)
-    updateStatus: (id, status, adminNotes) => request(`/leaves/${id}/status`, {
+    getPendingForMe: () => request('/leaves/pending-for-me'),
+
+    // Approve/reject leave request
+    updateStatus: (id, status, adminNotes, extra = {}) => request(`/leaves/${id}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status, admin_notes: adminNotes }),
+        body: JSON.stringify({ status, admin_notes: adminNotes, ...extra }),
     }),
 
     // Get my leave quota info
@@ -529,6 +531,15 @@ export const employeesAPI = {
     }),
     deleteDocument: (id, docId) => request(`/employees/${id}/documents/${docId}`, {
         method: 'DELETE',
+    }),
+};
+
+export const organizationAPI = {
+    getTree: () => request('/organization'),
+    getMembers: () => request('/organization/members'),
+    setSupervisor: (userId, supervisorId) => request(`/organization/${userId}/supervisor`, {
+        method: 'PUT',
+        body: JSON.stringify({ supervisor_id: supervisorId || null }),
     }),
 };
 
@@ -863,6 +874,7 @@ export default {
     scheduleAPI,
     offDaysAPI,
     employeesAPI,
+    organizationAPI,
     overtimeAPI,
     loansAPI,
     payrollAPI,

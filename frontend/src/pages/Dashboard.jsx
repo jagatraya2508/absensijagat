@@ -269,7 +269,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ===== MENU MANAGER ===== */}
-                {(hasPermission('manager.approvals') || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports')) && (
+                {(hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title">✅ Task Pimpinan</span>
@@ -280,6 +280,12 @@ export default function Dashboard() {
                                 <Link to="/approvals" className="menu-item">
                                     <div className="menu-icon bg-emerald-100 text-emerald-600">✅</div>
                                     <span className="menu-label">Persetujuan Lembur</span>
+                                </Link>
+                            )}
+                            {(hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves')) && (
+                                <Link to="/leave-approvals" className="menu-item">
+                                    <div className="menu-icon bg-lime-100 text-lime-600">✅</div>
+                                    <span className="menu-label">Persetujuan Izin</span>
                                 </Link>
                             )}
                             {hasPermission('admin.leaves') && (
@@ -353,7 +359,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ===== MENU ADMIN - MASTER DATA ===== */}
-                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
+                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.organization') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title">📦 Master Data</span>
@@ -388,6 +394,12 @@ export default function Dashboard() {
                                 <Link to="/admin/employees" className="menu-item">
                                     <div className="menu-icon bg-purple-100 text-purple-600">👤</div>
                                     <span className="menu-label">Data Karyawan</span>
+                                </Link>
+                            )}
+                            {(hasPermission('admin.employees') || hasPermission('admin.organization')) && (
+                                <Link to="/admin/organization" className="menu-item">
+                                    <div className="menu-icon bg-slate-100 text-slate-600">🗂️</div>
+                                    <span className="menu-label">Struktur Organisasi</span>
                                 </Link>
                             )}
                             {hasPermission('admin.face_registration') && (

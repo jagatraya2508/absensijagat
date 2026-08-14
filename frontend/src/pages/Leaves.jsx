@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { leavesAPI } from '../utils/api';
+import ApprovalTimeline from '../components/ApprovalTimeline';
 
 export default function Leaves() {
     const [requests, setRequests] = useState([]);
@@ -357,12 +358,15 @@ export default function Leaves() {
                                     </div>
                                     <span className={`badge badge-${statusLabels[req.status].color}`}>
                                         {statusLabels[req.status].icon} {statusLabels[req.status].label}
+                                        {req.status === 'pending' && req.total_steps > 1 ? ` (${req.current_step || 1}/${req.total_steps})` : ''}
                                     </span>
                                 </div>
 
                                 <p style={{ margin: '0.75rem 0', color: 'var(--gray-300)', fontSize: '0.9rem' }}>
                                     {req.reason}
                                 </p>
+
+                                <ApprovalTimeline steps={req.approval_steps} currentStep={req.current_step} status={req.status} />
 
                                 {req.admin_notes && (
                                     <p style={{

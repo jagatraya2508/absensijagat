@@ -50,6 +50,7 @@ router.get('/permissions', (req, res) => {
         { key: 'admin.driver_activities', label: 'Aktivitas Driver', category: 'Admin' },
         { key: 'admin.driver_tracking', label: 'Tracking Kunjungan', category: 'Admin' },
         { key: 'admin.leaves', label: 'Kelola Izin', category: 'Admin' },
+        { key: 'manager.leave_approvals', label: 'Persetujuan Izin (Atasan)', category: 'Managerial' },
         { key: 'admin.manual_attendance', label: 'Persetujuan Absen', category: 'Admin' },
         { key: 'admin.loans', label: 'Pinjaman', category: 'HR & Keuangan' },
         { key: 'admin.payroll', label: 'Payroll', category: 'HR & Keuangan' },
@@ -63,7 +64,8 @@ router.get('/permissions', (req, res) => {
         { key: 'admin.license', label: 'License', category: 'Sistem' },
         { key: 'admin.kiosk', label: 'Mode Kiosk', category: 'Sistem' },
         
-        { key: 'manager.approvals', label: 'Persetujuan Lembur (Manager)', category: 'Managerial' }
+        { key: 'manager.approvals', label: 'Persetujuan Lembur (Manager)', category: 'Managerial' },
+        { key: 'admin.organization', label: 'Struktur Organisasi', category: 'Master' }
     ];
 
     res.json(availablePermissions);

@@ -41,13 +41,15 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/positions', icon: '🏅', label: 'Master Jabatan', permissionKey: 'admin.positions' },
         { path: '/admin/vehicle-types', icon: '🚚', label: 'Master Kendaraan', permissionKey: 'admin.vehicle_types' },
         { path: '/admin/employees', icon: '👤', label: 'Data Karyawan', permissionKey: 'admin.employees' },
+        { path: '/admin/organization', icon: '🗂️', label: 'Struktur Organisasi', permissionKey: 'admin.organization', extraKeys: ['admin.employees'] },
         { path: '/admin/face-registration', icon: '🔐', label: 'Registrasi Wajah', permissionKey: 'admin.face_registration' },
         { path: '/admin/work-schedule', icon: '🕐', label: 'Jadwal Kerja', permissionKey: 'admin.work_schedule' },
         { path: '/admin/customers', icon: '🏪', label: 'Master Customer', permissionKey: 'admin.customers' },
-    ].filter(item => hasPermission(item.permissionKey));
+    ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)));
 
     const pimpinanItems = [
         { path: '/approvals', icon: '✅', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals' },
+        { path: '/leave-approvals', icon: '📝', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
         { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
         { path: '/admin/manual-attendance', icon: '📋', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
         { path: '/off-days', icon: '📅', label: 'Atur Libur', permissionKey: 'admin.off_days' },
@@ -60,7 +62,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/recruitment', icon: '🧑‍💼', label: 'Recruitment', permissionKey: 'admin.recruitment' },
         { path: '/admin/daily-work-report', icon: '📊', label: 'Review Laporan Harian', permissionKey: 'admin.daily_work_report' },
         { path: '/admin/reports', icon: '📊', label: 'Laporan', permissionKey: 'admin.reports' },
-    ].filter(item => hasPermission(item.permissionKey));
+    ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor));
 
     // Other admin items (flat)
     const adminItems = [
@@ -181,7 +183,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                         flexDirection: 'column',
                                         flexShrink: 0,
                                         overflow: 'hidden',
-                                        maxHeight: openMenus.master ? '600px' : '0px',
+                                        maxHeight: openMenus.master ? '700px' : '0px',
                                         transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                                         opacity: openMenus.master ? 1 : 0,
                                         paddingLeft: '0.75rem',

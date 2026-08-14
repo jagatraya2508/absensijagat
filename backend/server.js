@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('./db');
+const { ensureOrgApprovalSchema } = require('./utils/leaveApproval');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -64,6 +65,7 @@ app.use('/api/manual-attendances', require('./routes/manual_attendances'));
 app.use('/api/roles', require('./routes/roles'));
 app.use('/api/daily-work-reports', require('./routes/dailyWorkReports'));
 app.use('/api/backup', require('./routes/backup'));
+app.use('/api/organization', require('./routes/organization'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -76,6 +78,7 @@ async function initDatabase() {
         const schemaPath = path.join(__dirname, 'db/schema.sql');
         const schema = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schema);
+        await ensureOrgApprovalSchema(pool);
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Error initializing database:', error);

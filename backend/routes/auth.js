@@ -179,6 +179,15 @@ router.post('/login', async (req, res) => {
             { expiresIn: '24h' }
         );
 
+        let isSupervisor = false;
+        try {
+            const sup = await pool.query(
+                'SELECT EXISTS(SELECT 1 FROM employee_details WHERE supervisor_id = $1) as is_supervisor',
+                [user.id]
+            );
+            isSupervisor = sup.rows[0].is_supervisor === true || sup.rows[0].is_supervisor === 't';
+        } catch (_) { /* column may not exist yet */ }
+
         res.json({
             token,
             user: {
@@ -191,7 +200,8 @@ router.post('/login', async (req, res) => {
                 photo: user.photo,
                 is_driver: user.is_driver,
                 is_collector: user.is_collector,
-                use_tracking: user.use_tracking
+                use_tracking: user.use_tracking,
+                is_supervisor: isSupervisor
             }
         });
     } catch (error) {
@@ -329,7 +339,15 @@ router.get('/me', authenticateToken, async (req, res) => {
             permissions = permsResult.rows.map(p => p.permission_key);
         }
 
-        user.permissions = permissions; // Will be empty for admin (they have all), or populated for custom roles
+        user.permissions = permissions;
+        user.is_supervisor = false;
+        try {
+            const sup = await pool.query(
+                'SELECT EXISTS(SELECT 1 FROM employee_details WHERE supervisor_id = $1) as is_supervisor',
+                [user.id]
+            );
+            user.is_supervisor = sup.rows[0].is_supervisor === true || sup.rows[0].is_supervisor === 't';
+        } catch (_) { /* column may not exist yet */ }
 
         res.json(user);
     } catch (error) {

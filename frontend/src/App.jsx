@@ -42,8 +42,10 @@ import AdminCustomers from './pages/AdminCustomers';
 import Kiosk from './pages/Kiosk';
 import DailyWorkReport from './pages/DailyWorkReport';
 import AdminDailyWorkReport from './pages/AdminDailyWorkReport';
+import AdminOrganization from './pages/AdminOrganization';
+import LeaveApprovals from './pages/LeaveApprovals';
 
-function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, permission = null }) {
+function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, permission = null, anyPermission = null, allowSupervisor = false }) {
     const { user, loading, hasPermission } = useAuth();
 
     if (loading) {
@@ -66,7 +68,13 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
         return <Navigate to="/" replace />;
     }
 
-    if (permission && !hasPermission(permission)) {
+    const gated = !!(permission || anyPermission || allowSupervisor);
+    const hasAccess =
+        (permission && hasPermission(permission)) ||
+        (anyPermission && anyPermission.some((p) => hasPermission(p))) ||
+        (allowSupervisor && !!user.is_supervisor);
+
+    if (gated && !hasAccess) {
         return <Navigate to="/" replace />;
     }
 
@@ -336,6 +344,17 @@ function AppRoutes() {
             />
 
             <Route
+                path="/leave-approvals"
+                element={
+                    <ProtectedRoute allowSupervisor anyPermission={['admin.leaves', 'manager.leave_approvals']}>
+                        <AppLayout>
+                            <LeaveApprovals />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
                 path="/admin/manual-attendance"
                 element={
                     <ProtectedRoute permission="admin.manual_attendance">
@@ -396,6 +415,17 @@ function AppRoutes() {
                     <ProtectedRoute permission="admin.employees">
                         <AppLayout>
                             <AdminEmployees />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/organization"
+                element={
+                    <ProtectedRoute anyPermission={['admin.employees', 'admin.organization']}>
+                        <AppLayout>
+                            <AdminOrganization />
                         </AppLayout>
                     </ProtectedRoute>
                 }

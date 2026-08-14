@@ -686,6 +686,115 @@ CREATE TABLE IF NOT EXISTS employee_documents (
 );
 CREATE INDEX IF NOT EXISTS idx_employee_documents_user_id ON employee_documents(user_id);
 
+-- Pengaturan cuti
+CREATE TABLE IF NOT EXISTS leave_settings (
+    id SERIAL PRIMARY KEY,
+    annual_leave_quota INTEGER DEFAULT 12,
+    late_deducts_leave BOOLEAN DEFAULT FALSE,
+    sick_deducts_leave BOOLEAN DEFAULT FALSE,
+    permission_deducts_leave BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS big_leave_rules (
+    id SERIAL PRIMARY KEY,
+    min_years INTEGER NOT NULL,
+    leave_days INTEGER NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(min_years)
+);
+
+-- Konfigurasi tingkat approval per jenis izin/cuti (1 = sekali approve, 2+ = bertingkat)
+CREATE TABLE IF NOT EXISTS leave_approval_config (
+    id SERIAL PRIMARY KEY,
+    leave_type VARCHAR(20) NOT NULL UNIQUE,
+    approval_levels INTEGER NOT NULL DEFAULT 1 CHECK (approval_levels >= 1 AND approval_levels <= 5),
+    fallback_to_admin BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO leave_approval_config (leave_type, approval_levels, fallback_to_admin)
+VALUES
+    ('late', 1, TRUE),
+    ('sick', 1, TRUE),
+    ('permission', 1, TRUE),
+    ('leave', 1, TRUE),
+    ('change_off', 1, TRUE)
+ON CONFLICT (leave_type) DO NOTHING;
+
+-- Langkah approval tiap pengajuan (mengikuti rantai atasan di struktur organisasi)
+CREATE TABLE IF NOT EXISTS leave_approval_steps (
+    id SERIAL PRIMARY KEY,
+    leave_request_id INTEGER REFERENCES leave_requests(id) ON DELETE CASCADE,
+    step_order INTEGER NOT NULL,
+    approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    approver_label VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'pending', 'approved', 'rejected', 'skipped')),
+    notes TEXT,
+    acted_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(leave_request_id, step_order)
+);
+
+CREATE INDEX IF NOT EXISTS idx_leave_steps_request ON leave_approval_steps(leave_request_id);
+CREATE INDEX IF NOT EXISTS idx_leave_steps_approver ON leave_approval_steps(approver_id);
+CREATE INDEX IF NOT EXISTS idx_leave_steps_status ON leave_approval_steps(status);
+
+-- Aktivitas driver
+CREATE TABLE IF NOT EXISTS driver_activities (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    activity_date DATE NOT NULL,
+    is_subuh BOOLEAN DEFAULT FALSE,
+    departure_time TIME,
+    rit_count INTEGER DEFAULT 1,
+    rit_notes TEXT,
+    is_overnight BOOLEAN DEFAULT FALSE,
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, activity_date)
+);
+
+-- Tracking kunjungan driver / collector
+CREATE TABLE IF NOT EXISTS driver_tracking (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    tracking_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    customer_name VARCHAR(200) NOT NULL,
+    address TEXT,
+    checkin_time TIMESTAMP,
+    checkin_latitude DECIMAL(10, 8),
+    checkin_longitude DECIMAL(11, 8),
+    checkout_time TIMESTAMP,
+    checkout_latitude DECIMAL(10, 8),
+    checkout_longitude DECIMAL(11, 8),
+    notes TEXT,
+    status VARCHAR(20) DEFAULT 'checked_in',
+    tracking_type VARCHAR(20) DEFAULT 'delivery',
+    amount_billed DECIMAL(15, 2),
+    amount_collected DECIMAL(15, 2),
+    payment_method VARCHAR(30),
+    invoice_number VARCHAR(100),
+    collection_status VARCHAR(20),
+    checkin_photo_path VARCHAR(255),
+    checkout_photo_path VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_driver_tracking_user ON driver_tracking(user_id);
+CREATE INDEX IF NOT EXISTS idx_driver_tracking_date ON driver_tracking(tracking_date);
+
+-- Pengaturan kode customer
+CREATE TABLE IF NOT EXISTS app_settings (
+    key VARCHAR(100) PRIMARY KEY,
+    value TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================
 -- AUTO-PATCH MISSING COLUMNS (FOR EXISTING DBs)
 -- ============================================
@@ -695,6 +804,20 @@ ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS no_kk VARCHAR(20);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_driver BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_tracking BOOLEAN DEFAULT FALSE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS supervisor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS current_step INTEGER DEFAULT 1;
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS total_steps INTEGER DEFAULT 1;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_code VARCHAR(50);
+ALTER TABLE manual_attendances ADD COLUMN IF NOT EXISTS attachment_path VARCHAR(255);
+ALTER TABLE leave_requests DROP CONSTRAINT IF EXISTS leave_requests_type_check;
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS tracking_type VARCHAR(20) DEFAULT 'delivery';
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS amount_billed DECIMAL(15, 2);
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS amount_collected DECIMAL(15, 2);
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30);
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(100);
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS collection_status VARCHAR(20);
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkin_photo_path VARCHAR(255);
+ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkout_photo_path VARCHAR(255);
 
 -- Fix admin password if old dummy hash exists
 UPDATE users SET password = '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O' WHERE employee_id = 'ADMIN001' AND password LIKE '$2b$10$rQZ5%';

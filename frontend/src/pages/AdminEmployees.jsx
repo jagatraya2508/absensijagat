@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI } from '../utils/api';
+import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI } from '../utils/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -33,6 +33,7 @@ export default function AdminEmployees() {
     const [masterPositions, setMasterPositions] = useState([]);
     const [masterLocations, setMasterLocations] = useState([]);
     const [masterVehicleTypes, setMasterVehicleTypes] = useState([]);
+    const [orgMembers, setOrgMembers] = useState([]);
     const [bpjsDefaults, setBpjsDefaults] = useState({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -50,7 +51,7 @@ export default function AdminEmployees() {
     const [formData, setFormData] = useState({
         nik: '', no_kk: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
-        department: '', position: '', join_date: '',
+        department: '', position: '', join_date: '', supervisor_id: '',
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
@@ -80,6 +81,12 @@ export default function AdminEmployees() {
             setMasterPositions(pos);
             setMasterLocations(loc.filter(l => l.is_active));
             setMasterVehicleTypes(vts);
+            try {
+                const members = await organizationAPI.getMembers();
+                setOrgMembers(members);
+            } catch (e) {
+                setOrgMembers([]);
+            }
         } catch (err) {
             console.error('Failed to fetch masters:', err);
         }
@@ -116,6 +123,7 @@ export default function AdminEmployees() {
                 gender: d.gender || '', marital_status: d.marital_status || 'Belum Menikah',
                 religion: d.religion || '', education: d.education || '',
                 department: d.department || '', position: d.position || '',
+                supervisor_id: d.supervisor_id || '',
                 join_date: d.join_date ? d.join_date.split('T')[0] : '',
                 bank_name: d.bank_name || '', bank_account: d.bank_account || '',
                 bank_holder: d.bank_holder || '',
@@ -178,6 +186,9 @@ export default function AdminEmployees() {
             const payload = { ...formData };
             if (!payload.vehicle_type_id) {
                 payload.vehicle_type_id = null;
+            }
+            if (!payload.supervisor_id) {
+                payload.supervisor_id = null;
             }
             rateFields.forEach(f => {
                 if (payload[f] !== '' && payload[f] != null) {
@@ -685,6 +696,20 @@ export default function AdminEmployees() {
                                         <div className="form-group">
                                             <label className="form-label">Tanggal Masuk</label>
                                             <input className="form-input" type="date" value={formData.join_date} onChange={e => updateField('join_date', e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Atasan Langsung</label>
+                                            <select className="form-input form-select" value={formData.supervisor_id || ''} onChange={e => updateField('supervisor_id', e.target.value ? Number(e.target.value) : '')}>
+                                                <option value="">— Tidak ada atasan —</option>
+                                                {orgMembers.filter(m => m.id !== selectedEmployee?.id).map(m => (
+                                                    <option key={m.id} value={m.id}>
+                                                        {m.name}{m.position ? ` (${m.position})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>
+                                                Dipakai untuk rantai approval izin & cuti. Bisa juga diatur di menu Struktur Organisasi.
+                                            </small>
                                         </div>
                                     </div>
                                 )}

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { wouldCreateCycle, ensureOrgApprovalSchema } = require('../utils/leaveApproval');
 
 // Configure multer for employee document uploads
 const docStorage = multer.diskStorage({
@@ -42,10 +43,12 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
                    ed.bpjs_kes_enrolled, ed.bpjs_jht_enrolled, ed.bpjs_jp_enrolled, ed.bpjs_jkk_enrolled, ed.bpjs_jkm_enrolled, ed.pph21_enabled,
                    ed.bpjs_kes_employee_rate, ed.bpjs_kes_company_rate, ed.bpjs_jht_employee_rate, ed.bpjs_jht_company_rate,
                    ed.bpjs_jp_employee_rate, ed.bpjs_jp_company_rate, ed.bpjs_jkk_rate, ed.bpjs_jkm_rate,
-                   ed.vehicle_type_id, vt.name as vehicle_type_name
+                   ed.vehicle_type_id, vt.name as vehicle_type_name,
+                   ed.supervisor_id, supervisor.name as supervisor_name
             FROM users u
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN vehicle_types vt ON ed.vehicle_type_id = vt.id
+            LEFT JOIN users supervisor ON supervisor.id = ed.supervisor_id
             WHERE u.role = 'employee'
             ORDER BY u.name ASC
         `);
@@ -109,7 +112,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
             no_kk,
-            location_ids, vehicle_type_id
+            location_ids, vehicle_type_id, supervisor_id
         } = req.body;
 
 
@@ -117,6 +120,15 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
         if (userCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+        }
+
+        if (supervisor_id) {
+            const nextSupervisor = parseInt(supervisor_id, 10);
+            if (nextSupervisor && await wouldCreateCycle(pool, id, nextSupervisor)) {
+                return res.status(400).json({
+                    error: 'Tidak bisa menetapkan atasan ini karena akan membuat siklus pelaporan'
+                });
+            }
         }
 
         // Upsert employee details
@@ -224,7 +236,19 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             }
         }
 
-        res.json(result.rows[0]);
+        if (supervisor_id !== undefined) {
+            const nextSupervisor = supervisor_id ? parseInt(supervisor_id, 10) : null;
+            try {
+                await ensureOrgApprovalSchema(pool);
+            } catch (e) { /* schema already applied */ }
+            await pool.query(
+                `UPDATE employee_details SET supervisor_id = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [nextSupervisor, id]
+            );
+        }
+
+        const latest = await pool.query('SELECT * FROM employee_details WHERE user_id = $1', [id]);
+        res.json(latest.rows[0] || result.rows[0]);
     } catch (error) {
         console.error('Update employee error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });

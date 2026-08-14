@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 
 const THEME_PRESETS = [
     { name: 'Merah Marun', icon: '🔴', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
@@ -130,6 +132,8 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
 }
 
 export default function AdminSettings() {
+    const navigate = useNavigate();
+    const { logout } = useAuth();
     const { settings, updateLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
 
     // Company Name state
@@ -153,6 +157,13 @@ export default function AdminSettings() {
         sick_deducts_leave: false,
         permission_deducts_leave: false
     });
+    const [approvalConfig, setApprovalConfig] = useState([
+        { leave_type: 'late', approval_levels: 1, fallback_to_admin: true },
+        { leave_type: 'sick', approval_levels: 1, fallback_to_admin: true },
+        { leave_type: 'permission', approval_levels: 1, fallback_to_admin: true },
+        { leave_type: 'leave', approval_levels: 1, fallback_to_admin: true },
+        { leave_type: 'change_off', approval_levels: 1, fallback_to_admin: true }
+    ]);
     const [bigLeaveRules, setBigLeaveRules] = useState([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [leaveMessage, setLeaveMessage] = useState({ type: '', text: '' });
@@ -226,6 +237,12 @@ export default function AdminSettings() {
                     permission_deducts_leave: data.settings.permission_deducts_leave
                 });
             }
+            if (data.approval_config && data.approval_config.length > 0) {
+                setApprovalConfig((prev) => prev.map((item) => {
+                    const found = data.approval_config.find((c) => c.leave_type === item.leave_type);
+                    return found ? { ...item, ...found } : item;
+                }));
+            }
             if (data.big_leave_rules) {
                 setBigLeaveRules(data.big_leave_rules);
             }
@@ -292,7 +309,8 @@ export default function AdminSettings() {
             const { settingsAPI } = await import('../utils/api');
             await settingsAPI.updateLeave({
                 ...leaveSettings,
-                big_leave_rules: bigLeaveRules
+                big_leave_rules: bigLeaveRules,
+                approval_config: approvalConfig
             });
             setLeaveMessage({ type: 'success', text: 'Pengaturan cuti berhasil disimpan!' });
         } catch (error) {
@@ -371,9 +389,17 @@ export default function AdminSettings() {
             formData.append('backup', restoreFile);
             formData.append('confirm', 'TIMPA');
             const result = await backupAPI.restore(formData);
-            setRestoreMessage({ type: 'success', text: result.message || 'Restore berhasil.' });
+            const extra = result.summary ? ` (${result.summary})` : '';
+            setRestoreMessage({
+                type: 'success',
+                text: `${result.message || 'Restore berhasil.'}${extra} Anda akan diarahkan ke halaman login.`
+            });
             setRestoreFile(null);
             setRestoreConfirm('');
+            setTimeout(() => {
+                logout();
+                navigate('/login');
+            }, 2500);
         } catch (error) {
             setRestoreMessage({ type: 'danger', text: error.message || 'Gagal restore database' });
         } finally {
@@ -1009,7 +1035,8 @@ export default function AdminSettings() {
 
                     <div style={{ padding: '0.5rem 0' }}>
                         <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem' }}>
-                            Unduh salinan database atau restore dari file backup. Restore akan menimpa seluruh data database.
+                            Unduh salinan database dari aplikasi yang datanya ingin disalin, lalu restore di sini.
+                            Restore akan menghapus seluruh data lokal dan menggantinya dengan isi file backup.
                             File upload di folder server (foto absensi, logo, dll.) tidak ikut ter-backup.
                         </p>
 
@@ -1075,7 +1102,7 @@ export default function AdminSettings() {
                                     <input
                                         type="file"
                                         className="form-input"
-                                        accept=".sql,.dump,.backup"
+                                        accept=".sql,.dump,.backup,.json"
                                         disabled={restoreLoading || backupLoading}
                                         onChange={(e) => {
                                             setRestoreFile(e.target.files?.[0] || null);
@@ -1202,6 +1229,69 @@ export default function AdminSettings() {
                                             <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pengajuan izin datang terlambat akan mengurangi cuti</div>
                                         </div>
                                     </label>
+                                </div>
+                            </div>
+
+                            <div style={{
+                                padding: '1.25rem',
+                                background: 'var(--gray-50)',
+                                borderRadius: 'var(--radius-lg)',
+                                border: '1px solid var(--gray-200)',
+                                marginBottom: '2rem'
+                            }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: 'var(--gray-800)' }}>Tingkat Approval Izin & Cuti</h3>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+                                    1 tingkat = cukup atasan langsung. 2+ tingkat = bertingkat mengikuti struktur organisasi (atasan → atasan dari atasan). Jika rantai atasan kurang, dilanjutkan ke Admin/HR.
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {[
+                                        { type: 'late', label: '⏰ Izin Terlambat' },
+                                        { type: 'sick', label: '🏥 Izin Sakit' },
+                                        { type: 'permission', label: '📝 Izin Tidak Masuk' },
+                                        { type: 'leave', label: '🏖️ Cuti' },
+                                        { type: 'change_off', label: '🔄 Tukar Libur' }
+                                    ].map((item) => {
+                                        const cfg = approvalConfig.find((c) => c.leave_type === item.type) || { approval_levels: 1, fallback_to_admin: true };
+                                        return (
+                                            <div key={item.type} style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '1.4fr 160px 1fr',
+                                                gap: '0.75rem',
+                                                alignItems: 'center',
+                                                padding: '0.75rem 1rem',
+                                                background: 'white',
+                                                border: '1px solid var(--gray-200)',
+                                                borderRadius: 'var(--radius-md)'
+                                            }}>
+                                                <div style={{ fontWeight: 600 }}>{item.label}</div>
+                                                <select
+                                                    className="form-input form-select"
+                                                    value={cfg.approval_levels}
+                                                    onChange={(e) => setApprovalConfig((prev) => prev.map((c) =>
+                                                        c.leave_type === item.type
+                                                            ? { ...c, approval_levels: parseInt(e.target.value, 10) }
+                                                            : c
+                                                    ))}
+                                                >
+                                                    <option value={1}>1 tingkat</option>
+                                                    <option value={2}>2 tingkat</option>
+                                                    <option value={3}>3 tingkat</option>
+                                                </select>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--gray-600)', margin: 0 }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={cfg.fallback_to_admin !== false}
+                                                        onChange={(e) => setApprovalConfig((prev) => prev.map((c) =>
+                                                            c.leave_type === item.type
+                                                                ? { ...c, fallback_to_admin: e.target.checked }
+                                                                : c
+                                                        ))}
+                                                    />
+                                                    Lanjut ke Admin/HR jika atasan tidak lengkap
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 

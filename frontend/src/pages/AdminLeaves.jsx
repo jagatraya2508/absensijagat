@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { leavesAPI } from '../utils/api';
+import ApprovalTimeline from '../components/ApprovalTimeline';
 
 export default function AdminLeaves() {
     const [requests, setRequests] = useState([]);
@@ -39,13 +40,16 @@ export default function AdminLeaves() {
         }
     }
 
-    async function handleUpdateStatus(id, status) {
+    async function handleUpdateStatus(id, status, extra = {}) {
         setProcessing(id);
         try {
-            await leavesAPI.updateStatus(id, status, adminNotes);
+            const result = await leavesAPI.updateStatus(id, status, adminNotes, extra);
             setAdminNotes('');
             setSelectedRequest(null);
             fetchRequests();
+            if (result?.message) {
+                alert(result.message);
+            }
         } catch (error) {
             alert(error.message || 'Gagal memproses pengajuan');
         } finally {
@@ -145,6 +149,7 @@ export default function AdminLeaves() {
                                     </div>
                                     <span className={`badge badge-${statusLabels[req.status].color}`}>
                                         {statusLabels[req.status].icon} {statusLabels[req.status].label}
+                                        {req.status === 'pending' && req.total_steps > 1 ? ` (${req.current_step || 1}/${req.total_steps})` : ''}
                                     </span>
                                 </div>
 
@@ -174,6 +179,8 @@ export default function AdminLeaves() {
                                         </a>
                                     </div>
                                 )}
+
+                                <ApprovalTimeline steps={req.approval_steps} currentStep={req.current_step} status={req.status} />
 
                                 {/* Admin Notes (if processed) */}
                                 {req.admin_notes && (
@@ -211,8 +218,18 @@ export default function AdminLeaves() {
                                                         disabled={processing === req.id}
                                                         style={{ padding: '0.5rem 1rem' }}
                                                     >
-                                                        {processing === req.id ? '⏳' : '✅'} Setujui
+                                                        {processing === req.id ? '⏳' : '✅'} Setujui Tingkat Ini
                                                     </button>
+                                                    {req.total_steps > 1 && (req.current_step || 1) < req.total_steps && (
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            onClick={() => handleUpdateStatus(req.id, 'approved', { final: true })}
+                                                            disabled={processing === req.id}
+                                                            style={{ padding: '0.5rem 1rem' }}
+                                                        >
+                                                            ✅ Setujui Final
+                                                        </button>
+                                                    )}
                                                     <button
                                                         className="btn btn-danger"
                                                         onClick={() => handleUpdateStatus(req.id, 'rejected')}

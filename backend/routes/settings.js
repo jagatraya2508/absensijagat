@@ -182,10 +182,20 @@ router.get('/leave', authenticateToken, isAdmin, async (req, res) => {
     try {
         const settingsResult = await pool.query('SELECT * FROM leave_settings LIMIT 1');
         const rulesResult = await pool.query('SELECT * FROM big_leave_rules ORDER BY min_years ASC');
-        
+        let approvalConfig = [];
+        try {
+            const { ensureOrgApprovalSchema } = require('../utils/leaveApproval');
+            await ensureOrgApprovalSchema(pool);
+            const cfgResult = await pool.query('SELECT * FROM leave_approval_config ORDER BY id ASC');
+            approvalConfig = cfgResult.rows;
+        } catch (e) {
+            console.error('Load approval config error:', e.message);
+        }
+
         res.json({
             settings: settingsResult.rows[0] || null,
-            big_leave_rules: rulesResult.rows
+            big_leave_rules: rulesResult.rows,
+            approval_config: approvalConfig
         });
     } catch (error) {
         console.error('Get leave settings error:', error);
@@ -197,7 +207,7 @@ router.get('/leave', authenticateToken, isAdmin, async (req, res) => {
 router.put('/leave', authenticateToken, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
-        const { annual_leave_quota, late_deducts_leave, sick_deducts_leave, permission_deducts_leave, big_leave_rules } = req.body;
+        const { annual_leave_quota, late_deducts_leave, sick_deducts_leave, permission_deducts_leave, big_leave_rules, approval_config } = req.body;
         
         await client.query('BEGIN');
         
@@ -236,12 +246,35 @@ router.put('/leave', authenticateToken, isAdmin, async (req, res) => {
             }
         }
 
+        const savedApproval = [];
+        if (Array.isArray(approval_config)) {
+            const { ensureOrgApprovalSchema } = require('../utils/leaveApproval');
+            await ensureOrgApprovalSchema(pool);
+            for (const cfg of approval_config) {
+                if (!cfg.leave_type) continue;
+                const levels = Math.max(1, Math.min(5, parseInt(cfg.approval_levels, 10) || 1));
+                const fallback = cfg.fallback_to_admin !== false;
+                const r = await client.query(
+                    `INSERT INTO leave_approval_config (leave_type, approval_levels, fallback_to_admin, updated_at)
+                     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                     ON CONFLICT (leave_type) DO UPDATE SET
+                        approval_levels = EXCLUDED.approval_levels,
+                        fallback_to_admin = EXCLUDED.fallback_to_admin,
+                        updated_at = CURRENT_TIMESTAMP
+                     RETURNING *`,
+                    [cfg.leave_type, levels, fallback]
+                );
+                savedApproval.push(r.rows[0]);
+            }
+        }
+
         await client.query('COMMIT');
         
         res.json({
             message: 'Pengaturan cuti berhasil diperbarui',
             settings: settingsResult.rows[0],
-            big_leave_rules: insertedRules
+            big_leave_rules: insertedRules,
+            approval_config: savedApproval
         });
     } catch (error) {
         await client.query('ROLLBACK');
