@@ -814,6 +814,34 @@ export const rolesAPI = {
         body: JSON.stringify(data),
     }),
     delete: (id) => request(`/roles/${id}`, { method: 'DELETE' }),
+
+    downloadTemplate: () => {
+        const token = getToken();
+        return fetch(`${API_BASE}/roles/template`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(async (res) => {
+            if (!res.ok) {
+                let message = 'Gagal mengunduh template';
+                try {
+                    const data = await res.json();
+                    message = data.error || message;
+                } catch (_) { /* ignore */ }
+                throw new Error(message);
+            }
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template-import-role.xlsx';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+    },
+
+    import: (formData) =>
+        request('/roles/import', {
+            method: 'POST',
+            body: formData,
+        }),
 };
 
 // Daily Work Report API
