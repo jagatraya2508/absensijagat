@@ -6,11 +6,31 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy-gudang:
+    name: Deploy Absensi Gudang
     runs-on: [self-hosted, "absensigudang"]
-
     steps:
       - name: Run Deployment Script
         run: |
           cd /srv/docker/absensigudang
           bash ./deploy.sh
+
+  deploy-jagat:
+    name: Deploy Absensi Jagat
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: 203.194.114.152
+          username: wisnu
+          password: ${{ secrets.JAGAT_SSH_PASSWORD }}
+          port: 22
+          script_stop: true
+          command_timeout: 40m
+          script: |
+            set -e
+            cd /home/wisnu/absensijagat
+            git fetch --all
+            git reset --hard origin/main
+            bash ./deploy.sh
