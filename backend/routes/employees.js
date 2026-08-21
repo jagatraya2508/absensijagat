@@ -206,7 +206,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
                    ed.nik, ed.phone, ed.department, ed.position, ed.join_date,
                    ed.basic_salary, ed.salary_type, ed.gender, ed.bpjs_kesehatan_no, ed.npwp,
-                   ed.is_driver, ed.is_collector, ed.use_tracking, ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
+                   ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking, ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
                    ed.bpjs_kes_enrolled, ed.bpjs_jht_enrolled, ed.bpjs_jp_enrolled, ed.bpjs_jkk_enrolled, ed.bpjs_jkm_enrolled, ed.pph21_enabled,
                    ed.bpjs_kes_employee_rate, ed.bpjs_kes_company_rate, ed.bpjs_jht_employee_rate, ed.bpjs_jht_company_rate,
                    ed.bpjs_jp_employee_rate, ed.bpjs_jp_company_rate, ed.bpjs_jkk_rate, ed.bpjs_jkm_rate,
@@ -721,7 +721,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
             basic_salary, salary_type, transport_allowance, meal_allowance, overtime_rate,
             tax_status, emergency_contact_name, emergency_contact_phone,
-            is_driver, is_collector, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
+            is_driver, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
             bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
@@ -729,6 +729,8 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             location_ids, vehicle_type_id, supervisor_id
         } = req.body;
 
+
+        const trackingEnabled = !!(use_tracking || is_driver || is_collector || is_sales);
 
         // Check user exists
         const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
@@ -755,7 +757,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
                 npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
                 basic_salary, salary_type, transport_allowance, meal_allowance, overtime_rate,
                 tax_status, emergency_contact_name, emergency_contact_phone,
-                is_driver, is_collector, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
+                is_driver, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
                 bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
                 bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
                 bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
@@ -765,10 +767,10 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15, $16, $17, $18, $19,
                 $20, $21, $22, $23, $24, $25, $26, $27,
-                $28, $29, $30, $31, $32, $33, $34, $35,
-                $36, $37, $38, $39, $40, $41,
-                $42, $43, $44, $45, $46, $47, $48, $49,
-                $50, $51,
+                $28, $29, $30, $31, $32, $33, $34, $35, $36,
+                $37, $38, $39, $40, $41, $42,
+                $43, $44, $45, $46, $47, $48, $49, $50,
+                $51, $52,
                 CURRENT_TIMESTAMP
             )
             ON CONFLICT (user_id) DO UPDATE SET
@@ -800,6 +802,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
                 emergency_contact_phone = EXCLUDED.emergency_contact_phone,
                 is_driver = EXCLUDED.is_driver,
                 is_collector = EXCLUDED.is_collector,
+                is_sales = EXCLUDED.is_sales,
                 use_tracking = EXCLUDED.use_tracking,
                 driver_subuh_allowance = EXCLUDED.driver_subuh_allowance,
                 driver_rit_allowance = EXCLUDED.driver_rit_allowance,
@@ -832,7 +835,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             npwp || null, bpjs_kesehatan_no || null, bpjs_ketenagakerjaan_no || null,
             basic_salary || 0, salary_type || 'monthly', transport_allowance || 0, meal_allowance || 0, overtime_rate || 50000,
             tax_status || 'TK/0', emergency_contact_name || null, emergency_contact_phone || null,
-            is_driver || false, is_collector || false, use_tracking || false, driver_subuh_allowance || 0, driver_rit_allowance || 0, driver_inap_allowance || 0, driver_ritase_dekat_allowance || 0, driver_ritase_jauh_allowance || 0,
+            is_driver || false, is_collector || false, is_sales || false, trackingEnabled, driver_subuh_allowance || 0, driver_rit_allowance || 0, driver_inap_allowance || 0, driver_ritase_dekat_allowance || 0, driver_ritase_jauh_allowance || 0,
             bpjs_kes_enrolled !== false, bpjs_jht_enrolled !== false, bpjs_jp_enrolled !== false, bpjs_jkk_enrolled !== false, bpjs_jkm_enrolled !== false, pph21_enabled !== false,
             bpjs_kes_employee_rate || null, bpjs_kes_company_rate || null, bpjs_jht_employee_rate || null, bpjs_jht_company_rate || null,
             bpjs_jp_employee_rate || null, bpjs_jp_company_rate || null, bpjs_jkk_rate || null, bpjs_jkm_rate || null,

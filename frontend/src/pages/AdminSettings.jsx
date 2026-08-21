@@ -186,6 +186,14 @@ export default function AdminSettings() {
     const [restoreFile, setRestoreFile] = useState(null);
     const [restoreConfirm, setRestoreConfirm] = useState('');
     const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
+    const [dbInfo, setDbInfo] = useState(null);
+    const [remoteUrl, setRemoteUrl] = useState(() => localStorage.getItem('backup_remote_url') || '');
+    const [remoteEmployeeId, setRemoteEmployeeId] = useState('');
+    const [remotePassword, setRemotePassword] = useState('');
+    const [syncConfirm, setSyncConfirm] = useState('');
+    const [syncLoading, setSyncLoading] = useState('');
+    const [syncMessage, setSyncMessage] = useState({ type: '', text: '' });
+    const [showManualBackup, setShowManualBackup] = useState(false);
 
     // Sync when themeColors change (e.g. after save)
     useEffect(() => {
@@ -207,7 +215,18 @@ export default function AdminSettings() {
     useEffect(() => {
         fetchLeaveSettings();
         fetchSmtpSettings();
+        fetchBackupInfo();
     }, []);
+
+    const fetchBackupInfo = async () => {
+        try {
+            const { backupAPI } = await import('../utils/api');
+            const info = await backupAPI.getInfo();
+            setDbInfo(info);
+        } catch (error) {
+            console.error('Failed to load backup info:', error);
+        }
+    };
 
     const fetchSmtpSettings = async () => {
         try {
@@ -362,6 +381,87 @@ export default function AdminSettings() {
             setBackupMessage({ type: 'danger', text: error.message || 'Gagal membuat backup' });
         } finally {
             setBackupLoading(false);
+        }
+    };
+
+    const busyBackup = backupLoading || restoreLoading || !!syncLoading;
+
+    const handleRemoteUrlChange = (value) => {
+        setRemoteUrl(value);
+        localStorage.setItem('backup_remote_url', value);
+    };
+
+    const validateSyncForm = (direction) => {
+        if (!remoteUrl.trim()) {
+            setSyncMessage({ type: 'danger', text: 'Isi URL server tujuan' });
+            return false;
+        }
+        if (!remoteEmployeeId.trim() || !remotePassword) {
+            setSyncMessage({ type: 'danger', text: 'Isi NIK dan password admin di server tujuan' });
+            return false;
+        }
+        if (syncConfirm.trim().toUpperCase() !== 'TIMPA') {
+            setSyncMessage({ type: 'danger', text: 'Ketik TIMPA untuk konfirmasi' });
+            return false;
+        }
+        const warning = direction === 'pull'
+            ? 'PERINGATAN: Database LOKAL akan ditimpa seluruhnya dengan data dari SERVER.\n\nLanjutkan?'
+            : 'PERINGATAN: Database SERVER akan ditimpa seluruhnya dengan data LOKAL.\n\nLanjutkan?';
+        return window.confirm(warning);
+    };
+
+    const handlePullFromServer = async () => {
+        if (!validateSyncForm('pull')) return;
+        setSyncLoading('pull');
+        setSyncMessage({ type: '', text: '' });
+        try {
+            const { backupAPI } = await import('../utils/api');
+            const result = await backupAPI.pullFromRemote({
+                remote_url: remoteUrl.trim(),
+                employee_id: remoteEmployeeId.trim(),
+                password: remotePassword,
+                confirm: 'TIMPA',
+            });
+            const extra = result.inserted ? ` (${result.inserted} baris)` : '';
+            setSyncMessage({
+                type: 'success',
+                text: `${result.message || 'Restore dari server berhasil.'}${extra} Anda akan diarahkan ke halaman login.`,
+            });
+            setSyncConfirm('');
+            setRemotePassword('');
+            setTimeout(() => {
+                logout();
+                navigate('/login');
+            }, 2500);
+        } catch (error) {
+            setSyncMessage({ type: 'danger', text: error.message || 'Gagal menarik database dari server' });
+        } finally {
+            setSyncLoading('');
+        }
+    };
+
+    const handlePushToServer = async () => {
+        if (!validateSyncForm('push')) return;
+        setSyncLoading('push');
+        setSyncMessage({ type: '', text: '' });
+        try {
+            const { backupAPI } = await import('../utils/api');
+            const result = await backupAPI.pushToRemote({
+                remote_url: remoteUrl.trim(),
+                employee_id: remoteEmployeeId.trim(),
+                password: remotePassword,
+                confirm: 'TIMPA',
+            });
+            setSyncMessage({
+                type: 'success',
+                text: result.message || 'Database lokal berhasil menimpa database server.',
+            });
+            setSyncConfirm('');
+            setRemotePassword('');
+        } catch (error) {
+            setSyncMessage({ type: 'danger', text: error.message || 'Gagal mengirim database ke server' });
+        } finally {
+            setSyncLoading('');
         }
     };
 
@@ -1034,13 +1134,17 @@ export default function AdminSettings() {
                     </div>
 
                     <div style={{ padding: '0.5rem 0' }}>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem' }}>
-                            Unduh salinan database dari aplikasi yang datanya ingin disalin, lalu restore di sini.
-                            Restore akan menghapus seluruh data lokal dan menggantinya dengan isi file backup.
-                            File upload di folder server (foto absensi, logo, dll.) tidak ikut ter-backup.
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '0.75rem' }}>
+                            Tarik data dari server produksi ke lokal, atau kirim data lokal ke server.
+                            Database tujuan akan ditimpa seluruhnya. File upload (foto, logo) tidak ikut tersalin.
                         </p>
+                        {dbInfo && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>
+                                Database saat ini: <strong>{dbInfo.database}</strong> @ {dbInfo.host}
+                                {dbInfo.isLocal ? ' (lokal)' : ' (server)'}
+                            </p>
+                        )}
 
-                        {/* Backup */}
                         <div style={{
                             padding: '1.25rem',
                             border: '1px solid var(--gray-200)',
@@ -1048,103 +1152,229 @@ export default function AdminSettings() {
                             marginBottom: '1.25rem',
                             background: 'var(--gray-50)'
                         }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
-                                Backup Database
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--gray-800)' }}>
+                                Sinkronisasi Server ↔ Lokal
                             </h3>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
-                                Menghasilkan file SQL data lengkap (siap dipakai untuk restore di aplikasi ini).
-                            </p>
-                            {backupMessage.text && (
-                                <div className={`alert alert-${backupMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                    <span className="alert-icon">{backupMessage.type === 'success' ? '✅' : '⚠️'}</span>
-                                    {backupMessage.text}
+                            {syncMessage.text && (
+                                <div className={`alert alert-${syncMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                    <span className="alert-icon">{syncMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                    {syncMessage.text}
                                 </div>
                             )}
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleBackupDownload}
-                                disabled={backupLoading || restoreLoading}
-                            >
-                                {backupLoading ? (
-                                    <>
-                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                        <span>Membuat backup...</span>
-                                    </>
-                                ) : (
-                                    '⬇️ Unduh Backup (.sql)'
-                                )}
-                            </button>
-                        </div>
-
-                        {/* Restore */}
-                        <div style={{
-                            padding: '1.25rem',
-                            border: '1px solid #fecaca',
-                            borderRadius: 'var(--radius-md)',
-                            background: '#fff5f5'
-                        }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: '#991b1b' }}>
-                                Restore Database (Menimpa Data)
-                            </h3>
-                            <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginBottom: '1rem' }}>
-                                Perhatian: semua data saat ini akan diganti dengan isi file backup. Tindakan ini tidak bisa dibatalkan.
-                            </p>
-                            {restoreMessage.text && (
-                                <div className={`alert alert-${restoreMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                    <span className="alert-icon">{restoreMessage.type === 'success' ? '✅' : '⚠️'}</span>
-                                    {restoreMessage.text}
-                                </div>
-                            )}
-                            <form onSubmit={handleRestore}>
-                                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                                    <label className="form-label">File Backup (.sql / .dump)</label>
-                                    <input
-                                        type="file"
-                                        className="form-input"
-                                        accept=".sql,.dump,.backup,.json"
-                                        disabled={restoreLoading || backupLoading}
-                                        onChange={(e) => {
-                                            setRestoreFile(e.target.files?.[0] || null);
-                                            setRestoreMessage({ type: '', text: '' });
-                                        }}
-                                    />
-                                    {restoreFile && (
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.35rem' }}>
-                                            Dipilih: {restoreFile.name} ({Math.round(restoreFile.size / 1024)} KB)
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                                    <label className="form-label">
-                                        Ketik <strong>TIMPA</strong> untuk konfirmasi
-                                    </label>
+                            <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+                                <label className="form-label">URL Server Produksi</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={remoteUrl}
+                                    onChange={(e) => handleRemoteUrlChange(e.target.value)}
+                                    placeholder="https://absensigudang.sahabatjayasukses.com"
+                                    disabled={busyBackup}
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                <div className="form-group" style={{ marginBottom: '0.85rem', flex: '1 1 180px' }}>
+                                    <label className="form-label">NIK Admin Server</label>
                                     <input
                                         type="text"
                                         className="form-input"
-                                        value={restoreConfirm}
-                                        onChange={(e) => setRestoreConfirm(e.target.value)}
-                                        placeholder="TIMPA"
-                                        disabled={restoreLoading || backupLoading}
+                                        value={remoteEmployeeId}
+                                        onChange={(e) => setRemoteEmployeeId(e.target.value)}
+                                        placeholder="NIK admin di server"
+                                        disabled={busyBackup}
                                         autoComplete="off"
                                     />
                                 </div>
+                                <div className="form-group" style={{ marginBottom: '0.85rem', flex: '1 1 180px' }}>
+                                    <label className="form-label">Password Admin Server</label>
+                                    <input
+                                        type="password"
+                                        className="form-input"
+                                        value={remotePassword}
+                                        onChange={(e) => setRemotePassword(e.target.value)}
+                                        placeholder="Password admin di server"
+                                        disabled={busyBackup}
+                                        autoComplete="new-password"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                <label className="form-label">
+                                    Ketik <strong>TIMPA</strong> untuk konfirmasi
+                                </label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={syncConfirm}
+                                    onChange={(e) => setSyncConfirm(e.target.value)}
+                                    placeholder="TIMPA"
+                                    disabled={busyBackup}
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
                                 <button
-                                    type="submit"
-                                    className="btn btn-danger"
-                                    disabled={restoreLoading || backupLoading || !restoreFile || restoreConfirm.trim().toUpperCase() !== 'TIMPA'}
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handlePullFromServer}
+                                    disabled={busyBackup || syncConfirm.trim().toUpperCase() !== 'TIMPA'}
+                                    style={{ flex: '1 1 220px' }}
                                 >
-                                    {restoreLoading ? (
+                                    {syncLoading === 'pull' ? (
                                         <>
                                             <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                            <span>Merestore...</span>
+                                            <span>Menarik dari server...</span>
                                         </>
                                     ) : (
-                                        '⚠️ Restore & Timpa Database'
+                                        '⬇️ Server → Timpa Lokal'
                                     )}
                                 </button>
-                            </form>
+                                <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    onClick={handlePushToServer}
+                                    disabled={busyBackup || syncConfirm.trim().toUpperCase() !== 'TIMPA'}
+                                    style={{ flex: '1 1 220px' }}
+                                >
+                                    {syncLoading === 'push' ? (
+                                        <>
+                                            <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                            <span>Mengirim ke server...</span>
+                                        </>
+                                    ) : (
+                                        '⬆️ Lokal → Timpa Server'
+                                    )}
+                                </button>
+                            </div>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.75rem' }}>
+                                Proses ini bisa memakan waktu beberapa menit. Jangan tutup halaman sampai selesai.
+                            </p>
                         </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowManualBackup((v) => !v)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--gray-500)',
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                marginBottom: showManualBackup ? '1rem' : 0,
+                                padding: 0,
+                            }}
+                        >
+                            {showManualBackup ? '▾ Sembunyikan unduh / restore file' : '▸ Unduh atau restore dari file (manual)'}
+                        </button>
+
+                        {showManualBackup && (
+                            <>
+                                <div style={{
+                                    padding: '1.25rem',
+                                    border: '1px solid var(--gray-200)',
+                                    borderRadius: 'var(--radius-md)',
+                                    marginBottom: '1.25rem',
+                                    background: 'var(--gray-50)'
+                                }}>
+                                    <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
+                                        Unduh Backup File
+                                    </h3>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+                                        Menghasilkan file SQL data lengkap dari database saat ini.
+                                    </p>
+                                    {backupMessage.text && (
+                                        <div className={`alert alert-${backupMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                            <span className="alert-icon">{backupMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                            {backupMessage.text}
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={handleBackupDownload}
+                                        disabled={busyBackup}
+                                    >
+                                        {backupLoading ? (
+                                            <>
+                                                <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                                <span>Membuat backup...</span>
+                                            </>
+                                        ) : (
+                                            '⬇️ Unduh Backup (.sql)'
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div style={{
+                                    padding: '1.25rem',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: 'var(--radius-md)',
+                                    background: '#fff5f5'
+                                }}>
+                                    <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: '#991b1b' }}>
+                                        Restore dari File (Menimpa Data)
+                                    </h3>
+                                    <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginBottom: '1rem' }}>
+                                        Semua data saat ini akan diganti dengan isi file backup.
+                                    </p>
+                                    {restoreMessage.text && (
+                                        <div className={`alert alert-${restoreMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                            <span className="alert-icon">{restoreMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                            {restoreMessage.text}
+                                        </div>
+                                    )}
+                                    <form onSubmit={handleRestore}>
+                                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                            <label className="form-label">File Backup (.sql / .dump)</label>
+                                            <input
+                                                type="file"
+                                                className="form-input"
+                                                accept=".sql,.dump,.backup,.json"
+                                                disabled={busyBackup}
+                                                onChange={(e) => {
+                                                    setRestoreFile(e.target.files?.[0] || null);
+                                                    setRestoreMessage({ type: '', text: '' });
+                                                }}
+                                            />
+                                            {restoreFile && (
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.35rem' }}>
+                                                    Dipilih: {restoreFile.name} ({Math.round(restoreFile.size / 1024)} KB)
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                            <label className="form-label">
+                                                Ketik <strong>TIMPA</strong> untuk konfirmasi
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                value={restoreConfirm}
+                                                onChange={(e) => setRestoreConfirm(e.target.value)}
+                                                placeholder="TIMPA"
+                                                disabled={busyBackup}
+                                                autoComplete="off"
+                                            />
+                                        </div>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-danger"
+                                            disabled={busyBackup || !restoreFile || restoreConfirm.trim().toUpperCase() !== 'TIMPA'}
+                                        >
+                                            {restoreLoading ? (
+                                                <>
+                                                    <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                                    <span>Merestore...</span>
+                                                </>
+                                            ) : (
+                                                '⚠️ Restore & Timpa Database'
+                                            )}
+                                        </button>
+                                    </form>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 

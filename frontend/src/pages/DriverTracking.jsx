@@ -5,6 +5,12 @@ import Camera from '../components/Camera';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import {
+    getAllowedTrackingTypes,
+    getDefaultTrackingType,
+    getTrackingPageCopy,
+    getTrackingTypeMeta,
+} from '../utils/tracking';
 
 // Fix default marker icons for leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -43,9 +49,12 @@ export default function DriverTracking() {
     const [address, setAddress] = useState('');
     const [notes, setNotes] = useState('');
     
-    // Collector specific fields
+    // Role / task type
     const { user } = useAuth();
-    const isCollector = user?.is_collector;
+    const allowedTypes = getAllowedTrackingTypes(user);
+    const pageCopy = getTrackingPageCopy(user);
+    const [selectedType, setSelectedType] = useState(() => getDefaultTrackingType(user));
+    const isCollection = selectedType === 'collection';
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [amountBilled, setAmountBilled] = useState('');
     const [amountCollected, setAmountCollected] = useState('');
@@ -92,6 +101,11 @@ export default function DriverTracking() {
         // Load all customers on mount
         customersAPI.search('').then(data => setCustomers(data)).catch(() => {});
     }, []);
+
+    useEffect(() => {
+        const next = getDefaultTrackingType(user);
+        setSelectedType((prev) => (allowedTypes.includes(prev) ? prev : next));
+    }, [user, allowedTypes.join(',')]);
 
     async function fetchToday() {
         try {
@@ -294,8 +308,8 @@ export default function DriverTracking() {
             if (notes.trim()) formData.append('notes', notes.trim());
             if (photoBlob) formData.append('photo', photoBlob, 'checkin-selfie.jpg');
 
-            if (isCollector) {
-                formData.append('tracking_type', 'collection');
+            formData.append('tracking_type', selectedType);
+            if (isCollection) {
                 if (invoiceNumber) formData.append('invoice_number', invoiceNumber.trim());
                 if (amountBilled) formData.append('amount_billed', parseNumericString(amountBilled));
             }
@@ -530,8 +544,8 @@ export default function DriverTracking() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📍 Tracking Pengiriman</h1>
-                <p className="page-subtitle">Check-in & Check-out di lokasi customer</p>
+                <h1 className="page-title">📍 {pageCopy.title}</h1>
+                <p className="page-subtitle">{pageCopy.subtitle}</p>
             </div>
 
             {error && (
@@ -560,6 +574,11 @@ export default function DriverTracking() {
                             </div>
                         )}
                         {gpsError && <div style={{ fontSize: '0.8rem', color: 'var(--danger-400)' }}>{gpsError}</div>}
+                        {user?.use_tracking && (
+                            <div style={{ fontSize: '0.78rem', color: 'var(--success-400)', marginTop: 4 }}>
+                                📡 Posisi Anda dibagikan ke peta live admin selama aplikasi terbuka
+                            </div>
+                        )}
                     </div>
                     <button className="btn btn-outline" onClick={() => getGPS().catch(() => {})}
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
@@ -588,6 +607,28 @@ export default function DriverTracking() {
                             <h2 className="card-title">📥 Check-in Customer</h2>
                         </div>
                         <div style={{ padding: '1.25rem' }}>
+                            {allowedTypes.length > 1 && (
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="form-label">Jenis Tugas *</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                        {allowedTypes.map((type) => {
+                                            const meta = getTrackingTypeMeta(type);
+                                            return (
+                                                <button
+                                                    key={type}
+                                                    type="button"
+                                                    className={`btn ${selectedType === type ? 'btn-primary' : 'btn-outline'}`}
+                                                    style={{ fontSize: '0.85rem' }}
+                                                    onClick={() => setSelectedType(type)}
+                                                >
+                                                    {meta.icon} {meta.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Mode Toggle */}
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                                 <button
@@ -737,7 +778,7 @@ export default function DriverTracking() {
                                     value={address} onChange={e => setAddress(e.target.value)} />
                             </div>
                             
-                            {isCollector && (
+                            {isCollection && (
                                 <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
                                     <div>
                                         <label className="form-label">Nomor Invoice (Opsional)</label>
@@ -784,6 +825,9 @@ export default function DriverTracking() {
                                                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--success-400)' }}>
                                                     🏪 {rec.customer_name} 
                                                     {rec.tracking_type === 'collection' && <span className="badge badge-warning" style={{ marginLeft: 6 }}>Tagihan</span>}
+                                                    {rec.tracking_type === 'sales' && <span className="badge badge-success" style={{ marginLeft: 6 }}>Sales</span>}
+                                                    {rec.tracking_type === 'visit' && <span className="badge badge-outline" style={{ marginLeft: 6 }}>Kunjungan</span>}
+                                                    {rec.tracking_type === 'delivery' && allowedTypes.length > 1 && <span className="badge badge-outline" style={{ marginLeft: 6 }}>Pengiriman</span>}
                                                 </div>
                                                 {rec.address && <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)', marginTop: '0.2rem' }}>{rec.address}</div>}
                                                 {rec.tracking_type === 'collection' && rec.invoice_number && (
@@ -814,7 +858,7 @@ export default function DriverTracking() {
                                         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                                             <button className="btn btn-danger" onClick={() => openCameraForCheckout(rec)}
                                                 disabled={submitting} style={{ flex: 1 }}>
-                                                {rec.tracking_type === 'collection' ? '📝 Lapor Tagihan & Out' : '📸 Foto & Check-out'}
+                                                {getTrackingTypeMeta(rec.tracking_type).checkoutLabel}
                                             </button>
                                             <button className="btn btn-outline" onClick={() => openMapForRecords([rec])}
                                                 style={{ padding: '0.5rem 0.75rem' }} title="Lihat di peta">
@@ -851,6 +895,9 @@ export default function DriverTracking() {
                                                 <div style={{ fontWeight: 700, fontSize: '1rem' }}>
                                                     🏪 {rec.customer_name}
                                                     {rec.tracking_type === 'collection' && <span className="badge badge-warning" style={{ marginLeft: 6 }}>Tagihan</span>}
+                                                    {rec.tracking_type === 'sales' && <span className="badge badge-success" style={{ marginLeft: 6 }}>Sales</span>}
+                                                    {rec.tracking_type === 'visit' && <span className="badge badge-outline" style={{ marginLeft: 6 }}>Kunjungan</span>}
+                                                    {rec.tracking_type === 'delivery' && allowedTypes.length > 1 && <span className="badge badge-outline" style={{ marginLeft: 6 }}>Pengiriman</span>}
                                                 </div>
                                                 {rec.address && <div style={{ fontSize: '0.82rem', color: 'var(--gray-400)' }}>{rec.address}</div>}
                                                 

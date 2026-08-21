@@ -4,8 +4,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
 const { generateCustomerCode } = require('../utils/customerCode');
+const { classifyMotion } = require('../utils/motionMode');
 
 // Configure multer for photo uploads
 const storage = multer.diskStorage({
@@ -38,20 +39,38 @@ const upload = multer({
 });
 
 // ============================================
-// DRIVER ENDPOINTS (Employee yang is_driver)
+// TRACKING ENDPOINTS (driver, collector, sales, dan tugas lain)
 // ============================================
+
+const VALID_TRACKING_TYPES = ['delivery', 'collection', 'sales', 'visit'];
+
+function allowedTrackingTypes(user, role) {
+    if (user.role === 'admin') return VALID_TRACKING_TYPES;
+    const types = [];
+    if (role?.is_driver) types.push('delivery');
+    if (role?.is_collector) types.push('collection');
+    if (role?.is_sales) types.push('sales');
+    if (types.length === 0 && role?.use_tracking) types.push('visit');
+    return types.length ? types : ['visit'];
+}
+
+function resolveTrackingType(requested, allowed) {
+    const type = VALID_TRACKING_TYPES.includes(requested) ? requested : null;
+    if (type && allowed.includes(type)) return type;
+    return allowed[0] || 'visit';
+}
 
 // Middleware: check if user is allowed to use tracking
 async function isTrackingUser(req, res, next) {
     try {
         // Admin always has access
         if (req.user.role === 'admin') {
-            req.userRole = { is_driver: true, is_collector: true, use_tracking: true };
+            req.userRole = { is_driver: true, is_collector: true, is_sales: true, use_tracking: true };
             return next();
         }
 
         const result = await pool.query(
-            'SELECT is_driver, is_collector, use_tracking FROM employee_details WHERE user_id = $1',
+            'SELECT is_driver, is_collector, is_sales, use_tracking FROM employee_details WHERE user_id = $1',
             [req.user.id]
         );
         if (result.rows.length === 0 || !result.rows[0].use_tracking) {
@@ -60,6 +79,7 @@ async function isTrackingUser(req, res, next) {
         req.userRole = {
             is_driver: result.rows[0].is_driver,
             is_collector: result.rows[0].is_collector,
+            is_sales: result.rows[0].is_sales,
             use_tracking: result.rows[0].use_tracking
         };
         next();
@@ -119,7 +139,7 @@ router.get('/my-history', authenticateToken, isTrackingUser, async (req, res) =>
 // POST /checkin — Driver check-in at customer location (with selfie photo)
 router.post('/checkin', authenticateToken, isTrackingUser, upload.single('photo'), async (req, res) => {
     try {
-        const { customer_name, address, latitude, longitude, notes, tracking_type = 'delivery', amount_billed, invoice_number } = req.body;
+        const { customer_name, address, latitude, longitude, notes, tracking_type = 'visit', amount_billed, invoice_number } = req.body;
 
         if (!customer_name) {
             return res.status(400).json({ error: 'Nama customer harus diisi' });
@@ -127,6 +147,9 @@ router.post('/checkin', authenticateToken, isTrackingUser, upload.single('photo'
         if (!latitude || !longitude) {
             return res.status(400).json({ error: 'Koordinat GPS harus tersedia' });
         }
+
+        const allowed = allowedTrackingTypes(req.user, req.userRole);
+        const resolvedType = resolveTrackingType(tracking_type, allowed);
 
         const photoPath = req.file ? `/uploads/tracking/${req.file.filename}` : null;
         const customerName = String(customer_name).trim();
@@ -173,7 +196,7 @@ router.post('/checkin', authenticateToken, isTrackingUser, upload.single('photo'
              (user_id, tracking_date, customer_name, address, checkin_time, checkin_latitude, checkin_longitude, checkin_photo_path, notes, status, tracking_type, amount_billed, invoice_number)
              VALUES ($1, CURRENT_DATE, $2, $3, NOW(), $4, $5, $6, $7, 'checked_in', $8, $9, $10)
              RETURNING *`,
-            [req.user.id, customerName, address || null, latitude, longitude, photoPath, notes || null, tracking_type, amount_billed || null, invoice_number || null]
+            [req.user.id, customerName, address || null, latitude, longitude, photoPath, notes || null, resolvedType, amount_billed || null, invoice_number || null]
         );
 
         res.status(201).json({
@@ -299,16 +322,218 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 router.get('/drivers', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT u.id, u.name, u.employee_id, ed.is_driver, ed.is_collector, ed.use_tracking
+            SELECT u.id, u.name, u.employee_id, ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking
             FROM users u
             JOIN employee_details ed ON u.id = ed.user_id
-            WHERE u.role = 'employee' AND (ed.is_driver = true OR ed.is_collector = true OR ed.use_tracking = true)
+            WHERE u.role = 'employee' AND ed.use_tracking = true
             ORDER BY u.name ASC
         `);
         res.json(result.rows);
     } catch (error) {
         console.error('Get drivers error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function ensureLiveTrackingSchema() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS live_tracking_latest (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            latitude DECIMAL(10, 8) NOT NULL,
+            longitude DECIMAL(11, 8) NOT NULL,
+            accuracy DECIMAL(10, 2),
+            speed DECIMAL(10, 2),
+            heading DECIMAL(6, 2),
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS live_tracking_points (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            latitude DECIMAL(10, 8) NOT NULL,
+            longitude DECIMAL(11, 8) NOT NULL,
+            speed DECIMAL(10, 2),
+            heading DECIMAL(6, 2),
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_live_points_user_time
+        ON live_tracking_points(user_id, recorded_at DESC)
+    `);
+}
+
+// POST /live — karyawan mengirim posisi GPS saat ini
+router.post('/live', authenticateToken, isTrackingUser, async (req, res) => {
+    try {
+        const latitude = parseFloat(req.body.latitude);
+        const longitude = parseFloat(req.body.longitude);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return res.status(400).json({ error: 'Koordinat GPS tidak valid' });
+        }
+        const accuracy = req.body.accuracy != null ? parseFloat(req.body.accuracy) : null;
+        const speed = req.body.speed != null && req.body.speed !== '' ? parseFloat(req.body.speed) : null;
+        const heading = req.body.heading != null && req.body.heading !== '' ? parseFloat(req.body.heading) : null;
+
+        await ensureLiveTrackingSchema();
+
+        await pool.query(`
+            INSERT INTO live_tracking_latest (user_id, latitude, longitude, accuracy, speed, heading, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET
+                latitude = EXCLUDED.latitude,
+                longitude = EXCLUDED.longitude,
+                accuracy = EXCLUDED.accuracy,
+                speed = EXCLUDED.speed,
+                heading = COALESCE(EXCLUDED.heading, live_tracking_latest.heading),
+                updated_at = NOW()
+        `, [
+            req.user.id, latitude, longitude,
+            Number.isFinite(accuracy) ? accuracy : null,
+            Number.isFinite(speed) ? speed : null,
+            Number.isFinite(heading) ? heading : null,
+        ]);
+
+        const last = await pool.query(
+            `SELECT latitude, longitude, recorded_at
+             FROM live_tracking_points
+             WHERE user_id = $1
+             ORDER BY recorded_at DESC
+             LIMIT 1`,
+            [req.user.id]
+        );
+        let insertPoint = true;
+        if (last.rows[0]) {
+            const dist = haversineMeters(
+                parseFloat(last.rows[0].latitude),
+                parseFloat(last.rows[0].longitude),
+                latitude,
+                longitude
+            );
+            const ageMs = Date.now() - new Date(last.rows[0].recorded_at).getTime();
+            if (dist < 20 && ageMs < 15000) insertPoint = false;
+        }
+        if (insertPoint) {
+            await pool.query(
+                `INSERT INTO live_tracking_points (user_id, latitude, longitude, speed, heading)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [
+                    req.user.id, latitude, longitude,
+                    Number.isFinite(speed) ? speed : null,
+                    Number.isFinite(heading) ? heading : null,
+                ]
+            );
+        }
+
+        if (Math.random() < 0.08) {
+            await pool.query(`DELETE FROM live_tracking_points WHERE recorded_at < NOW() - INTERVAL '12 hours'`);
+        }
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Live ping error:', error);
+        res.status(500).json({ error: 'Gagal menyimpan posisi live' });
+    }
+});
+
+// GET /live — posisi kendaraan real-time + jejak
+router.get('/live', authenticateToken, hasPermission('admin.driver_tracking'), async (req, res) => {
+    try {
+        await ensureLiveTrackingSchema();
+        const latest = await pool.query(`
+            SELECT l.user_id, l.latitude, l.longitude, l.accuracy, l.speed, l.heading, l.updated_at,
+                   u.name, u.employee_id, u.photo,
+                   COALESCE(ed.is_driver, false) as is_driver,
+                   COALESCE(ed.is_collector, false) as is_collector,
+                   COALESCE(ed.is_sales, false) as is_sales,
+                   vt.name as vehicle_type_name,
+                   dt.customer_name, dt.status as visit_status, dt.tracking_type
+            FROM live_tracking_latest l
+            JOIN users u ON u.id = l.user_id
+            LEFT JOIN employee_details ed ON ed.user_id = u.id
+            LEFT JOIN vehicle_types vt ON vt.id = ed.vehicle_type_id
+            LEFT JOIN LATERAL (
+                SELECT customer_name, status, tracking_type
+                FROM driver_tracking
+                WHERE user_id = l.user_id AND status = 'checked_in'
+                ORDER BY checkin_time DESC
+                LIMIT 1
+            ) dt ON true
+            WHERE l.updated_at > NOW() - INTERVAL '30 minutes'
+            ORDER BY l.updated_at DESC
+        `);
+
+        const userIds = latest.rows.map((r) => r.user_id);
+        let trailsByUser = {};
+        if (userIds.length > 0) {
+            const trails = await pool.query(`
+                SELECT user_id, latitude, longitude, recorded_at
+                FROM live_tracking_points
+                WHERE user_id = ANY($1::int[])
+                  AND recorded_at > NOW() - INTERVAL '45 minutes'
+                ORDER BY user_id, recorded_at ASC
+            `, [userIds]);
+            for (const row of trails.rows) {
+                if (!trailsByUser[row.user_id]) trailsByUser[row.user_id] = [];
+                trailsByUser[row.user_id].push({
+                    lat: parseFloat(row.latitude),
+                    lng: parseFloat(row.longitude),
+                    at: row.recorded_at,
+                });
+            }
+        }
+
+        const now = Date.now();
+        const vehicles = latest.rows.map((row) => {
+            const updated = new Date(row.updated_at).getTime();
+            const ageSec = Math.max(0, Math.round((now - updated) / 1000));
+            const trail = trailsByUser[row.user_id] || [];
+            const speed = row.speed != null ? parseFloat(row.speed) : null;
+            const motion = classifyMotion({
+                speedMs: speed,
+                trail,
+                vehicleTypeName: row.vehicle_type_name,
+            });
+            return {
+                user_id: row.user_id,
+                name: row.name,
+                employee_id: row.employee_id,
+                photo: row.photo,
+                latitude: parseFloat(row.latitude),
+                longitude: parseFloat(row.longitude),
+                accuracy: row.accuracy != null ? parseFloat(row.accuracy) : null,
+                speed,
+                heading: row.heading != null ? parseFloat(row.heading) : null,
+                updated_at: row.updated_at,
+                age_sec: ageSec,
+                online: ageSec <= 45,
+                customer_name: row.customer_name || null,
+                visit_status: row.visit_status || null,
+                tracking_type: row.tracking_type || null,
+                is_driver: row.is_driver,
+                is_collector: row.is_collector,
+                is_sales: row.is_sales,
+                vehicle_type_name: row.vehicle_type_name || null,
+                motion,
+                trail,
+            };
+        });
+
+        res.json({ vehicles, server_time: new Date().toISOString() });
+    } catch (error) {
+        console.error('Get live tracking error:', error);
+        res.status(500).json({ error: 'Gagal memuat peta live' });
     }
 });
 

@@ -3,6 +3,8 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { Readable } = require('stream');
+const { pipeline } = require('stream/promises');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
 
@@ -543,6 +545,252 @@ async function restoreBackupFile(filePath) {
 
     return restoreSqlBackup(content);
 }
+
+function normalizeRemoteApiBase(raw) {
+    if (!raw || typeof raw !== 'string') {
+        throw new Error('URL server wajib diisi');
+    }
+    let url = raw.trim();
+    if (!/^https?:\/\//i.test(url)) {
+        url = `https://${url}`;
+    }
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch (_) {
+        throw new Error('URL server tidak valid');
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('URL server harus http atau https');
+    }
+    let base = `${parsed.protocol}//${parsed.host}${parsed.pathname}`.replace(/\/+$/, '');
+    if (!/\/api$/i.test(base)) {
+        base = `${base}/api`;
+    }
+    return base;
+}
+
+async function readRemoteError(res, fallback) {
+    const text = await res.text();
+    try {
+        const data = JSON.parse(text);
+        return data.error || fallback;
+    } catch (_) {
+        if ((text || '').trim().startsWith('<')) {
+            return `${fallback}. Cek URL server (harus mengarah ke aplikasi absensi).`;
+        }
+        return fallback;
+    }
+}
+
+async function loginRemoteAdmin(apiBase, employeeId, password) {
+    let res;
+    try {
+        res = await fetch(`${apiBase}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: employeeId, password }),
+        });
+    } catch (error) {
+        throw new Error(`Tidak dapat terhubung ke ${apiBase}: ${error.message}`);
+    }
+    if (!res.ok) {
+        throw new Error(await readRemoteError(res, 'Gagal login ke server tujuan'));
+    }
+    const data = await res.json();
+    if (!data.token) {
+        throw new Error('Server tujuan tidak mengembalikan token login');
+    }
+    if (data.user && data.user.role !== 'admin') {
+        throw new Error('Akun di server tujuan harus role admin');
+    }
+    return data.token;
+}
+
+async function downloadRemoteBackup(apiBase, token, outPath) {
+    let res;
+    try {
+        res = await fetch(`${apiBase}/backup/download`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+    } catch (error) {
+        throw new Error(`Gagal mengunduh backup dari ${apiBase}: ${error.message}`);
+    }
+    if (!res.ok) {
+        throw new Error(await readRemoteError(res, `Gagal mengunduh backup dari server (${res.status})`));
+    }
+    if (res.body && typeof Readable.fromWeb === 'function') {
+        await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(outPath));
+    } else {
+        fs.writeFileSync(outPath, Buffer.from(await res.arrayBuffer()));
+    }
+    const stat = fs.statSync(outPath);
+    if (!stat.size) {
+        throw new Error('File backup dari server kosong');
+    }
+    const fd = fs.openSync(outPath, 'r');
+    try {
+        const buf = Buffer.alloc(Math.min(400, stat.size));
+        fs.readSync(fd, buf, 0, buf.length, 0);
+        const peek = buf.toString('utf8');
+        if (!peek.includes('ABSENSI_NODE_BACKUP') && !peek.trim().startsWith('{')) {
+            throw new Error('File dari server bukan backup aplikasi ini. Deploy fitur Backup ke server dulu.');
+        }
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+function buildRestoreMultipart(filePath, filename) {
+    const boundary = `----AbsensiBackup${Date.now()}${Math.random().toString(16).slice(2)}`;
+    const fileBuffer = fs.readFileSync(filePath);
+    const header = Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="backup"; filename="${filename}"\r\n` +
+        `Content-Type: application/sql\r\n\r\n`
+    );
+    const footer = Buffer.from(
+        `\r\n--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="confirm"\r\n\r\n` +
+        `TIMPA\r\n` +
+        `--${boundary}--\r\n`
+    );
+    return {
+        body: Buffer.concat([header, fileBuffer, footer]),
+        contentType: `multipart/form-data; boundary=${boundary}`,
+    };
+}
+
+async function restoreRemoteBackup(apiBase, token, filePath, filename) {
+    const multipart = buildRestoreMultipart(filePath, filename);
+    let res;
+    try {
+        res = await fetch(`${apiBase}/backup/restore`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': multipart.contentType,
+            },
+            body: multipart.body,
+        });
+    } catch (error) {
+        throw new Error(`Gagal mengirim backup ke ${apiBase}: ${error.message}`);
+    }
+    if (!res.ok) {
+        throw new Error(await readRemoteError(res, `Gagal restore ke server tujuan (${res.status})`));
+    }
+    return res.json();
+}
+
+function currentDbInfo() {
+    if (process.env.DATABASE_URL) {
+        try {
+            const u = new URL(process.env.DATABASE_URL);
+            return {
+                host: u.hostname,
+                database: (u.pathname || '').replace(/^\//, '') || 'absensi',
+                isLocal: u.hostname === 'localhost' || u.hostname === '127.0.0.1',
+            };
+        } catch (_) {
+            return { host: 'remote', database: 'absensi', isLocal: false };
+        }
+    }
+    const host = process.env.DB_HOST || 'localhost';
+    return {
+        host,
+        database: process.env.DB_NAME || 'absensi',
+        isLocal: host === 'localhost' || host === '127.0.0.1',
+    };
+}
+
+function requireTimpa(confirm) {
+    if ((confirm || '').trim().toUpperCase() !== 'TIMPA') {
+        throw Object.assign(new Error('Konfirmasi tidak valid. Ketik TIMPA untuk menimpa database.'), { status: 400 });
+    }
+}
+
+// GET /api/backup/info
+router.get('/info', authenticateToken, isAdmin, async (_req, res) => {
+    res.json(currentDbInfo());
+});
+
+// POST /api/backup/pull-from-remote  (server → database saat ini)
+router.post('/pull-from-remote', authenticateToken, isAdmin, async (req, res) => {
+    req.setTimeout(15 * 60 * 1000);
+    res.setTimeout(15 * 60 * 1000);
+    const tmpPath = path.join(BACKUP_DIR, `pull-${Date.now()}.sql`);
+    try {
+        requireTimpa(req.body.confirm);
+        const apiBase = normalizeRemoteApiBase(req.body.remote_url);
+        const employeeId = (req.body.employee_id || '').trim();
+        const password = req.body.password || '';
+        if (!employeeId || !password) {
+            return res.status(400).json({ error: 'NIK dan password admin server wajib diisi' });
+        }
+
+        const token = await loginRemoteAdmin(apiBase, employeeId, password);
+        await downloadRemoteBackup(apiBase, token, tmpPath);
+        const result = await restoreBackupFile(tmpPath);
+        const countSummary = Object.entries(result.counts || {})
+            .map(([table, n]) => `${table}: ${n}`)
+            .join(', ');
+
+        res.json({
+            message: 'Database server berhasil diunduh dan menimpa database saat ini. Silakan login ulang.',
+            inserted: result.inserted,
+            tables: result.tables,
+            counts: result.counts,
+            warnings: result.warnings,
+            summary: countSummary,
+            source: apiBase,
+        });
+    } catch (error) {
+        console.error('Pull-from-remote error:', error);
+        res.status(error.status || 500).json({
+            error: error.message || 'Gagal menarik database dari server',
+        });
+    } finally {
+        if (fs.existsSync(tmpPath)) fs.unlink(tmpPath, () => {});
+    }
+});
+
+// POST /api/backup/push-to-remote  (database saat ini → server)
+router.post('/push-to-remote', authenticateToken, isAdmin, async (req, res) => {
+    req.setTimeout(15 * 60 * 1000);
+    res.setTimeout(15 * 60 * 1000);
+    const tmpPath = path.join(BACKUP_DIR, `push-${formatTimestamp()}.sql`);
+    try {
+        requireTimpa(req.body.confirm);
+        const apiBase = normalizeRemoteApiBase(req.body.remote_url);
+        const employeeId = (req.body.employee_id || '').trim();
+        const password = req.body.password || '';
+        if (!employeeId || !password) {
+            return res.status(400).json({ error: 'NIK dan password admin server wajib diisi' });
+        }
+
+        const token = await loginRemoteAdmin(apiBase, employeeId, password);
+        await createNodeBackupFile(tmpPath);
+        const remoteResult = await restoreRemoteBackup(
+            apiBase,
+            token,
+            tmpPath,
+            path.basename(tmpPath)
+        );
+
+        res.json({
+            message: 'Database lokal berhasil dikirim dan menimpa database di server.',
+            remote: remoteResult,
+            target: apiBase,
+        });
+    } catch (error) {
+        console.error('Push-to-remote error:', error);
+        res.status(error.status || 500).json({
+            error: error.message || 'Gagal mengirim database ke server',
+        });
+    } finally {
+        if (fs.existsSync(tmpPath)) fs.unlink(tmpPath, () => {});
+    }
+});
 
 // GET /api/backup/download
 router.get('/download', authenticateToken, isAdmin, async (req, res) => {

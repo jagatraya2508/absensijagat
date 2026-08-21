@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS employee_details (
     no_kk VARCHAR(20),
     is_driver BOOLEAN DEFAULT FALSE,
     is_collector BOOLEAN DEFAULT FALSE,
+    is_sales BOOLEAN DEFAULT FALSE,
     use_tracking BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -804,6 +805,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS off_day VARCHAR(20);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS no_kk VARCHAR(20);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_driver BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAULT FALSE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_tracking BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS supervisor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS current_step INTEGER DEFAULT 1;
@@ -820,6 +822,27 @@ ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS collection_status VARCHAR(2
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkin_photo_path VARCHAR(255);
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkout_photo_path VARCHAR(255);
 ALTER TABLE license_info ADD COLUMN IF NOT EXISTS machine_id VARCHAR(32);
+
+-- Posisi live kendaraan / karyawan lapangan
+CREATE TABLE IF NOT EXISTS live_tracking_latest (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    accuracy DECIMAL(10, 2),
+    speed DECIMAL(10, 2),
+    heading DECIMAL(6, 2),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS live_tracking_points (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    speed DECIMAL(10, 2),
+    heading DECIMAL(6, 2),
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_live_points_user_time ON live_tracking_points(user_id, recorded_at DESC);
 
 -- Fix admin password if old dummy hash exists
 UPDATE users SET password = '$2b$10$2EZWUsggTsOFNMP0GvP5D.70VZIX5OwVDNrUIm8KLvLh1hB789l9O' WHERE employee_id = 'ADMIN001' AND password LIKE '$2b$10$rQZ5%';

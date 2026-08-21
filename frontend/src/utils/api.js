@@ -6,12 +6,28 @@ function getToken() {
     return localStorage.getItem('token');
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isHtmlResponse(contentType, text) {
+    if (contentType && contentType.includes('text/html')) return true;
+    const trimmed = (text || '').trim();
+    return trimmed.startsWith('<!') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML');
+}
+
+function shouldRetry(status, html) {
+    return html || status === 502 || status === 503 || status === 504;
+}
+
 // Helper for API requests
-async function request(endpoint, options = {}) {
+async function request(endpoint, options = {}, attempt = 1) {
+    const { skipRetry, ...fetchOptions } = options;
+    const maxAttempts = skipRetry ? 1 : 3;
     const token = getToken();
 
     const headers = {
-        ...options.headers,
+        ...fetchOptions.headers,
     };
 
     // Don't set Content-Type for FormData
@@ -24,25 +40,45 @@ async function request(endpoint, options = {}) {
     }
 
     console.log(`Requesting: ${API_BASE}${endpoint}`);
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers,
-    });
+    let response;
+    try {
+        response = await fetch(`${API_BASE}${endpoint}`, {
+            ...fetchOptions,
+            headers,
+        });
+    } catch (err) {
+        if (attempt < maxAttempts) {
+            await sleep(700 * attempt);
+            return request(endpoint, options, attempt + 1);
+        }
+        throw new Error('Tidak dapat terhubung ke server. Pastikan backend sedang berjalan, lalu coba lagi.');
+    }
 
     const contentType = response.headers.get('content-type');
 
     // Read text buffer once
     const text = await response.text();
+    const html = isHtmlResponse(contentType, text);
 
-    if (contentType && contentType.includes('text/html')) {
-        console.error('Received HTML response:', text.substring(0, 100));
-        throw new Error(`Server Error (Received HTML instead of JSON from ${API_BASE}${endpoint})`);
+    if (html || !text) {
+        if (html && shouldRetry(response.status, html) && attempt < maxAttempts) {
+            await sleep(700 * attempt);
+            return request(endpoint, options, attempt + 1);
+        }
+        if (html) {
+            console.error('Received HTML response:', text.substring(0, 100));
+            throw new Error('Server backend tidak merespons. Tunggu hingga backend siap, lalu coba login lagi.');
+        }
     }
 
     let data;
     try {
         data = text ? JSON.parse(text) : {};
     } catch (e) {
+        if (attempt < maxAttempts && shouldRetry(response.status, false)) {
+            await sleep(700 * attempt);
+            return request(endpoint, options, attempt + 1);
+        }
         console.error('Failed to parse JSON:', text.substring(0, 100));
         throw new Error('Server Error (Invalid JSON response)');
     }
@@ -460,6 +496,7 @@ export const settingsAPI = {
 
 // Database backup & restore (admin only)
 export const backupAPI = {
+    getInfo: () => request('/backup/info'),
     download: async () => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE}/backup/download`, {
@@ -489,6 +526,17 @@ export const backupAPI = {
     restore: (formData) => request('/backup/restore', {
         method: 'POST',
         body: formData,
+        skipRetry: true,
+    }),
+    pullFromRemote: (data) => request('/backup/pull-from-remote', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        skipRetry: true,
+    }),
+    pushToRemote: (data) => request('/backup/push-to-remote', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        skipRetry: true,
     }),
 };
 
@@ -756,6 +804,12 @@ export const driverTrackingAPI = {
     getDrivers: () => request('/driver-tracking/drivers'),
     getById: (id) => request(`/driver-tracking/${id}`),
     delete: (id) => request(`/driver-tracking/${id}`, { method: 'DELETE' }),
+    pingLive: (data) => request('/driver-tracking/live', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        skipRetry: true,
+    }),
+    getLive: () => request('/driver-tracking/live', { skipRetry: true }),
 };
 
 // Customers API

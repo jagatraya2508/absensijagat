@@ -237,7 +237,7 @@ export default function Dashboard() {
                         <div className="menu-icon bg-orange-100 text-orange-600">⏰</div>
                         <span className="menu-label">Lembur</span>
                     </Link>
-                    {/* Tracking - hanya jika user adalah driver */}
+                    {/* Tracking - sesuai tugas yang diaktifkan */}
                     {(user?.use_tracking || user?.role === 'admin') && (
                         <Link to="/driver-tracking" className="menu-item">
                             <div className="menu-icon bg-teal-100 text-teal-600">📍</div>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Sidebar from './components/Sidebar';
+import { useLiveLocationShare } from './hooks/useLiveLocationShare';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Attendance from './pages/Attendance';
@@ -86,6 +87,7 @@ function AppLayout({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    useLiveLocationShare(user);
 
     useEffect(() => {
         setSidebarOpen(false);

@@ -3,6 +3,8 @@ import { driverTrackingAPI } from '../utils/api';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getTrackingTypeMeta, TRACKING_TYPES } from '../utils/tracking';
+import LiveTrackingMap from '../components/LiveTrackingMap';
 
 // Fix default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -37,6 +39,7 @@ export default function AdminDriverTracking() {
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [statusFilter, setStatusFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
+    const [viewMode, setViewMode] = useState('live');
 
     // Detail modal
     const [detailModal, setDetailModal] = useState({ open: false, record: null });
@@ -145,9 +148,31 @@ export default function AdminDriverTracking() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📍 Tracking Driver & Collector</h1>
-                <p className="page-subtitle">Monitor lokasi check-in & check-out pengiriman dan penagihan di customer</p>
+                <h1 className="page-title">📍 Tracking Kunjungan</h1>
+                <p className="page-subtitle">Peta live kendaraan dan riwayat check-in/check-out di lokasi customer</p>
             </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                <button
+                    type="button"
+                    className={`btn ${viewMode === 'live' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setViewMode('live')}
+                >
+                    📡 Peta Live
+                </button>
+                <button
+                    type="button"
+                    className={`btn ${viewMode === 'records' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setViewMode('records')}
+                >
+                    📋 Data Kunjungan
+                </button>
+            </div>
+
+            {viewMode === 'live' && <LiveTrackingMap />}
+
+            {viewMode === 'records' && (
+            <>
 
             {error && (
                 <div className="alert alert-danger mb-3">
@@ -214,8 +239,9 @@ export default function AdminDriverTracking() {
                         <select className="form-input form-select" value={typeFilter}
                             onChange={e => setTypeFilter(e.target.value)}>
                             <option value="">Semua Tugas</option>
-                            <option value="delivery">Pengiriman</option>
-                            <option value="collection">Penagihan</option>
+                            {Object.values(TRACKING_TYPES).map((t) => (
+                                <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
+                            ))}
                         </select>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -230,7 +256,7 @@ export default function AdminDriverTracking() {
             {records.length > 0 && records.some(r => r.checkin_latitude) && (
                 <div className="card mb-4" style={{ overflow: 'hidden' }}>
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 className="card-title">🗺️ Peta Lokasi Driver</h2>
+                        <h2 className="card-title">🗺️ Peta Lokasi Kunjungan</h2>
                         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--gray-400)' }}>
                             <span>🟢 Check-in</span>
                             <span>🔴 Check-out</span>
@@ -257,7 +283,7 @@ export default function AdminDriverTracking() {
                                             <Popup>
                                                 <div style={{ color: '#333', minWidth: 180 }}>
                                                     <strong>📥 Check-in</strong><br />
-                                                    <strong>{rec.driver_name || 'Driver'}</strong><br />
+                                                    <strong>{rec.driver_name || 'Karyawan'}</strong><br />
                                                     🏪 {rec.customer_name}<br />
                                                     🕐 {formatDateTime(rec.checkin_time)}
                                                 </div>
@@ -269,7 +295,7 @@ export default function AdminDriverTracking() {
                                             <Popup>
                                                 <div style={{ color: '#333', minWidth: 180 }}>
                                                     <strong>📤 Check-out</strong><br />
-                                                    <strong>{rec.driver_name || 'Driver'}</strong><br />
+                                                    <strong>{rec.driver_name || 'Karyawan'}</strong><br />
                                                     🏪 {rec.customer_name}<br />
                                                     🕐 {formatDateTime(rec.checkout_time)}
                                                 </div>
@@ -304,7 +330,7 @@ export default function AdminDriverTracking() {
                             <thead>
                                 <tr>
                                     <th>Tanggal</th>
-                                    <th>Driver</th>
+                                    <th>Karyawan</th>
                                     <th>Customer</th>
                                     <th>Check-in</th>
                                     <th>Check-out</th>
@@ -325,7 +351,11 @@ export default function AdminDriverTracking() {
                                         <td>
                                             <div style={{ fontWeight: 600 }}>
                                                 {rec.customer_name}
-                                                {rec.tracking_type === 'collection' && <span className="badge badge-warning" style={{ marginLeft: 6, fontSize: '0.65rem', padding: '0.15rem 0.35rem' }}>Tagihan</span>}
+                                                {rec.tracking_type && rec.tracking_type !== 'delivery' && (
+                                                    <span className={`badge ${getTrackingTypeMeta(rec.tracking_type).badgeClass}`} style={{ marginLeft: 6, fontSize: '0.65rem', padding: '0.15rem 0.35rem' }}>
+                                                        {getTrackingTypeMeta(rec.tracking_type).label}
+                                                    </span>
+                                                )}
                                             </div>
                                             {rec.address && <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{rec.address}</div>}
                                             {rec.tracking_type === 'collection' && rec.invoice_number && (
@@ -429,7 +459,7 @@ export default function AdminDriverTracking() {
                                     <>
                                         <div className="grid grid-2 mb-3" style={{ gap: '1rem' }}>
                                             <div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '0.3rem' }}>Driver</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '0.3rem' }}>Karyawan</div>
                                                 <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{r.driver_name}</div>
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)' }}>{r.employee_id}</div>
                                             </div>
@@ -444,8 +474,8 @@ export default function AdminDriverTracking() {
                                             <span className={`badge ${r.status === 'checked_in' ? 'badge-success' : 'badge-primary'}`}>
                                                 {r.status === 'checked_in' ? '🟢 Aktif' : '✅ Selesai'}
                                             </span>
-                                            <span className={`badge ${r.tracking_type === 'collection' ? 'badge-warning' : 'badge-outline'}`}>
-                                                {r.tracking_type === 'collection' ? '📝 Penagihan' : '🚚 Pengiriman'}
+                                            <span className={`badge ${r.tracking_type === 'collection' ? 'badge-warning' : r.tracking_type === 'sales' ? 'badge-success' : 'badge-outline'}`}>
+                                                {getTrackingTypeMeta(r.tracking_type).icon} {getTrackingTypeMeta(r.tracking_type).label}
                                             </span>
                                             <span className="badge badge-outline">{formatDate(r.tracking_date)}</span>
                                             {r.checkout_time && <span className="badge badge-warning">⏱️ {calcDuration(r.checkin_time, r.checkout_time)}</span>}
@@ -640,7 +670,7 @@ export default function AdminDriverTracking() {
                                                 <Popup>
                                                     <div style={{ color: '#333', minWidth: 180 }}>
                                                         <strong>📥 Check-in</strong><br />
-                                                        <strong>{rec.driver_name || 'Driver'}</strong><br />
+                                                        <strong>{rec.driver_name || 'Karyawan'}</strong><br />
                                                         🏪 {rec.customer_name}<br />
                                                         🕐 {formatDateTime(rec.checkin_time)}
                                                     </div>
@@ -652,7 +682,7 @@ export default function AdminDriverTracking() {
                                                 <Popup>
                                                     <div style={{ color: '#333', minWidth: 180 }}>
                                                         <strong>📤 Check-out</strong><br />
-                                                        <strong>{rec.driver_name || 'Driver'}</strong><br />
+                                                        <strong>{rec.driver_name || 'Karyawan'}</strong><br />
                                                         🏪 {rec.customer_name}<br />
                                                         🕐 {formatDateTime(rec.checkout_time)}
                                                     </div>
@@ -686,6 +716,8 @@ export default function AdminDriverTracking() {
                             style={{ marginTop: '0.5rem' }}>✕ Tutup</button>
                     </div>
                 </div>
+            )}
+            </>
             )}
         </div>
     );

@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "Aplikasi Absensi Karyawan dengan foto selfie dan GPS tracking",
     "scripts": {
-        "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+        "dev": "concurrently -n backend,frontend \"npm run backend\" \"node scripts/wait-backend.js && npm run frontend\"",
         "backend": "cd backend && npm run dev",
         "frontend": "cd frontend && npm run dev",
         "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"

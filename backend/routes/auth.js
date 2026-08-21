@@ -154,7 +154,7 @@ router.post('/login', async (req, res) => {
         }
 
         const result = await pool.query(
-            `SELECT u.*, COALESCE(ed.is_driver, false) as is_driver, COALESCE(ed.is_collector, false) as is_collector, COALESCE(ed.use_tracking, false) as use_tracking
+            `SELECT u.*, COALESCE(ed.is_driver, false) as is_driver, COALESCE(ed.is_collector, false) as is_collector, COALESCE(ed.is_sales, false) as is_sales, COALESCE(ed.use_tracking, false) as use_tracking
              FROM users u
              LEFT JOIN employee_details ed ON u.id = ed.user_id
              WHERE u.employee_id = $1`,
@@ -199,6 +199,7 @@ router.post('/login', async (req, res) => {
                 photo: user.photo,
                 is_driver: user.is_driver,
                 is_collector: user.is_collector,
+                is_sales: user.is_sales,
                 use_tracking: user.use_tracking,
                 is_supervisor: isSupervisor
             }
@@ -312,6 +313,7 @@ router.get('/me', authenticateToken, async (req, res) => {
             `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, u.off_day, u.photo,
                     COALESCE(ed.is_driver, false) as is_driver,
                     COALESCE(ed.is_collector, false) as is_collector,
+                    COALESCE(ed.is_sales, false) as is_sales,
                     COALESCE(ed.use_tracking, false) as use_tracking
              FROM users u
              LEFT JOIN employee_details ed ON u.id = ed.user_id

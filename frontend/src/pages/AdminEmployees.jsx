@@ -61,7 +61,7 @@ export default function AdminEmployees() {
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
-        is_driver: false, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
+        is_driver: false, is_collector: false, is_sales: false, use_tracking: false, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
         vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
         bpjs_kes_enrolled: true, bpjs_jht_enrolled: true, bpjs_jp_enrolled: true,
@@ -140,6 +140,7 @@ export default function AdminEmployees() {
                 meal_allowance: d.meal_allowance || 0, overtime_rate: d.overtime_rate || 50000,
                 is_driver: d.is_driver || false,
                 is_collector: d.is_collector || false,
+                is_sales: d.is_sales || false,
                 use_tracking: d.use_tracking || false,
                 driver_subuh_allowance: d.driver_subuh_allowance || 0,
                 driver_rit_allowance: d.driver_rit_allowance || 0,
@@ -215,7 +216,13 @@ export default function AdminEmployees() {
     }
 
     function updateField(field, value) {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData(prev => {
+            const next = { ...prev, [field]: value };
+            if ((field === 'is_driver' || field === 'is_collector' || field === 'is_sales') && value) {
+                next.use_tracking = true;
+            }
+            return next;
+        });
     }
 
     function toggleLocation(locId) {
@@ -1009,7 +1016,7 @@ export default function AdminEmployees() {
                                                         🚛 Driver & Kenek
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
-                                                        Aktifkan jika karyawan ini adalah driver atau kenek
+                                                        Aktifkan jika karyawan ini adalah driver atau kenek. Menu tracking pengiriman ikut terbuka.
                                                     </div>
                                                 </div>
                                             </div>
@@ -1081,7 +1088,42 @@ export default function AdminEmployees() {
                                                         💰 Collector / Penagih
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
-                                                        Aktifkan jika karyawan ini bertugas menagih ke customer (membuka menu Tracking Penagihan)
+                                                        Aktifkan jika karyawan ini bertugas menagih ke customer. Menu tracking penagihan ikut terbuka.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Sales Toggle */}
+                                        <div style={{ gridColumn: '1 / -1', padding: '1rem', background: 'rgba(16,185,129,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.is_sales}
+                                                        onChange={e => updateField('is_sales', e.target.checked)}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{
+                                                        width: 44, height: 24, borderRadius: 12,
+                                                        background: formData.is_sales ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--gray-600)',
+                                                        position: 'relative', display: 'inline-block',
+                                                        transition: 'background 0.3s', flexShrink: 0
+                                                    }}>
+                                                        <span style={{
+                                                            position: 'absolute', top: 3, left: formData.is_sales ? 23 : 3,
+                                                            width: 18, height: 18, borderRadius: '50%',
+                                                            background: '#fff', transition: 'left 0.3s',
+                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                                                        }} />
+                                                    </span>
+                                                </label>
+                                                <div>
+                                                    <span style={{ fontWeight: 600, color: formData.is_sales ? 'var(--success-400)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
+                                                        🤝 Sales
+                                                    </span>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
+                                                        Aktifkan jika karyawan ini bertugas kunjungan penjualan ke customer. Menu tracking sales ikut terbuka.
                                                     </div>
                                                 </div>
                                             </div>
@@ -1116,7 +1158,7 @@ export default function AdminEmployees() {
                                                         📍 Akses Fitur Tracking
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
-                                                        Aktifkan jika karyawan ini wajib melakukan laporan kunjungan (Check-in/Check-out via GPS)
+                                                        Wajib check-in/out GPS di lokasi. Otomatis aktif jika Driver, Collector, atau Sales diaktifkan. Bisa juga untuk tugas lapangan lain.
                                                     </div>
                                                 </div>
                                             </div>

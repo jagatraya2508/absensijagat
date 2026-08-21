@@ -94,9 +94,12 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, async () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+const server = app.listen(PORT, '0.0.0.0', async () => {
+    console.log(`Server running on http://127.0.0.1:${PORT}`);
     await initDatabase();
 });
+server.timeout = 15 * 60 * 1000;
+server.requestTimeout = 15 * 60 * 1000;
+server.headersTimeout = 16 * 60 * 1000;
 
 module.exports = app;
