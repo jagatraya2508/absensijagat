@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverActivitiesAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -199,13 +200,13 @@ export default function AdminDriverActivities() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🚛 Aktivitas Driver</h1>
+                <h1 className="page-title"><Icon name="Truck" size={16} inline /> Aktivitas Driver</h1>
                 <p className="page-subtitle">Kelola aktivitas harian driver — Subuh, RIT, dan Menginap</p>
             </div>
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span> {success}
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}
                 </div>
             )}
 
@@ -230,15 +231,15 @@ export default function AdminDriverActivities() {
                         <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }} className="hide-on-print">
                             <button onClick={handlePrint} className="btn btn-outline btn-sm" title="Print Data"
                                 style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
-                                🖨️ Print
+                                <Icon name="Printer" size={16} inline /> Print
                             </button>
                             <button onClick={handleExportPDF} className="btn btn-outline btn-sm" title="Export PDF"
                                 style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }}>
-                                📄 PDF
+                                <Icon name="FileText" size={16} inline /> PDF
                             </button>
                             <button onClick={handleExportExcel} className="btn btn-outline btn-sm" title="Export Excel"
                                 style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', color: '#10b981', borderColor: '#10b981' }}>
-                                📊 Excel
+                                <Icon name="BarChart3" size={16} inline /> Excel
                             </button>
                         </div>
                     </div>
@@ -248,19 +249,19 @@ export default function AdminDriverActivities() {
                                 padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
                                 background: activeView === 'calendar' ? 'linear-gradient(135deg, #6366f1, #818cf8)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
-                            }}>📅 Kalender</button>
+                            }}><Icon name="Calendar" size={16} inline /> Kalender</button>
                         <button onClick={() => setActiveView('list')}
                             style={{
                                 padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
                                 background: activeView === 'list' ? 'linear-gradient(135deg, #3b82f6, #60a5fa)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
-                            }}>📝 Daftar</button>
+                            }}><Icon name="FileText" size={16} inline /> Daftar</button>
                         <button onClick={() => setActiveView('summary')}
                             style={{
                                 padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
                                 background: activeView === 'summary' ? 'linear-gradient(135deg, #10b981, #34d399)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
-                            }}>📊 Rekap</button>
+                            }}><Icon name="BarChart3" size={16} inline /> Rekap</button>
                         {isAdmin && (
                             <button onClick={() => openAddModal('')}
                                 style={{
@@ -275,12 +276,12 @@ export default function AdminDriverActivities() {
             {/* Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                 {[
-                    { label: '🌙 Total Subuh', value: totalStats.subuh + ' hari', amount: totalStats.subuhAmount, color: '#6366f1' },
-                    { label: '🔄 Total RIT', value: totalStats.rit + ' trip', amount: totalStats.ritAmount, color: '#f59e0b' },
-                    { label: '🚚 Ritase Dekat', value: totalStats.extraRitDekat + ' trip', amount: totalStats.ritaseDekatAmount, color: '#8b5cf6' },
-                    { label: '🚛 Ritase Jauh', value: totalStats.extraRitJauh + ' trip', amount: totalStats.ritaseJauhAmount, color: '#a855f7' },
-                    { label: '🏨 Menginap', value: totalStats.overnight + ' hari', amount: totalStats.overnightAmount, color: '#ef4444' },
-                    { label: '💰 Grand Total', value: '', amount: totalStats.grandTotal, color: '#10b981' },
+                    { label: 'Total Subuh', value: totalStats.subuh + ' hari', amount: totalStats.subuhAmount, color: '#6366f1' },
+                    { label: 'Total RIT', value: totalStats.rit + ' trip', amount: totalStats.ritAmount, color: '#f59e0b' },
+                    { label: 'Ritase Dekat', value: totalStats.extraRitDekat + ' trip', amount: totalStats.ritaseDekatAmount, color: '#8b5cf6' },
+                    { label: 'Ritase Jauh', value: totalStats.extraRitJauh + ' trip', amount: totalStats.ritaseJauhAmount, color: '#a855f7' },
+                    { label: 'Menginap', value: totalStats.overnight + ' hari', amount: totalStats.overnightAmount, color: '#ef4444' },
+                    { label: 'Grand Total', value: '', amount: totalStats.grandTotal, color: '#10b981' },
                 ].map((stat, i) => (
                     <div key={i} className="card" style={{ padding: '1.25rem', borderLeft: `4px solid ${stat.color}` }}>
                         <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.25rem' }}>{stat.label}</div>
@@ -294,7 +295,7 @@ export default function AdminDriverActivities() {
             {activeView === 'calendar' && (
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">📅 Aktivitas {MONTHS[month]} {year}</h2>
+                        <h2 className="card-title"><Icon name="Calendar" size={16} inline /> Aktivitas {MONTHS[month]} {year}</h2>
                     </div>
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -339,19 +340,19 @@ export default function AdminDriverActivities() {
                                             {hasData && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                     {act.is_subuh && (
-                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(99,102,241,0.3)', padding: '1px 4px', borderRadius: 4, color: '#a5b4fc' }}>🌙 Subuh</span>
+                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(99,102,241,0.3)', padding: '1px 4px', borderRadius: 4, color: '#a5b4fc' }}><Icon name="Moon" size={16} inline /> Subuh</span>
                                                     )}
                                                     <span style={{ fontSize: '0.6rem', background: 'rgba(245,158,11,0.3)', padding: '1px 4px', borderRadius: 4, color: '#fcd34d' }}>
-                                                        🔄 {act.rit_count} RIT
+                                                        <Icon name="RefreshCw" size={16} inline /> {act.rit_count} RIT
                                                     </span>
                                                     {act.rit_count > 1 && (
                                                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                                            {act.ritase_dekat > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(139,92,246,0.3)', padding: '1px 4px', borderRadius: 4, color: '#c4b5fd' }}>🚚 {act.ritase_dekat} Dekat</span>}
-                                                            {act.ritase_jauh > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(168,85,247,0.3)', padding: '1px 4px', borderRadius: 4, color: '#d8b4fe' }}>🚛 {act.ritase_jauh} Jauh</span>}
+                                                            {act.ritase_dekat > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(139,92,246,0.3)', padding: '1px 4px', borderRadius: 4, color: '#c4b5fd' }}><Icon name="Truck" size={16} inline /> {act.ritase_dekat} Dekat</span>}
+                                                            {act.ritase_jauh > 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(168,85,247,0.3)', padding: '1px 4px', borderRadius: 4, color: '#d8b4fe' }}><Icon name="Truck" size={16} inline /> {act.ritase_jauh} Jauh</span>}
                                                         </div>
                                                     )}
                                                     {act.is_overnight && (
-                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: 4, color: '#fca5a5' }}>🏨 Inap</span>
+                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: 4, color: '#fca5a5' }}><Icon name="Building2" size={16} inline /> Inap</span>
                                                     )}
                                                 </div>
                                             )}
@@ -371,11 +372,11 @@ export default function AdminDriverActivities() {
             {activeView === 'summary' && (
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">📊 Rekap Driver — {MONTHS[month]} {year}</h2>
+                        <h2 className="card-title"><Icon name="BarChart3" size={16} inline /> Rekap Driver — {MONTHS[month]} {year}</h2>
                     </div>
                     {summary.length === 0 ? (
                         <div className="empty-state">
-                            <div className="empty-state-icon">🚛</div>
+                            <div className="empty-state-icon"><Icon name="Truck" size={16} inline /></div>
                             <p className="empty-state-text">Belum ada data aktivitas driver bulan ini</p>
                         </div>
                     ) : (
@@ -385,15 +386,15 @@ export default function AdminDriverActivities() {
                                     <tr>
                                         <th>Driver</th>
                                         <th style={{ textAlign: 'center' }}>Hari Kerja</th>
-                                        <th style={{ textAlign: 'center' }}>🌙 Subuh</th>
+                                        <th style={{ textAlign: 'center' }}><Icon name="Moon" size={16} inline /> Subuh</th>
                                         <th style={{ textAlign: 'right' }}>Uang Subuh</th>
-                                        <th style={{ textAlign: 'center' }}>🔄 Total RIT</th>
+                                        <th style={{ textAlign: 'center' }}><Icon name="RefreshCw" size={16} inline /> Total RIT</th>
                                         <th style={{ textAlign: 'right' }}>Uang RIT</th>
-                                        <th style={{ textAlign: 'center' }}>🚚 Dekat+</th>
+                                        <th style={{ textAlign: 'center' }}><Icon name="Truck" size={16} inline /> Dekat+</th>
                                         <th style={{ textAlign: 'right' }}>Uang Dekat</th>
-                                        <th style={{ textAlign: 'center' }}>🚛 Jauh+</th>
+                                        <th style={{ textAlign: 'center' }}><Icon name="Truck" size={16} inline /> Jauh+</th>
                                         <th style={{ textAlign: 'right' }}>Uang Jauh</th>
-                                        <th style={{ textAlign: 'center' }}>🏨 Menginap</th>
+                                        <th style={{ textAlign: 'center' }}><Icon name="Building2" size={16} inline /> Menginap</th>
                                         <th style={{ textAlign: 'right' }}>Uang Inap</th>
                                         <th style={{ textAlign: 'right', fontWeight: 700 }}>Total</th>
                                     </tr>
@@ -458,7 +459,7 @@ export default function AdminDriverActivities() {
             {activeView === 'list' && (
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">📝 Daftar Aktivitas — {MONTHS[month]} {year}</h2>
+                        <h2 className="card-title"><Icon name="FileText" size={16} inline /> Daftar Aktivitas — {MONTHS[month]} {year}</h2>
                     </div>
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -466,7 +467,7 @@ export default function AdminDriverActivities() {
                         </div>
                     ) : activities.length === 0 ? (
                         <div className="empty-state">
-                            <div className="empty-state-icon">🚛</div>
+                            <div className="empty-state-icon"><Icon name="Truck" size={16} inline /></div>
                             <p className="empty-state-text">Belum ada data aktivitas driver bulan ini</p>
                         </div>
                     ) : (
@@ -494,7 +495,7 @@ export default function AdminDriverActivities() {
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{act.employee_id}</div>
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
-                                                {act.is_subuh ? <span style={{ color: '#6366f1' }}>🌙 Ya {act.departure_time && `(${act.departure_time})`}</span> : '-'}
+                                                {act.is_subuh ? <span style={{ color: '#6366f1' }}><Icon name="Moon" size={16} inline /> Ya {act.departure_time && `(${act.departure_time})`}</span> : '-'}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <span className="badge badge-warning">{act.rit_count}</span>
@@ -506,14 +507,14 @@ export default function AdminDriverActivities() {
                                                 {act.ritase_jauh > 0 ? <span className="badge" style={{ background: 'rgba(168,85,247,0.2)', color: '#d8b4fe' }}>{act.ritase_jauh}</span> : '-'}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
-                                                {act.is_overnight ? <span style={{ color: '#ef4444' }}>🏨 Ya</span> : '-'}
+                                                {act.is_overnight ? <span style={{ color: '#ef4444' }}><Icon name="Building2" size={16} inline /> Ya</span> : '-'}
                                             </td>
                                             <td>{act.rit_notes || '-'}</td>
                                             {isAdmin && (
                                                 <td style={{ textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                        <button onClick={() => openEditModal(act)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem' }}>✏️ Edit</button>
-                                                        <button onClick={() => handleDelete(act.id)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>🗑️ Hapus</button>
+                                                        <button onClick={() => openEditModal(act)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem' }}><Icon name="Pencil" size={16} inline /> Edit</button>
+                                                        <button onClick={() => handleDelete(act.id)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem', color: '#ef4444', borderColor: '#ef4444' }}><Icon name="Trash2" size={16} inline /> Hapus</button>
                                                     </div>
                                                 </td>
                                             )}
@@ -531,12 +532,12 @@ export default function AdminDriverActivities() {
                 <div className="modal-overlay">
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
                         <div className="modal-header">
-                            <h3 className="modal-title">{editData ? '✏️ Edit Aktivitas' : '➕ Tambah Aktivitas'}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <h3 className="modal-title">{editData ? 'Edit Aktivitas' : 'Tambah Aktivitas'}</h3>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleSave}>
                             <div className="modal-body">
-                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon">⚠️</span> {error}</div>}
+                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div className="form-group">
@@ -566,12 +567,12 @@ export default function AdminDriverActivities() {
                                             border: formData.is_subuh ? '2px solid #6366f1' : '2px solid rgba(255,255,255,0.1)',
                                             transition: 'all 0.2s'
                                         }}>
-                                        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🌙</div>
+                                        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}><Icon name="Moon" size={16} inline /></div>
                                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: formData.is_subuh ? '#818cf8' : 'var(--gray-400)' }}>
                                             Jalan Subuh
                                         </div>
                                         <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginTop: 2 }}>
-                                            {formData.is_subuh ? '✓ Aktif' : 'Tidak'}
+                                            {formData.is_subuh ? 'Aktif' : 'Tidak'}
                                         </div>
                                     </div>
 
@@ -580,7 +581,7 @@ export default function AdminDriverActivities() {
                                         padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center',
                                         background: 'rgba(245,158,11,0.1)', border: '2px solid rgba(245,158,11,0.3)'
                                     }}>
-                                        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🔄</div>
+                                        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}><Icon name="RefreshCw" size={16} inline /></div>
                                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fbbf24', marginBottom: 6 }}>Jumlah RIT</div>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                                             <button type="button" onClick={() => {
@@ -623,12 +624,12 @@ export default function AdminDriverActivities() {
                                             border: formData.is_overnight ? '2px solid #ef4444' : '2px solid rgba(255,255,255,0.1)',
                                             transition: 'all 0.2s'
                                         }}>
-                                        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🏨</div>
+                                        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}><Icon name="Building2" size={16} inline /></div>
                                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: formData.is_overnight ? '#f87171' : 'var(--gray-400)' }}>
                                             Menginap
                                         </div>
                                         <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginTop: 2 }}>
-                                            {formData.is_overnight ? '✓ Aktif' : 'Tidak'}
+                                            {formData.is_overnight ? 'Aktif' : 'Tidak'}
                                         </div>
                                     </div>
                                 </div>
@@ -641,7 +642,7 @@ export default function AdminDriverActivities() {
                                         marginBottom: '1rem'
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                                            <span style={{ fontSize: '1.5rem' }}>🚚</span>
+                                            <span style={{ fontSize: '1.5rem' }}><Icon name="Truck" size={16} inline /></span>
                                             <div>
                                                 <div style={{ fontWeight: 700, color: '#c4b5fd', fontSize: '0.85rem' }}>
                                                     Ritase Tambahan: {formData.rit_count - 1} trip
@@ -711,12 +712,12 @@ export default function AdminDriverActivities() {
                                 {editData && isAdmin && (
                                     <button type="button" className="btn" onClick={() => { setShowModal(false); handleDelete(editData.id); }}
                                         style={{ marginRight: 'auto', background: 'rgba(239,68,68,0.2)', color: '#f87171', border: 'none', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
-                                        🗑️ Hapus
+                                        <Icon name="Trash2" size={16} inline /> Hapus
                                     </button>
                                 )}
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : '💾 Simpan'}
+                                    {saving ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
                         </form>

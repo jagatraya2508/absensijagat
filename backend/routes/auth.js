@@ -101,7 +101,10 @@ function normalizeRoleName(value, roles) {
         manager: 'manager',
         pimpinan: 'manager',
         'pimpinan / manager': 'manager',
-        'pimpinan/manager': 'manager'
+        'pimpinan/manager': 'manager',
+        kiosk: 'kiosk',
+        'operator kiosk': 'kiosk',
+        'mode kiosk': 'kiosk',
     };
     const mapped = aliases[lower] || lower;
     const byName = roles.find(r => r.name.toLowerCase() === mapped);
@@ -114,7 +117,8 @@ function normalizeRoleName(value, roles) {
 const DEFAULT_ROLES = [
     { name: 'admin', label: 'Admin' },
     { name: 'manager', label: 'Pimpinan / Manager' },
-    { name: 'employee', label: 'Karyawan' }
+    { name: 'employee', label: 'Karyawan' },
+    { name: 'kiosk', label: 'Operator Kiosk' },
 ];
 
 async function getImportRoles() {
@@ -125,6 +129,18 @@ async function getImportRoles() {
         console.error('Failed to load roles for user import:', err.message);
     }
     return DEFAULT_ROLES;
+}
+
+async function getRolePermissions(roleName) {
+    if (!roleName || roleName === 'admin') return [];
+    const permsResult = await pool.query(
+        `SELECT rp.permission_key
+         FROM role_permissions rp
+         JOIN roles r ON rp.role_id = r.id
+         WHERE r.name = $1`,
+        [roleName]
+    );
+    return permsResult.rows.map((p) => p.permission_key);
 }
 
 function logError(error) {
@@ -187,6 +203,8 @@ router.post('/login', async (req, res) => {
             isSupervisor = sup.rows[0].is_supervisor === true || sup.rows[0].is_supervisor === 't';
         } catch (_) { /* column may not exist yet */ }
 
+        const permissions = await getRolePermissions(user.role);
+
         res.json({
             token,
             user: {
@@ -201,7 +219,8 @@ router.post('/login', async (req, res) => {
                 is_collector: user.is_collector,
                 is_sales: user.is_sales,
                 use_tracking: user.use_tracking,
-                is_supervisor: isSupervisor
+                is_supervisor: isSupervisor,
+                permissions,
             }
         });
     } catch (error) {
@@ -327,17 +346,9 @@ router.get('/me', authenticateToken, async (req, res) => {
 
         const user = result.rows[0];
 
-        // Fetch permissions for the user's role
         let permissions = [];
         if (user.role !== 'admin') {
-            const permsResult = await pool.query(
-                `SELECT rp.permission_key 
-                 FROM role_permissions rp 
-                 JOIN roles r ON rp.role_id = r.id 
-                 WHERE r.name = $1`,
-                [user.role]
-            );
-            permissions = permsResult.rows.map(p => p.permission_key);
+            permissions = await getRolePermissions(user.role);
         }
 
         user.permissions = permissions;

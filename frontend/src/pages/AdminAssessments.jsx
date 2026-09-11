@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -210,7 +211,7 @@ export default function AdminAssessments() {
         <div>
             <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 className="page-title">📋 Penilaian Kedisiplinan</h1>
+                    <h1 className="page-title"><Icon name="ClipboardList" size={16} inline /> Penilaian Kedisiplinan</h1>
                     <p className="page-subtitle">Evaluasi kedisiplinan pegawai berdasarkan kehadiran</p>
                 </div>
                 <button className="btn btn-primary" onClick={openNew} style={{ marginTop: '0.25rem' }}>+ Buat Penilaian</button>
@@ -219,7 +220,7 @@ export default function AdminAssessments() {
             {/* Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div className="card status-card">
-                    <div className="status-card-icon primary">📊</div>
+                    <div className="status-card-icon primary"><Icon name="BarChart3" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Total Penilaian</h3>
                         <p>{assessments.length}</p>
@@ -233,14 +234,14 @@ export default function AdminAssessments() {
                     </div>
                 </div>
                 <div className="card status-card">
-                    <div className="status-card-icon success">🏆</div>
+                    <div className="status-card-icon success"><Icon name="Trophy" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Grade A & B</h3>
                         <p>{gradeA + gradeB}</p>
                     </div>
                 </div>
                 <div className="card status-card">
-                    <div className="status-card-icon danger">⚠️</div>
+                    <div className="status-card-icon danger"><Icon name="AlertTriangle" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Grade D & E</h3>
                         <p>{gradeLow}</p>
@@ -282,7 +283,7 @@ export default function AdminAssessments() {
                     </div>
                 ) : assessments.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray-400)' }}>
-                        <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</p>
+                        <p style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="ClipboardList" size={16} inline /></p>
                         <p>Belum ada penilaian untuk periode ini</p>
                         <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={openNew}>
                             + Buat Penilaian Pertama
@@ -335,9 +336,9 @@ export default function AdminAssessments() {
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                 <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                    onClick={() => openEdit(a)}>✏️</button>
+                                                    onClick={() => openEdit(a)}><Icon name="Pencil" size={16} inline /></button>
                                                 <button className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                    onClick={() => handleDelete(a.id)}>🗑️</button>
+                                                    onClick={() => handleDelete(a.id)}><Icon name="Trash2" size={16} inline /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -353,8 +354,8 @@ export default function AdminAssessments() {
                 <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">{editId ? '✏️ Edit Penilaian' : '➕ Buat Penilaian Baru'}</h2>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+                            <h2 className="modal-title">{editId ? 'Edit Penilaian' : 'Buat Penilaian Baru'}</h2>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} inline /></button>
                         </div>
                         <form onSubmit={handleSubmit}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -399,13 +400,13 @@ export default function AdminAssessments() {
                             <div style={{ marginBottom: '1rem' }}>
                                 <button type="button" className="btn btn-success" onClick={calculateScore}
                                     disabled={calculating || !form.user_id} style={{ width: '100%' }}>
-                                    {calculating ? '⏳ Menghitung...' : '🔄 Hitung Otomatis dari Data Kehadiran'}
+                                    {calculating ? 'Menghitung...' : 'Hitung Otomatis dari Data Kehadiran'}
                                 </button>
                             </div>
 
                             {/* Attendance Stats */}
                             <div className="card" style={{ marginBottom: '1rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--primary-400)' }}>📊 Data Kehadiran</h3>
+                                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--primary-400)' }}><Icon name="BarChart3" size={16} inline /> Data Kehadiran</h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>Hari Kerja</span>
@@ -482,7 +483,7 @@ export default function AdminAssessments() {
                             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
                                 <button type="submit" className="btn btn-primary">
-                                    {editId ? '💾 Perbarui' : '💾 Simpan'}
+                                    {editId ? 'Perbarui' : 'Simpan'}
                                 </button>
                             </div>
                         </form>

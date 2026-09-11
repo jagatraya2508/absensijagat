@@ -2,9 +2,10 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import Icon from './Icon';
 
 export default function Sidebar({ isOpen = false, onNavigate }) {
-    const { user, logout, hasPermission } = useAuth();
+    const { user, logout, hasPermission, isKioskOnly } = useAuth();
     const { settings, companyName } = useSettings();
     const navigate = useNavigate();
     const location = useLocation();
@@ -19,57 +20,61 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         navigate('/login');
     }
 
-    const menuItems = [
-        { path: '/', icon: '🏠', label: 'Dashboard' },
-        { path: '/attendance', icon: '📸', label: 'Absensi' },
-        ...(hasPermission('admin.kiosk') ? [{ path: '/kiosk', icon: '🖥️', label: 'Mode Kiosk' }] : []),
-        { path: '/manual-attendance', icon: '📝', label: 'Pengajuan Absen' },
-        { path: '/history', icon: '📋', label: 'Riwayat' },
-        { path: '/schedule', icon: '🗓️', label: 'Kalender' },
-        { path: '/leaves', icon: '📝', label: 'Izin & Cuti' },
-        { path: '/overtime', icon: '⏰', label: 'Pengajuan Lembur' },
-        { path: '/daily-work-report', icon: '📝', label: 'Laporan Harian' },
-        ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: '📍', label: 'Tracking' }] : []),
-        ...(hasPermission('admin.assets') ? [{ path: '/admin/assets', icon: '📦', label: 'Manajemen Aset' }] : []),
-        { path: '/change-password', icon: '👤', label: 'Profil Saya' },
+    const kioskOnly = isKioskOnly();
+
+    const menuItems = kioskOnly
+        ? [{ path: '/kiosk', icon: 'Monitor', label: 'Mode Kiosk' }]
+        : [
+        { path: '/', icon: 'LayoutDashboard', label: 'Dashboard' },
+        { path: '/attendance', icon: 'Camera', label: 'Absensi' },
+        ...(hasPermission('admin.kiosk') ? [{ path: '/kiosk', icon: 'Monitor', label: 'Mode Kiosk' }] : []),
+        { path: '/manual-attendance', icon: 'ClipboardPen', label: 'Pengajuan Absen' },
+        { path: '/history', icon: 'History', label: 'Riwayat' },
+        { path: '/schedule', icon: 'Calendar', label: 'Kalender' },
+        { path: '/leaves', icon: 'FileText', label: 'Izin & Cuti' },
+        { path: '/overtime', icon: 'Clock', label: 'Pengajuan Lembur' },
+        { path: '/daily-work-report', icon: 'NotebookPen', label: 'Laporan Harian' },
+        ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: 'MapPin', label: 'Tracking' }] : []),
+        ...(hasPermission('admin.assets') ? [{ path: '/admin/assets', icon: 'Package', label: 'Manajemen Aset' }] : []),
+        { path: '/change-password', icon: 'User', label: 'Profil Saya' },
     ];
 
     // Master submenu items
     const masterItems = [
-        { path: '/admin/locations', icon: '📍', label: 'Kelola Lokasi', permissionKey: 'admin.locations' },
-        { path: '/admin/departments', icon: '🏢', label: 'Master Departemen', permissionKey: 'admin.departments' },
-        { path: '/admin/positions', icon: '🏅', label: 'Master Jabatan', permissionKey: 'admin.positions' },
-        { path: '/admin/vehicle-types', icon: '🚚', label: 'Master Kendaraan', permissionKey: 'admin.vehicle_types' },
-        { path: '/admin/employees', icon: '👤', label: 'Data Karyawan', permissionKey: 'admin.employees' },
-        { path: '/admin/organization', icon: '🗂️', label: 'Struktur Organisasi', permissionKey: 'admin.organization', extraKeys: ['admin.employees'] },
-        { path: '/admin/face-registration', icon: '🔐', label: 'Registrasi Wajah', permissionKey: 'admin.face_registration' },
-        { path: '/admin/work-schedule', icon: '🕐', label: 'Jadwal Kerja', permissionKey: 'admin.work_schedule' },
-        { path: '/admin/customers', icon: '🏪', label: 'Master Customer', permissionKey: 'admin.customers' },
+        { path: '/admin/locations', icon: 'MapPin', label: 'Kelola Lokasi', permissionKey: 'admin.locations' },
+        { path: '/admin/departments', icon: 'Building2', label: 'Master Departemen', permissionKey: 'admin.departments' },
+        { path: '/admin/positions', icon: 'Award', label: 'Master Jabatan', permissionKey: 'admin.positions' },
+        { path: '/admin/vehicle-types', icon: 'Truck', label: 'Master Kendaraan', permissionKey: 'admin.vehicle_types' },
+        { path: '/admin/employees', icon: 'User', label: 'Data Karyawan', permissionKey: 'admin.employees' },
+        { path: '/admin/organization', icon: 'Network', label: 'Struktur Organisasi', permissionKey: 'admin.organization', extraKeys: ['admin.employees'] },
+        { path: '/admin/face-registration', icon: 'ScanFace', label: 'Registrasi Wajah', permissionKey: 'admin.face_registration' },
+        { path: '/admin/work-schedule', icon: 'CalendarClock', label: 'Jadwal Kerja', permissionKey: 'admin.work_schedule' },
+        { path: '/admin/customers', icon: 'Store', label: 'Master Customer', permissionKey: 'admin.customers' },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)));
 
     const pimpinanItems = [
-        { path: '/approvals', icon: '✅', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals' },
-        { path: '/leave-approvals', icon: '📝', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
-        { path: '/admin/leaves', icon: '📝', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
-        { path: '/admin/manual-attendance', icon: '📋', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
-        { path: '/off-days', icon: '📅', label: 'Atur Libur', permissionKey: 'admin.off_days' },
-        { path: '/admin/announcements', icon: '📢', label: 'Kelola Pengumuman', permissionKey: 'admin.announcements' },
-        { path: '/admin/driver-activities', icon: '🚛', label: 'Aktivitas Driver', permissionKey: 'admin.driver_activities' },
-        { path: '/admin/driver-tracking', icon: '📍', label: 'Tracking Kunjungan', permissionKey: 'admin.driver_tracking' },
-        { path: '/admin/loans', icon: '💰', label: 'Pinjaman', permissionKey: 'admin.loans' },
-        { path: '/admin/payroll', icon: '💵', label: 'Payroll', permissionKey: 'admin.payroll' },
-        { path: '/admin/assessments', icon: '📋', label: 'Penilaian', permissionKey: 'admin.assessments' },
-        { path: '/admin/recruitment', icon: '🧑‍💼', label: 'Recruitment', permissionKey: 'admin.recruitment' },
-        { path: '/admin/daily-work-report', icon: '📊', label: 'Review Laporan Harian', permissionKey: 'admin.daily_work_report' },
-        { path: '/admin/reports', icon: '📊', label: 'Laporan', permissionKey: 'admin.reports' },
+        { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals' },
+        { path: '/leave-approvals', icon: 'ClipboardCheck', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
+        { path: '/admin/leaves', icon: 'FileText', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
+        { path: '/admin/manual-attendance', icon: 'ClipboardList', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
+        { path: '/off-days', icon: 'CalendarOff', label: 'Atur Libur', permissionKey: 'admin.off_days' },
+        { path: '/admin/announcements', icon: 'Megaphone', label: 'Kelola Pengumuman', permissionKey: 'admin.announcements' },
+        { path: '/admin/driver-activities', icon: 'Truck', label: 'Aktivitas Driver', permissionKey: 'admin.driver_activities' },
+        { path: '/admin/driver-tracking', icon: 'MapPin', label: 'Tracking Kunjungan', permissionKey: 'admin.driver_tracking' },
+        { path: '/admin/loans', icon: 'Wallet', label: 'Pinjaman', permissionKey: 'admin.loans' },
+        { path: '/admin/payroll', icon: 'Banknote', label: 'Payroll', permissionKey: 'admin.payroll' },
+        { path: '/admin/assessments', icon: 'ClipboardList', label: 'Penilaian', permissionKey: 'admin.assessments' },
+        { path: '/admin/recruitment', icon: 'Briefcase', label: 'Recruitment', permissionKey: 'admin.recruitment' },
+        { path: '/admin/daily-work-report', icon: 'BarChart3', label: 'Review Laporan Harian', permissionKey: 'admin.daily_work_report' },
+        { path: '/admin/reports', icon: 'BarChart3', label: 'Laporan', permissionKey: 'admin.reports' },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor));
 
     // Other admin items (flat)
     const adminItems = [
-        { path: '/admin/users', icon: '👥', label: 'Kelola User', permissionKey: 'admin.users' },
-        { path: '/admin/roles', icon: '🔑', label: 'Kelola Role', permissionKey: 'admin.roles' },
-        { path: '/admin/settings', icon: '⚙️', label: 'Pengaturan', permissionKey: 'admin.settings' },
-        { path: '/admin/license', icon: '🔑', label: 'License', permissionKey: 'admin.license' },
+        { path: '/admin/users', icon: 'Users', label: 'Kelola User', permissionKey: 'admin.users' },
+        { path: '/admin/roles', icon: 'Shield', label: 'Kelola Role', permissionKey: 'admin.roles' },
+        { path: '/admin/settings', icon: 'Settings', label: 'Pengaturan', permissionKey: 'admin.settings' },
+        { path: '/admin/license', icon: 'KeyRound', label: 'License', permissionKey: 'admin.license' },
     ].filter(item => hasPermission(item.permissionKey));
 
     const isMasterActive = masterItems.some(item => location.pathname === item.path);
@@ -95,12 +100,12 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                             }
                             end={item.path === '/'}
                         >
-                            <span className="sidebar-link-icon">{item.icon}</span>
+                            <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
                             {item.label}
                         </NavLink>
                     ))}
 
-                    {pimpinanItems.length > 0 && (
+                    {pimpinanItems.length > 0 && !kioskOnly && (
                         <>
                             <div style={{
                                 margin: '1.25rem 0 0.5rem 0',
@@ -127,14 +132,14 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                         `sidebar-link ${isActive ? 'active' : ''}`
                                     }
                                 >
-                                    <span className="sidebar-link-icon">{item.icon}</span>
+                                    <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
                                     {item.label}
                                 </NavLink>
                             ))}
                         </>
                     )}
 
-                    {(masterItems.length > 0 || adminItems.length > 0) && (
+                    {(masterItems.length > 0 || adminItems.length > 0) && !kioskOnly && (
                         <>
                             <div style={{
                                 margin: '1.25rem 0 0.5rem 0',
@@ -168,14 +173,14 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                         }}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                            <span className="sidebar-link-icon">📦</span>
+                                            <span className="sidebar-link-icon"><Icon name="Box" size={18} /></span>
                                             Master
                                         </div>
                                         <span style={{
                                             fontSize: '0.6rem', transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                             transform: openMenus.master ? 'rotate(180deg)' : 'rotate(0deg)',
                                             opacity: 0.5
-                                        }}>▼</span>
+                                        }}><Icon name="ChevronDown" size={14} /></span>
                                     </div>
 
                                     <div style={{
@@ -203,7 +208,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                                 }
                                                 style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem' }}
                                             >
-                                                <span className="sidebar-link-icon">{item.icon}</span>
+                                                <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
                                                 {item.label}
                                             </NavLink>
                                         ))}
@@ -221,7 +226,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                         `sidebar-link ${isActive ? 'active' : ''}`
                                     }
                                 >
-                                    <span className="sidebar-link-icon">{item.icon}</span>
+                                    <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
                                     {item.label}
                                 </NavLink>
                             ))}
@@ -240,11 +245,11 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                     <div className="sidebar-user-info">
                         <div className="sidebar-user-name">{user?.name}</div>
                         <div className="sidebar-user-role">
-                            {user?.role === 'admin' ? 'Administrator' : user?.role === 'manager' ? 'Pimpinan / Manager' : 'Karyawan'}
+                            {user?.role === 'admin' ? 'Administrator' : user?.role === 'manager' ? 'Pimpinan / Manager' : user?.role === 'kiosk' ? 'Operator Kiosk' : 'Karyawan'}
                         </div>
                     </div>
                     <button className="sidebar-logout" onClick={handleLogout} title="Logout">
-                        🚪
+                        <Icon name="LogOut" size={18} />
                     </button>
                 </div>
             </aside>

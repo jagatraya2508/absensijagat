@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { authAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import Icon from '../components/Icon';
 
 export default function ChangePassword() {
     const { user, setUser } = useAuth();
@@ -59,21 +60,21 @@ export default function ChangePassword() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">👤 Profil Saya</h1>
+                <h1 className="page-title"><Icon name="User" size={16} inline /> Profil Saya</h1>
                 <p className="page-subtitle">Kelola foto profil Anda</p>
             </div>
 
             <div className="card" style={{ maxWidth: 600, margin: '0 auto', marginBottom: '2rem' }}>
                 {error && (
                     <div className="alert alert-danger mb-3">
-                        <span className="alert-icon">⚠️</span>
+                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                         {error}
                     </div>
                 )}
 
                 {success && (
                     <div className="alert alert-success mb-3">
-                        <span className="alert-icon">✓</span>
+                        <span className="alert-icon"><Icon name="Check" size={16} inline /></span>
                         {success}
                     </div>
                 )}

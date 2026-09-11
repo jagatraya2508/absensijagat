@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import Icon from '../components/Icon';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -237,13 +238,13 @@ export default function Overtime() {
         <>
         <div className={`fade-in ${printData ? 'hide-when-printing-spl' : ''}`}>
             <div className="page-header">
-                <h1 className="page-title">⏰ Pengajuan Lembur (SPL)</h1>
+                <h1 className="page-title"><Icon name="Clock" size={16} inline /> Pengajuan Lembur (SPL)</h1>
                 <p className="page-subtitle">Ajukan dan pantau status surat perintah lembur Anda</p>
             </div>
 
             {message.text && (
                 <div className={`alert alert-${message.type} mb-4`}>
-                    {message.type === 'success' ? '✅' : '⚠️'} {message.text}
+                    {message.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'} {message.text}
                 </div>
             )}
 
@@ -251,7 +252,7 @@ export default function Overtime() {
                 <div className="card-header">
                     <h2 className="card-title">Riwayat Pengajuan Lembur</h2>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-outline" onClick={fetchRequests} disabled={loading}>🔄 Refresh</button>
+                        <button className="btn btn-outline" onClick={fetchRequests} disabled={loading}><Icon name="RefreshCw" size={16} inline /> Refresh</button>
                         <button className="btn btn-primary" onClick={openModal}>+ Ajukan Lembur</button>
                     </div>
                 </div>
@@ -262,7 +263,7 @@ export default function Overtime() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📝</div>
+                        <div className="empty-state-icon"><Icon name="FileText" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada riwayat pengajuan lembur</p>
                         <button className="btn btn-primary mt-3" onClick={openModal}>Buat Pengajuan</button>
                     </div>
@@ -312,17 +313,17 @@ export default function Overtime() {
                                                     <>
                                                         <button className="btn btn-outline" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                                                             onClick={() => openEditModal(req)} title="Edit">
-                                                            ✏️ Edit
+                                                            <Icon name="Pencil" size={16} inline /> Edit
                                                         </button>
                                                         {req.status === 'pending' && (
                                                             <button className="btn btn-outline" style={{ color: 'var(--warning-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                                                                 onClick={() => cancelRequest(req.id)} title="Batalkan">
-                                                                ⛔ Batal
+                                                                <Icon name="Ban" size={16} inline /> Batal
                                                             </button>
                                                         )}
                                                         <button className="btn btn-outline" style={{ color: 'var(--danger-500)', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                                                             onClick={() => deleteRequest(req.id)} title="Hapus">
-                                                            🗑️
+                                                            <Icon name="Trash2" size={16} inline />
                                                         </button>
                                                     </>
                                                 )}
@@ -348,8 +349,8 @@ export default function Overtime() {
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">{editingId ? '✏️ Edit Pengajuan Lembur' : '📋 Ajukan Lembur Baru'}</h2>
-                            <button className="modal-close" onClick={() => { setShowModal(false); setEditingId(null); }}>×</button>
+                            <h2 className="modal-title">{editingId ? 'Edit Pengajuan Lembur' : 'Ajukan Lembur Baru'}</h2>
+                            <button className="modal-close" onClick={() => { setShowModal(false); setEditingId(null); }}><Icon name="X" size={16} /></button>
                         </div>
 
                         <div style={{ padding: '1.5rem' }}>

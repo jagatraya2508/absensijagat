@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { attendanceAPI, authAPI, reportsAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import ImageModal from '../components/ImageModal';
+import Icon from '../components/Icon';
 
 export default function History() {
     const { user } = useAuth();
@@ -103,11 +104,11 @@ export default function History() {
 
     function getLeaveLabel(leaveType) {
         switch (leaveType) {
-            case 'late': return '⏰ Izin Terlambat';
-            case 'sick': return '🏥 Izin Sakit';
-            case 'leave': return '🏖️ Cuti';
-            case 'change_off': return '🔁 Tukar Libur';
-            default: return '📝 Izin';
+            case 'late': return 'Izin Terlambat';
+            case 'sick': return 'Izin Sakit';
+            case 'leave': return 'Cuti';
+            case 'change_off': return 'Tukar Libur';
+            default: return 'Izin';
         }
     }
 
@@ -124,7 +125,7 @@ export default function History() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📋 Riwayat Absensi</h1>
+                <h1 className="page-title"><Icon name="ClipboardList" size={16} inline /> Riwayat Absensi</h1>
                 <p className="page-subtitle">
                     {isAdmin ? 'Lihat riwayat absensi semua karyawan' : 'Lihat riwayat absensi Anda'}
                 </p>
@@ -180,7 +181,7 @@ export default function History() {
                         </select>
                     </div>
                     <button type="submit" className="btn btn-primary">
-                        🔍 Filter
+                        <Icon name="Search" size={16} inline /> Filter
                     </button>
                     <button
                         type="button"
@@ -215,7 +216,7 @@ export default function History() {
                                 }}
                                 style={{ padding: '0.5rem 1rem' }}
                             >
-                                {exporting ? '⏳' : '📄'} PDF
+                                {exporting ? 'Hourglass' : 'FileText'} PDF
                             </button>
                             <button
                                 type="button"
@@ -236,7 +237,7 @@ export default function History() {
                                 }}
                                 style={{ padding: '0.5rem 1rem' }}
                             >
-                                {exporting ? '⏳' : '📊'} Excel
+                                {exporting ? 'Hourglass' : 'BarChart3'} Excel
                             </button>
                         </>
                     )}
@@ -245,7 +246,7 @@ export default function History() {
 
             {error && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                     {error}
                 </div>
             )}
@@ -257,7 +258,7 @@ export default function History() {
             ) : records.length === 0 ? (
                 <div className="card">
                     <div className="empty-state">
-                        <div className="empty-state-icon">📋</div>
+                        <div className="empty-state-icon"><Icon name="ClipboardList" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada riwayat absensi</p>
                     </div>
                 </div>
@@ -317,7 +318,7 @@ export default function History() {
                                                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                                 fontSize: '1.5rem', flexShrink: 0
                                                             }}>
-                                                                🏖️
+                                                                <Icon name="Palmtree" size={16} inline />
                                                             </div>
                                                             <div style={{ flex: 1 }}>
                                                                 <div style={{ fontWeight: 600, color: 'var(--primary-300)' }}>Hari Libur</div>
@@ -347,7 +348,7 @@ export default function History() {
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     fontSize: '1.5rem', flexShrink: 0
                                                 }}>
-                                                    📝
+                                                    <Icon name="FileText" size={16} inline />
                                                 </div>
                                                             <div style={{ flex: 1 }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -357,7 +358,7 @@ export default function History() {
                                                     </div>
                                                     {record.notes && (
                                                         <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.35rem' }}>
-                                                            💬 {record.notes}
+                                                            <Icon name="MessageSquare" size={16} inline /> {record.notes}
                                                         </div>
                                                     )}
                                                 </div>
@@ -416,22 +417,22 @@ export default function History() {
                                                             <div style={{ flex: 1 }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                                                         <span className={`badge ${record.type === 'check_in' ? 'badge-primary' : 'badge-warning'}`}>
-                                                            {record.type === 'check_in' ? '📥 Masuk' : '📤 Pulang'}
+                                                            {record.type === 'check_in' ? 'Masuk' : 'Pulang'}
                                                         </span>
                                                         <span style={{ fontWeight: 600 }}>{formatTime(record.recorded_at)}</span>
                                                     </div>
                                                     <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)' }}>
-                                                        📍 {record.location_name || 'Lokasi tidak diketahui'}
+                                                        <Icon name="MapPin" size={16} inline /> {record.location_name || 'Lokasi tidak diketahui'}
                                                     </div>
                                                     {record.notes && (
                                                         <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.25rem' }}>
-                                                            💬 {record.notes}
+                                                            <Icon name="MessageSquare" size={16} inline /> {record.notes}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <span className={`badge ${record.is_valid ? 'badge-success' : 'badge-warning'}`}>
-                                                        {record.is_valid ? '✓ Valid' : `⚠ ${Math.round(record.distance_meters || 0)}m`}
+                                                        {record.is_valid ? 'Valid' : `${Math.round(record.distance_meters || 0)}m`}
                                                     </span>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>
                                                         {record.latitude ? parseFloat(record.latitude).toFixed(4) : '-'}, {record.longitude ? parseFloat(record.longitude).toFixed(4) : '-'}
@@ -449,7 +450,7 @@ export default function History() {
                                                             }}
                                                             onClick={() => handleDelete(record.id)}
                                                         >
-                                                            🗑️
+                                                            <Icon name="Trash2" size={16} inline />
                                                         </button>
                                                     )}
                                                 </div>

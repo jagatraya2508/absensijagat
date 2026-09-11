@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { leavesAPI } from '../utils/api';
 import ApprovalTimeline from '../components/ApprovalTimeline';
+import Icon from '../components/Icon';
 
 const leaveTypes = {
-    late: { label: 'Izin Terlambat', icon: '⏰', color: 'warning' },
-    sick: { label: 'Izin Sakit', icon: '🏥', color: 'danger' },
-    permission: { label: 'Izin Tidak Masuk', icon: '📝', color: 'secondary' },
-    leave: { label: 'Cuti', icon: '🏖️', color: 'primary' },
-    change_off: { label: 'Tukar Libur', icon: '🔄', color: 'info' }
+    late: { label: 'Izin Terlambat', icon: 'Clock', color: 'warning' },
+    sick: { label: 'Izin Sakit', icon: 'HeartPulse', color: 'danger' },
+    permission: { label: 'Izin Tidak Masuk', icon: 'FileText', color: 'secondary' },
+    leave: { label: 'Cuti', icon: 'Palmtree', color: 'primary' },
+    change_off: { label: 'Tukar Libur', icon: 'RefreshCw', color: 'info' }
 };
 
 export default function LeaveApprovals() {
@@ -66,19 +67,19 @@ export default function LeaveApprovals() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">✅ Persetujuan Izin & Cuti</h1>
+                <h1 className="page-title"><Icon name="CheckCircle2" size={16} inline /> Persetujuan Izin & Cuti</h1>
                 <p className="page-subtitle">Setujui atau tolak pengajuan dari bawahan Anda sesuai tingkat approval</p>
             </div>
 
-            {error && <div className="alert alert-danger mb-4">⚠️ {error}</div>}
-            {success && <div className="alert alert-success mb-4">✅ {success}</div>}
+            {error && <div className="alert alert-danger mb-4"><Icon name="AlertTriangle" size={16} inline /> {error}</div>}
+            {success && <div className="alert alert-success mb-4"><Icon name="CheckCircle2" size={16} inline /> {success}</div>}
 
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">Menunggu keputusan Anda</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <span className="badge badge-warning">{requests.length}</span>
-                        <button className="btn btn-outline" onClick={fetchRequests} disabled={loading}>🔄 Refresh</button>
+                        <button className="btn btn-outline" onClick={fetchRequests} disabled={loading}><Icon name="RefreshCw" size={16} inline /> Refresh</button>
                     </div>
                 </div>
 
@@ -88,7 +89,7 @@ export default function LeaveApprovals() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🎉</div>
+                        <div className="empty-state-icon"><Icon name="Trophy" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada pengajuan yang menunggu persetujuan Anda.</p>
                     </div>
                 ) : (
@@ -103,7 +104,7 @@ export default function LeaveApprovals() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 4 }}>
-                                            <span style={{ fontSize: '1.25rem' }}>{leaveTypes[req.type]?.icon}</span>
+                                            <Icon name={leaveTypes[req.type]?.icon} size={20} />
                                             <strong style={{ color: 'white' }}>{req.employee_name}</strong>
                                             <span style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>({req.employee_id})</span>
                                         </div>
@@ -121,7 +122,7 @@ export default function LeaveApprovals() {
                                         )}
                                     </div>
                                     <span className="badge badge-warning">
-                                        ⏳ Tingkat {req.current_step || req.current_step_order || 1}/{req.total_steps || (req.approval_steps?.length || 1)}
+                                        <Icon name="Hourglass" size={16} inline /> Tingkat {req.current_step || req.current_step_order || 1}/{req.total_steps || (req.approval_steps?.length || 1)}
                                     </span>
                                 </div>
 
@@ -152,14 +153,14 @@ export default function LeaveApprovals() {
                                         disabled={processing === req.id}
                                         onClick={() => handleAction(req.id, 'rejected')}
                                     >
-                                        ❌ Tolak
+                                        <Icon name="XCircle" size={16} inline /> Tolak
                                     </button>
                                     <button
                                         className="btn btn-success"
                                         disabled={processing === req.id}
                                         onClick={() => handleAction(req.id, 'approved')}
                                     >
-                                        ✅ Setujui
+                                        <Icon name="CheckCircle2" size={16} inline /> Setujui
                                     </button>
                                 </div>
                             </div>

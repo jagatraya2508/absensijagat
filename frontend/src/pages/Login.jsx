@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { authAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function Login() {
     const [employeeId, setEmployeeId] = useState('');
@@ -37,8 +38,8 @@ export default function Login() {
         setLoading(true);
 
         try {
-            await login(employeeId, password);
-            navigate('/');
+            const data = await login(employeeId, password);
+            navigate(data?.user?.role === 'kiosk' ? '/kiosk' : '/');
         } catch (err) {
             setError(err.message || 'Login gagal. Periksa kembali Employee ID dan password.');
         } finally {
@@ -58,7 +59,7 @@ export default function Login() {
 
                     {error && (
                         <div className="alert alert-danger">
-                            <span className="alert-icon">⚠️</span>
+                            <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                             {error}
                         </div>
                     )}

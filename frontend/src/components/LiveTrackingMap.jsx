@@ -3,17 +3,17 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import { driverTrackingAPI } from '../utils/api';
 import { getTrackingTypeMeta } from '../utils/tracking';
+import Icon from './Icon';
 
 const TRAIL_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#ec4899'];
 
-function vehicleIcon({ heading, online, name, motion }) {
+function vehicleIcon({ heading, online, name }) {
     const deg = Number.isFinite(heading) && heading >= 0 ? heading : 0;
     const color = online ? '#10b981' : '#94a3b8';
-    const emoji = motion?.icon || '📍';
     const html = `
         <div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-6px);">
             <div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);max-width:140px;overflow:hidden;text-overflow:ellipsis;">
-                ${emoji} ${String(name || '').replace(/[&<>"']/g, '')}
+                ${String(name || '').replace(/[&<>"']/g, '')}
             </div>
             <svg width="34" height="34" viewBox="0 0 24 24" style="transform:rotate(${deg}deg);filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));margin-top:2px;">
                 <path d="M12 2 L20 21 L12 16 L4 21 Z" fill="${color}" stroke="#fff" stroke-width="1.4"/>
@@ -70,7 +70,7 @@ function motionText(v) {
     if (!m) return formatSpeed(v.speed);
     const kmh = m.speed_kmh != null ? `${Math.round(m.speed_kmh)} km/jam` : formatSpeed(v.speed);
     const guess = m.guessed ? ' (perkiraan)' : '';
-    return `${m.icon} ${m.label}${guess} · ${kmh}`;
+    return `${m.label}${guess} · ${kmh}`;
 }
 
 function taskLabel(v) {
@@ -119,20 +119,20 @@ export default function LiveTrackingMap() {
     return (
         <div className="card mb-4" style={{ overflow: 'hidden' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h2 className="card-title">📡 Peta Live Kendaraan</h2>
+                <h2 className="card-title"><Icon name="Radio" size={16} inline /> Peta Live Kendaraan</h2>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontSize: '0.8rem', color: 'var(--gray-400)' }}>
                     <span style={{ color: '#10b981', fontWeight: 700 }}>● {onlineCount} online</span>
                     <span>{vehicles.length} di peta</span>
-                    <span title="Deteksi dari kecepatan GPS">🚶 motor/mobil/jalan kaki</span>
+                    <span title="Deteksi dari kecepatan GPS"><Icon name="PersonStanding" size={16} inline /> motor/mobil/jalan kaki</span>
                     <button className="btn btn-outline" onClick={fetchLive} style={{ padding: '0.3rem 0.7rem', fontSize: '0.8rem' }}>
-                        🔄
+                        <Icon name="RefreshCw" size={16} inline />
                     </button>
                 </div>
             </div>
 
             {error && (
                 <div className="alert alert-danger" style={{ margin: '0.75rem 1rem' }}>
-                    <span className="alert-icon">⚠️</span>{error}
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>{error}
                 </div>
             )}
 
@@ -181,7 +181,7 @@ export default function LiveTrackingMap() {
                             </div>
                             {v.customer_name && (
                                 <div style={{ fontSize: '0.75rem', color: 'var(--success-400)', marginTop: 2 }}>
-                                    🏪 {v.customer_name}
+                                    <Icon name="Store" size={16} inline /> {v.customer_name}
                                 </div>
                             )}
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: TRAIL_COLORS[idx % TRAIL_COLORS.length], marginTop: 6 }} />
@@ -214,7 +214,7 @@ export default function LiveTrackingMap() {
                                     )}
                                     <Marker
                                         position={[v.latitude, v.longitude]}
-                                        icon={vehicleIcon({ heading: v.heading, online: v.online, name: v.name.split(' ')[0], motion: v.motion })}
+                                        icon={vehicleIcon({ heading: v.heading, online: v.online, name: v.name.split(' ')[0] })}
                                         eventHandlers={{ click: () => setSelectedId(v.user_id) }}
                                         opacity={dim ? 0.45 : 1}
                                     >
@@ -222,10 +222,14 @@ export default function LiveTrackingMap() {
                                             <div style={{ color: '#333', minWidth: 180 }}>
                                                 <strong>{v.name}</strong><br />
                                                 {v.employee_id} · {taskLabel(v)}<br />
-                                                {v.motion ? `${v.motion.icon} ${v.motion.label}${v.motion.guessed ? ' (perkiraan)' : ''}` : formatSpeed(v.speed)}
+                                                {v.motion ? (
+                                                    <>
+                                                        <Icon name={v.motion.icon} size={14} inline /> {v.motion.label}{v.motion.guessed ? ' (perkiraan)' : ''}
+                                                    </>
+                                                ) : formatSpeed(v.speed)}
                                                 {v.motion?.speed_kmh != null ? ` · ${Math.round(v.motion.speed_kmh)} km/jam` : null}<br />
-                                                ⏱ {formatAge(v.age_sec)}
-                                                {v.customer_name ? <><br />🏪 {v.customer_name}</> : null}
+                                                <Icon name="Clock" size={12} inline /> {formatAge(v.age_sec)}
+                                                {v.customer_name ? <><br /><Icon name="Store" size={16} inline /> {v.customer_name}</> : null}
                                             </div>
                                         </Popup>
                                     </Marker>

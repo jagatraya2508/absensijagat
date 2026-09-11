@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { vehicleTypesAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminVehicleTypes() {
     const [vehicleTypes, setVehicleTypes] = useState([]);
@@ -85,18 +86,18 @@ export default function AdminVehicleTypes() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🚚 Master Kendaraan</h1>
+                <h1 className="page-title"><Icon name="Truck" size={16} inline /> Master Kendaraan</h1>
                 <p className="page-subtitle">Kelola daftar jenis kendaraan operasional untuk driver</p>
             </div>
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span> {success}
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}
                 </div>
             )}
             {error && !showModal && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span> {error}
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}
                 </div>
             )}
 
@@ -105,13 +106,13 @@ export default function AdminVehicleTypes() {
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                         <h2 className="card-title" style={{ margin: 0 }}>Daftar Jenis Kendaraan</h2>
                         <button className="btn btn-primary" onClick={() => openModal()}>
-                            ➕ Tambah Kendaraan
+                            <Icon name="Plus" size={16} inline /> Tambah Kendaraan
                         </button>
                     </div>
                     <input
                         type="text"
                         className="form-input"
-                        placeholder="🔍 Cari kendaraan..."
+                        placeholder="Cari kendaraan..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         style={{ maxWidth: 300, margin: 0 }}
@@ -124,7 +125,7 @@ export default function AdminVehicleTypes() {
                     </div>
                 ) : filteredData.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🚚</div>
+                        <div className="empty-state-icon"><Icon name="Truck" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada data jenis kendaraan</p>
                         <button className="btn btn-outline" onClick={() => openModal()}>
                             Tambah Jenis Kendaraan Sekarang
@@ -154,14 +155,14 @@ export default function AdminVehicleTypes() {
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
                                                     onClick={() => openModal(vt)}
                                                 >
-                                                    ✏️ Edit
+                                                    <Icon name="Pencil" size={16} inline /> Edit
                                                 </button>
                                                 <button 
                                                     className="btn btn-outline" 
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', color: 'var(--danger-500)', borderColor: 'var(--danger-500)' }}
                                                     onClick={() => handleDelete(vt.id)}
                                                 >
-                                                    🗑️ Hapus
+                                                    <Icon name="Trash2" size={16} inline /> Hapus
                                                 </button>
                                             </div>
                                         </td>
@@ -179,13 +180,13 @@ export default function AdminVehicleTypes() {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">{formData.id ? 'Edit Jenis Kendaraan' : 'Tambah Jenis Kendaraan'}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleSave}>
                             <div className="modal-body">
                                 {error && (
                                     <div className="alert alert-danger mb-3">
-                                        <span className="alert-icon">⚠️</span> {error}
+                                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}
                                     </div>
                                 )}
                                 <div className="form-group">
@@ -214,7 +215,7 @@ export default function AdminVehicleTypes() {
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : '💾 Simpan'}
+                                    {saving ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
                         </form>

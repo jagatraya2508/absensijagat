@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -6,17 +7,17 @@ import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const CATEGORY_MAP = {
-    task: { label: 'Task', icon: '📋', color: '#3b82f6' },
-    meeting: { label: 'Meeting', icon: '👥', color: '#8b5cf6' },
-    admin: { label: 'Administrasi', icon: '📁', color: '#f59e0b' },
-    other: { label: 'Lainnya', icon: '📌', color: '#6b7280' }
+    task: { label: 'Task', icon: 'ClipboardList', color: '#3b82f6' },
+    meeting: { label: 'Meeting', icon: 'Users', color: '#8b5cf6' },
+    admin: { label: 'Administrasi', icon: 'Folder', color: '#f59e0b' },
+    other: { label: 'Lainnya', icon: 'Pin', color: '#6b7280' }
 };
 
 const STATUS_MAP = {
-    completed: { label: 'Selesai', icon: '✅', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
-    in_progress: { label: 'Dikerjakan', icon: '🔄', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-    pending: { label: 'Pending', icon: '⏳', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
-    blocked: { label: 'Blocked', icon: '🚫', color: '#6b7280', bg: 'rgba(107,114,128,0.12)' }
+    completed: { label: 'Selesai', icon: 'CheckCircle2', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+    in_progress: { label: 'Dikerjakan', icon: 'RefreshCw', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+    pending: { label: 'Pending', icon: 'Hourglass', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+    blocked: { label: 'Blocked', icon: 'Ban', color: '#6b7280', bg: 'rgba(107,114,128,0.12)' }
 };
 
 const PRIORITY_MAP = {
@@ -491,15 +492,15 @@ export default function DailyWorkReport() {
     // ============================================
 
     const tabItems = [
-        { key: 'daily', label: 'Laporan Hari Ini', icon: '📋' },
-        { key: 'pending', label: 'Pekerjaan Pending', icon: '⏳' },
-        { key: 'schedule', label: 'Jadwal Penyelesaian', icon: '📅' }
+        { key: 'daily', label: 'Laporan Hari Ini', icon: 'ClipboardList' },
+        { key: 'pending', label: 'Pekerjaan Pending', icon: 'Hourglass' },
+        { key: 'schedule', label: 'Jadwal Penyelesaian', icon: 'Calendar' }
     ];
 
     return (
         <div className="page-container">
             <div className="page-header">
-                <h1>📝 Laporan Kerjaan Harian</h1>
+                <h1><Icon name="FileText" size={16} inline /> Laporan Kerjaan Harian</h1>
                 <p style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
                     Catat dan lacak pekerjaan harian Anda
                 </p>
@@ -508,13 +509,13 @@ export default function DailyWorkReport() {
             {/* Success/Error Messages */}
             {success && (
                 <div className="alert alert-success" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>✅</span> {success}
+                    <span><Icon name="CheckCircle2" size={16} inline /></span> {success}
                 </div>
             )}
             {error && !showItemModal && (
                 <div className="alert alert-danger" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>❌</span> {error}
-                    <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 18 }}>×</button>
+                    <span><Icon name="XCircle" size={16} inline /></span> {error}
+                    <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 18 }}><Icon name="X" size={16} /></button>
                 </div>
             )}
 
@@ -533,7 +534,7 @@ export default function DailyWorkReport() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                         }}
                     >
-                        <span>{tab.icon}</span> {tab.label}
+                        <span><Icon name={tab.icon} size={16} inline /></span> {tab.label}
                     </button>
                 ))}
             </div>
@@ -545,7 +546,7 @@ export default function DailyWorkReport() {
                     <div className="card" style={{ marginBottom: 16 }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>📅 Tanggal:</label>
+                                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}><Icon name="Calendar" size={16} inline /> Tanggal:</label>
                                 <input
                                     type="date"
                                     value={selectedDate}
@@ -569,13 +570,13 @@ export default function DailyWorkReport() {
                                 )}
                                 <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
                                     <button className="btn btn-outline" onClick={handleExportPDF} style={{ fontSize: '0.8rem', padding: '4px 10px' }} title="Export PDF" disabled={!currentReport || !currentReport.items}>
-                                        📄 PDF
+                                        <Icon name="FileText" size={16} inline /> PDF
                                     </button>
                                     <button className="btn btn-outline" onClick={handleExportExcel} style={{ fontSize: '0.8rem', padding: '4px 10px' }} title="Export Excel" disabled={!currentReport || !currentReport.items}>
-                                        📊 Excel
+                                        <Icon name="BarChart3" size={16} inline /> Excel
                                     </button>
                                     <button className="btn btn-outline" onClick={handlePrint} style={{ fontSize: '0.8rem', padding: '4px 10px' }} title="Print / Cetak">
-                                        🖨️ Cetak
+                                        <Icon name="Printer" size={16} inline /> Cetak
                                     </button>
                                 </div>
                             </div>
@@ -590,7 +591,7 @@ export default function DailyWorkReport() {
                     ) : !currentReport ? (
                         /* No report yet for this date */
                         <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-                            <div style={{ fontSize: 48, marginBottom: 12 }}>📝</div>
+                            <div style={{ fontSize: 48, marginBottom: 12 }}><Icon name="FileText" size={16} inline /></div>
                             <h3 style={{ marginBottom: 8 }}>Belum ada laporan untuk tanggal ini</h3>
                             <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
                                 Buat laporan kerjaan harian untuk mencatat aktivitas Anda
@@ -603,7 +604,7 @@ export default function DailyWorkReport() {
                         <>
                             {/* Summary */}
                             <div className="card" style={{ marginBottom: 16 }}>
-                                <h3 style={{ marginBottom: 8, fontSize: '0.9rem' }}>📝 Ringkasan Hari Ini</h3>
+                                <h3 style={{ marginBottom: 8, fontSize: '0.9rem' }}><Icon name="FileText" size={16} inline /> Ringkasan Hari Ini</h3>
                                 <textarea
                                     value={summary}
                                     onChange={e => setSummary(e.target.value)}
@@ -615,16 +616,16 @@ export default function DailyWorkReport() {
                                 />
                                 <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                                     <button className="btn btn-secondary" onClick={handleSaveSummary} disabled={saving || currentReport.status === 'reviewed'} style={{ fontSize: '0.82rem' }}>
-                                        💾 Simpan Ringkasan
+                                        <Icon name="Save" size={16} inline /> Simpan Ringkasan
                                     </button>
                                     {currentReport.status === 'draft' && (
                                         <button className="btn btn-primary" onClick={handleSubmitReport} disabled={saving} style={{ fontSize: '0.82rem' }}>
-                                            📤 Submit Laporan
+                                            <Icon name="Upload" size={16} inline /> Submit Laporan
                                         </button>
                                     )}
                                     {currentReport.status === 'draft' && (
                                         <button className="btn btn-danger" onClick={handleDeleteReport} disabled={saving} style={{ fontSize: '0.82rem', marginLeft: 'auto' }}>
-                                            🗑️ Hapus
+                                            <Icon name="Trash2" size={16} inline /> Hapus
                                         </button>
                                     )}
                                 </div>
@@ -633,7 +634,7 @@ export default function DailyWorkReport() {
                                 {currentReport.status === 'reviewed' && currentReport.review_notes && (
                                     <div style={{ marginTop: 12, padding: 12, borderRadius: 'var(--radius-md)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
                                         <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#10b981', marginBottom: 4 }}>
-                                            💬 Catatan Review dari {currentReport.reviewer_name || 'Admin'}:
+                                            <Icon name="MessageSquare" size={16} inline /> Catatan Review dari {currentReport.reviewer_name || 'Admin'}:
                                         </div>
                                         <div style={{ fontSize: '0.85rem' }}>{currentReport.review_notes}</div>
                                     </div>
@@ -643,7 +644,7 @@ export default function DailyWorkReport() {
                             {/* Timeline Table */}
                             <div className="card">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                    <h3 style={{ fontSize: '0.9rem' }}>⏰ Timeline Pekerjaan</h3>
+                                    <h3 style={{ fontSize: '0.9rem' }}><Icon name="Clock" size={16} inline /> Timeline Pekerjaan</h3>
                                     {currentReport.status !== 'reviewed' && (
                                         <button className="btn btn-primary" onClick={openAddItem} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>
                                             + Tambah Pekerjaan
@@ -653,7 +654,7 @@ export default function DailyWorkReport() {
 
                                 {(!currentReport.items || currentReport.items.length === 0) ? (
                                     <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-secondary)' }}>
-                                        <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+                                        <div style={{ fontSize: 36, marginBottom: 8 }}><Icon name="ClipboardList" size={16} inline /></div>
                                         <p>Belum ada item pekerjaan</p>
                                         <p style={{ fontSize: '0.8rem' }}>Klik "Tambah Pekerjaan" untuk memulai</p>
                                     </div>
@@ -693,7 +694,7 @@ export default function DailyWorkReport() {
                                                                     fontSize: '0.72rem', marginTop: 3,
                                                                     color: isOverdue(item.due_date) ? '#ef4444' : 'var(--text-secondary)'
                                                                 }}>
-                                                                    📅 Due: {formatShortDate(item.due_date)}
+                                                                    <Icon name="Calendar" size={16} inline /> Due: {formatShortDate(item.due_date)}
                                                                     {isOverdue(item.due_date) && ' (Overdue!)'}
                                                                 </div>
                                                             )}
@@ -705,7 +706,7 @@ export default function DailyWorkReport() {
                                                                 background: `${CATEGORY_MAP[item.category]?.color}18`,
                                                                 color: CATEGORY_MAP[item.category]?.color
                                                             }}>
-                                                                {CATEGORY_MAP[item.category]?.icon} {CATEGORY_MAP[item.category]?.label}
+                                                                <Icon name={CATEGORY_MAP[item.category]?.icon} size={14} inline /> {CATEGORY_MAP[item.category]?.label}
                                                             </span>
                                                         </td>
                                                         <td>
@@ -715,7 +716,7 @@ export default function DailyWorkReport() {
                                                                 background: STATUS_MAP[item.status]?.bg,
                                                                 color: STATUS_MAP[item.status]?.color, fontWeight: 600
                                                             }}>
-                                                                {STATUS_MAP[item.status]?.icon} {STATUS_MAP[item.status]?.label}
+                                                                <Icon name={STATUS_MAP[item.status]?.icon} size={14} inline /> {STATUS_MAP[item.status]?.label}
                                                             </span>
                                                         </td>
                                                         <td>
@@ -754,13 +755,13 @@ export default function DailyWorkReport() {
                                                                         onClick={() => openEditItem(item)}
                                                                         style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                                                                         title="Edit"
-                                                                    >✏️</button>
+                                                                    ><Icon name="Pencil" size={16} inline /></button>
                                                                     <button
                                                                         className="btn btn-danger"
                                                                         onClick={() => handleDeleteItem(item.id)}
                                                                         style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                                                                         title="Hapus"
-                                                                    >🗑️</button>
+                                                                    ><Icon name="Trash2" size={16} inline /></button>
                                                                 </div>
                                                             </td>
                                                         )}
@@ -774,7 +775,7 @@ export default function DailyWorkReport() {
 
                             {/* Recent Reports History */}
                             <div className="card" style={{ marginTop: 16 }}>
-                                <h3 style={{ fontSize: '0.9rem', marginBottom: 12 }}>📊 Riwayat Laporan</h3>
+                                <h3 style={{ fontSize: '0.9rem', marginBottom: 12 }}><Icon name="BarChart3" size={16} inline /> Riwayat Laporan</h3>
                                 {reports.length === 0 ? (
                                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Belum ada riwayat laporan</p>
                                 ) : (
@@ -819,7 +820,7 @@ export default function DailyWorkReport() {
                 <div>
                     {pendingItems.length === 0 ? (
                         <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-                            <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+                            <div style={{ fontSize: 48, marginBottom: 12 }}><Icon name="Trophy" size={16} inline /></div>
                             <h3 style={{ marginBottom: 8 }}>Tidak ada pekerjaan pending!</h3>
                             <p style={{ color: 'var(--text-secondary)' }}>
                                 Semua pekerjaan Anda sudah selesai. Kerja bagus!
@@ -833,14 +834,14 @@ export default function DailyWorkReport() {
                                     const count = pendingItems.filter(i => i.status === s).length;
                                     return (
                                         <div key={s} className="card" style={{ textAlign: 'center', padding: '14px 12px' }}>
-                                            <div style={{ fontSize: 24 }}>{STATUS_MAP[s]?.icon}</div>
+                                            <div style={{ fontSize: 24 }}><Icon name={STATUS_MAP[s]?.icon} size={20} /></div>
                                             <div style={{ fontSize: '1.4rem', fontWeight: 700, color: STATUS_MAP[s]?.color }}>{count}</div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{STATUS_MAP[s]?.label}</div>
                                         </div>
                                     );
                                 })}
                                 <div className="card" style={{ textAlign: 'center', padding: '14px 12px' }}>
-                                    <div style={{ fontSize: 24 }}>🔥</div>
+                                    <div style={{ fontSize: 24 }}><Icon name="Flame" size={16} inline /></div>
                                     <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ef4444' }}>
                                         {pendingItems.filter(i => isOverdue(i.due_date)).length}
                                     </div>
@@ -881,7 +882,7 @@ export default function DailyWorkReport() {
                                                                     background: STATUS_MAP[item.status]?.bg,
                                                                     color: STATUS_MAP[item.status]?.color, fontWeight: 600
                                                                 }}>
-                                                                    {STATUS_MAP[item.status]?.icon} {STATUS_MAP[item.status]?.label}
+                                                                    <Icon name={STATUS_MAP[item.status]?.icon} size={14} inline /> {STATUS_MAP[item.status]?.label}
                                                                 </span>
                                                             </div>
                                                             {item.description && (
@@ -891,15 +892,15 @@ export default function DailyWorkReport() {
                                                             )}
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
                                                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                                                    📋 Dari: {formatShortDate(item.report_date)}
+                                                                    <Icon name="ClipboardList" size={16} inline /> Dari: {formatShortDate(item.report_date)}
                                                                 </span>
                                                                 {item.due_date && (
                                                                     <span style={{
                                                                         fontSize: '0.75rem', fontWeight: 600,
                                                                         color: isOverdue(item.due_date) ? '#ef4444' : getDaysLeft(item.due_date) <= 3 ? '#f59e0b' : 'var(--text-secondary)'
                                                                     }}>
-                                                                        📅 Due: {formatShortDate(item.due_date)}
-                                                                        {isOverdue(item.due_date) && ' ⚠️ OVERDUE'}
+                                                                        <Icon name="Calendar" size={16} inline /> Due: {formatShortDate(item.due_date)}
+                                                                        {isOverdue(item.due_date) && ' OVERDUE'}
                                                                         {!isOverdue(item.due_date) && getDaysLeft(item.due_date) !== null && (
                                                                             <> ({getDaysLeft(item.due_date)} hari lagi)</>
                                                                         )}
@@ -940,7 +941,7 @@ export default function DailyWorkReport() {
                 <div>
                     {scheduleItems.length === 0 ? (
                         <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-                            <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+                            <div style={{ fontSize: 48, marginBottom: 12 }}><Icon name="Calendar" size={16} inline /></div>
                             <h3 style={{ marginBottom: 8 }}>Tidak ada jadwal penyelesaian</h3>
                             <p style={{ color: 'var(--text-secondary)' }}>
                                 Tidak ada pekerjaan pending dengan due date dalam 30 hari ke depan
@@ -970,7 +971,7 @@ export default function DailyWorkReport() {
                                                 background: overdue ? 'rgba(239,68,68,0.1)' : isToday ? 'rgba(59,130,246,0.1)' : 'var(--bg-secondary)',
                                                 borderLeft: `4px solid ${overdue ? '#ef4444' : isToday ? '#3b82f6' : 'var(--border-color)'}`
                                             }}>
-                                                <span style={{ fontSize: '1.2em' }}>{overdue ? '🔥' : isToday ? '📌' : '📅'}</span>
+                                                <span style={{ fontSize: '1.2em' }}>{overdue ? 'Flame' : isToday ? 'Pin' : 'Calendar'}</span>
                                                 <div>
                                                     <div style={{ fontWeight: 700, fontSize: '0.88rem', color: overdue ? '#ef4444' : 'var(--text-primary)' }}>
                                                         {formatDate(date)}
@@ -1007,7 +1008,7 @@ export default function DailyWorkReport() {
                                                                 background: STATUS_MAP[item.status]?.bg,
                                                                 color: STATUS_MAP[item.status]?.color, fontWeight: 600
                                                             }}>
-                                                                {STATUS_MAP[item.status]?.icon} {STATUS_MAP[item.status]?.label}
+                                                                <Icon name={STATUS_MAP[item.status]?.icon} size={14} inline /> {STATUS_MAP[item.status]?.label}
                                                             </span>
                                                         </div>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
@@ -1044,8 +1045,8 @@ export default function DailyWorkReport() {
                 <div className="modal-overlay" onClick={() => setShowItemModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
                         <div className="modal-header">
-                            <h3>{editingItem ? '✏️ Edit Pekerjaan' : '➕ Tambah Pekerjaan'}</h3>
-                            <button className="modal-close" onClick={() => setShowItemModal(false)}>×</button>
+                            <h3>{editingItem ? 'Edit Pekerjaan' : 'Tambah Pekerjaan'}</h3>
+                            <button className="modal-close" onClick={() => setShowItemModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleSaveItem}>
                             <div className="modal-body">
@@ -1104,7 +1105,7 @@ export default function DailyWorkReport() {
                                             onChange={e => setItemForm({ ...itemForm, category: e.target.value })}
                                         >
                                             {Object.entries(CATEGORY_MAP).map(([key, val]) => (
-                                                <option key={key} value={key}>{val.icon} {val.label}</option>
+                                                <option key={key} value={key}>{val.label}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -1123,7 +1124,7 @@ export default function DailyWorkReport() {
                                             }}
                                         >
                                             {Object.entries(STATUS_MAP).map(([key, val]) => (
-                                                <option key={key} value={key}>{val.icon} {val.label}</option>
+                                                <option key={key} value={key}>{val.label}</option>
                                             ))}
                                         </select>
                                     </div>

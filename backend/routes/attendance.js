@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
 const { calculateDistance } = require('../utils/distance');
 
 // Configure multer for photo uploads
@@ -299,7 +299,7 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
 });
 
 // Kiosk Attendance
-router.post('/kiosk', authenticateToken, isAdmin, upload.single('photo'), async (req, res) => {
+router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.single('photo'), async (req, res) => {
     try {
         const { user_id, location_id } = req.body;
 

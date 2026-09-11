@@ -1,11 +1,12 @@
+import Icon from '../components/Icon';
 import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
 
 const STATUS_MAP = {
-    completed: { label: 'Selesai', icon: '✅', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
-    in_progress: { label: 'Dikerjakan', icon: '🔄', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-    pending: { label: 'Pending', icon: '⏳', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
-    blocked: { label: 'Blocked', icon: '🚫', color: '#6b7280', bg: 'rgba(107,114,128,0.12)' }
+    completed: { label: 'Selesai', icon: 'CheckCircle2', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+    in_progress: { label: 'Dikerjakan', icon: 'RefreshCw', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+    pending: { label: 'Pending', icon: 'Hourglass', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+    blocked: { label: 'Blocked', icon: 'Ban', color: '#6b7280', bg: 'rgba(107,114,128,0.12)' }
 };
 
 const PRIORITY_MAP = {
@@ -16,10 +17,10 @@ const PRIORITY_MAP = {
 };
 
 const CATEGORY_MAP = {
-    task: { label: 'Task', icon: '📋', color: '#3b82f6' },
-    meeting: { label: 'Meeting', icon: '👥', color: '#8b5cf6' },
-    admin: { label: 'Administrasi', icon: '📁', color: '#f59e0b' },
-    other: { label: 'Lainnya', icon: '📌', color: '#6b7280' }
+    task: { label: 'Task', icon: 'ClipboardList', color: '#3b82f6' },
+    meeting: { label: 'Meeting', icon: 'Users', color: '#8b5cf6' },
+    admin: { label: 'Administrasi', icon: 'Folder', color: '#f59e0b' },
+    other: { label: 'Lainnya', icon: 'Pin', color: '#6b7280' }
 };
 
 const REPORT_STATUS_MAP = {
@@ -134,7 +135,7 @@ export default function AdminDailyWorkReport() {
     return (
         <div className="page-container">
             <div className="page-header">
-                <h1>📊 Review Laporan Kerjaan Harian</h1>
+                <h1><Icon name="BarChart3" size={16} inline /> Review Laporan Kerjaan Harian</h1>
                 <p style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
                     Review dan kelola laporan kerjaan harian karyawan
                 </p>
@@ -143,7 +144,7 @@ export default function AdminDailyWorkReport() {
             {/* Success/Error Messages */}
             {success && (
                 <div className="alert alert-success" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>✅</span> {success}
+                    <span><Icon name="CheckCircle2" size={16} inline /></span> {success}
                 </div>
             )}
 
@@ -184,7 +185,7 @@ export default function AdminDailyWorkReport() {
             <div className="card" style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>📅 Tanggal:</label>
+                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}><Icon name="Calendar" size={16} inline /> Tanggal:</label>
                         <input
                             type="date"
                             value={filterDate}
@@ -208,7 +209,7 @@ export default function AdminDailyWorkReport() {
                         </select>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 200 }}>
-                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>🔍</label>
+                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}><Icon name="Search" size={16} inline /></label>
                         <input
                             type="text"
                             value={filterSearch}
@@ -219,7 +220,7 @@ export default function AdminDailyWorkReport() {
                         />
                     </div>
                     <button className="btn btn-secondary" onClick={() => { setFilterDate(new Date().toISOString().split('T')[0]); setFilterStatus(''); setFilterSearch(''); }} style={{ fontSize: '0.8rem' }}>
-                        🔄 Reset
+                        <Icon name="RefreshCw" size={16} inline /> Reset
                     </button>
                 </div>
             </div>
@@ -233,7 +234,7 @@ export default function AdminDailyWorkReport() {
                     </div>
                 ) : reports.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                        <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}><Icon name="Inbox" size={16} inline /></div>
                         <h3 style={{ marginBottom: 8 }}>Tidak ada laporan</h3>
                         <p style={{ color: 'var(--text-secondary)' }}>
                             Tidak ada laporan harian untuk filter yang dipilih
@@ -303,7 +304,7 @@ export default function AdminDailyWorkReport() {
                                                     onClick={() => openDetail(report)}
                                                     style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                                                 >
-                                                    👁️ Detail
+                                                    <Icon name="Eye" size={16} inline /> Detail
                                                 </button>
                                                 {report.status === 'submitted' && (
                                                     <button
@@ -311,7 +312,7 @@ export default function AdminDailyWorkReport() {
                                                         onClick={() => openReview(report)}
                                                         style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                                                     >
-                                                        ✅ Review
+                                                        <Icon name="CheckCircle2" size={16} inline /> Review
                                                     </button>
                                                 )}
                                             </div>
@@ -330,12 +331,12 @@ export default function AdminDailyWorkReport() {
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
                         <div className="modal-header">
                             <div>
-                                <h3>📋 Detail Laporan Harian</h3>
+                                <h3><Icon name="ClipboardList" size={16} inline /> Detail Laporan Harian</h3>
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                                     {selectedReport.user_name} — {formatDate(selectedReport.report_date)}
                                 </p>
                             </div>
-                            <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowDetailModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <div className="modal-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
                             {/* Status Badge */}
@@ -357,7 +358,7 @@ export default function AdminDailyWorkReport() {
                                     background: 'var(--bg-secondary)', marginBottom: 16,
                                     border: '1px solid var(--border-color)'
                                 }}>
-                                    <div style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 4 }}>📝 Ringkasan:</div>
+                                    <div style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 4 }}><Icon name="FileText" size={16} inline /> Ringkasan:</div>
                                     <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>{selectedReport.summary}</div>
                                 </div>
                             )}
@@ -370,7 +371,7 @@ export default function AdminDailyWorkReport() {
                                     border: '1px solid rgba(16,185,129,0.2)'
                                 }}>
                                     <div style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 4, color: '#10b981' }}>
-                                        💬 Catatan Review ({selectedReport.reviewer_name || 'Admin'}):
+                                        <Icon name="MessageSquare" size={16} inline /> Catatan Review ({selectedReport.reviewer_name || 'Admin'}):
                                     </div>
                                     <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>{selectedReport.review_notes}</div>
                                 </div>
@@ -378,7 +379,7 @@ export default function AdminDailyWorkReport() {
 
                             {/* Items List */}
                             <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 10 }}>
-                                ⏰ Daftar Pekerjaan ({selectedReport.items?.length || 0} item)
+                                <Icon name="Clock" size={16} inline /> Daftar Pekerjaan ({selectedReport.items?.length || 0} item)
                             </div>
 
                             {(!selectedReport.items || selectedReport.items.length === 0) ? (
@@ -402,14 +403,14 @@ export default function AdminDailyWorkReport() {
                                                     background: `${CATEGORY_MAP[item.category]?.color}18`,
                                                     color: CATEGORY_MAP[item.category]?.color
                                                 }}>
-                                                    {CATEGORY_MAP[item.category]?.icon} {CATEGORY_MAP[item.category]?.label}
+                                                    <Icon name={CATEGORY_MAP[item.category]?.icon} size={14} inline /> {CATEGORY_MAP[item.category]?.label}
                                                 </span>
                                                 <span style={{
                                                     fontSize: '0.68rem', padding: '2px 8px', borderRadius: 10,
                                                     background: STATUS_MAP[item.status]?.bg,
                                                     color: STATUS_MAP[item.status]?.color, fontWeight: 600
                                                 }}>
-                                                    {STATUS_MAP[item.status]?.icon} {STATUS_MAP[item.status]?.label}
+                                                    <Icon name={STATUS_MAP[item.status]?.icon} size={14} inline /> {STATUS_MAP[item.status]?.label}
                                                 </span>
                                                 <span style={{
                                                     fontSize: '0.68rem', padding: '2px 8px', borderRadius: 10,
@@ -429,12 +430,12 @@ export default function AdminDailyWorkReport() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
                                                 {(item.start_time || item.end_time) && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
-                                                        🕐 {formatTime(item.start_time)} — {formatTime(item.end_time)}
+                                                        <Icon name="Clock" size={16} inline /> {formatTime(item.start_time)} — {formatTime(item.end_time)}
                                                     </span>
                                                 )}
                                                 {item.due_date && (
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                                        📅 Due: {formatDate(item.due_date)}
+                                                        <Icon name="Calendar" size={16} inline /> Due: {formatDate(item.due_date)}
                                                     </span>
                                                 )}
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
@@ -468,7 +469,7 @@ export default function AdminDailyWorkReport() {
                                     setShowDetailModal(false);
                                     openReview(selectedReport);
                                 }}>
-                                    ✅ Review Laporan
+                                    <Icon name="CheckCircle2" size={16} inline /> Review Laporan
                                 </button>
                             )}
                         </div>
@@ -482,12 +483,12 @@ export default function AdminDailyWorkReport() {
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
                         <div className="modal-header">
                             <div>
-                                <h3>✅ Review Laporan</h3>
+                                <h3><Icon name="CheckCircle2" size={16} inline /> Review Laporan</h3>
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                                     {selectedReport.user_name} — {formatDate(selectedReport.report_date)}
                                 </p>
                             </div>
-                            <button className="modal-close" onClick={() => setShowReviewModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowReviewModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleReview}>
                             <div className="modal-body">
@@ -522,9 +523,9 @@ export default function AdminDailyWorkReport() {
                                         value={reviewForm.status}
                                         onChange={e => setReviewForm({ ...reviewForm, status: e.target.value })}
                                     >
-                                        <option value="reviewed">✅ Approved / Reviewed</option>
-                                        <option value="submitted">🔄 Kembalikan ke Submitted</option>
-                                        <option value="draft">📝 Kembalikan ke Draft</option>
+                                        <option value="reviewed">Approved / Reviewed</option>
+                                        <option value="submitted">Kembalikan ke Submitted</option>
+                                        <option value="draft">Kembalikan ke Draft</option>
                                     </select>
                                 </div>
 
@@ -544,7 +545,7 @@ export default function AdminDailyWorkReport() {
                                     Batal
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : '✅ Submit Review'}
+                                    {saving ? 'Menyimpan...' : 'Submit Review'}
                                 </button>
                             </div>
                         </form>

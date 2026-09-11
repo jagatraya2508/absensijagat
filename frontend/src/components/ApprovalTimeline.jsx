@@ -1,3 +1,4 @@
+import Icon from './Icon';
 export default function ApprovalTimeline({ steps = [], currentStep, status }) {
     if (!steps.length) {
         return (
@@ -21,11 +22,11 @@ export default function ApprovalTimeline({ steps = [], currentStep, status }) {
     }
 
     const icon = {
-        approved: '✅',
-        rejected: '❌',
-        pending: '⏳',
-        waiting: '○',
-        skipped: '↷'
+        approved: 'CheckCircle2',
+        rejected: 'XCircle',
+        pending: 'Hourglass',
+        waiting: 'Circle',
+        skipped: 'Undo2'
     };
 
     return (
@@ -41,8 +42,8 @@ export default function ApprovalTimeline({ steps = [], currentStep, status }) {
                             border: s.border,
                             minWidth: 140
                         }}>
-                            <div style={{ fontSize: '0.72rem', color: s.color, fontWeight: 700 }}>
-                                {icon[step.status] || '○'} Tingkat {step.step_order}
+                            <div style={{ fontSize: '0.72rem', color: s.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Icon name={icon[step.status] || 'Circle'} size={12} /> Tingkat {step.step_order}
                             </div>
                             <div style={{ fontSize: '0.8rem', color: 'white', fontWeight: 600, marginTop: 2 }}>
                                 {step.approver_name || step.approver_label || 'Admin / HR'}
@@ -58,7 +59,7 @@ export default function ApprovalTimeline({ steps = [], currentStep, status }) {
                             )}
                         </div>
                         {index < steps.length - 1 && (
-                            <span style={{ color: 'var(--gray-500)', fontSize: '0.9rem' }}>→</span>
+                            <span style={{ color: 'var(--gray-500)', display: 'inline-flex' }}><Icon name="ArrowRight" size={14} /></span>
                         )}
                     </div>
                 );

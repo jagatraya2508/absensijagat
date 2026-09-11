@@ -294,9 +294,13 @@ body {
 }
 
 .sidebar-link-icon {
-  font-size: 1.15rem;
-  width: 24px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: inherit;
   transition: transform var(--transition);
 }
 
@@ -1317,6 +1321,16 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
 
 .alert-icon {
   font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-icon-inline {
+  display: inline-block;
+  vertical-align: -0.2em;
+  margin-right: 0.35em;
+  flex-shrink: 0;
 }
 
 .alert-success {

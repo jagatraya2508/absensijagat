@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI } from '../utils/api';
 import jsPDF from 'jspdf';
@@ -5,13 +6,13 @@ import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const TABS = [
-    { id: 'personal', label: '👤 Data Pribadi' },
-    { id: 'work', label: '💼 Data Kerja' },
-    { id: 'bank', label: '🏦 Bank & Pajak' },
-    { id: 'salary', label: '💰 Gaji & Tunjangan' },
-    { id: 'bpjs', label: '🏥 BPJS & PPh' },
-    { id: 'locations', label: '📍 Lokasi Absen' },
-    { id: 'documents', label: '📎 Dokumen' },
+    { id: 'personal', label: 'Data Pribadi' },
+    { id: 'work', label: 'Data Kerja' },
+    { id: 'bank', label: 'Bank & Pajak' },
+    { id: 'salary', label: 'Gaji & Tunjangan' },
+    { id: 'bpjs', label: 'BPJS & PPh' },
+    { id: 'locations', label: 'Lokasi Absen' },
+    { id: 'documents', label: 'Dokumen' },
 ];
 
 const DOC_TYPES = [
@@ -249,8 +250,8 @@ export default function AdminEmployees() {
     }
 
     function getSortIcon(key) {
-        if (sortConfig.key !== key) return '⇅';
-        return sortConfig.direction === 'asc' ? '▲' : '▼';
+        if (sortConfig.key !== key) return <Icon name="ArrowUpDown" size={12} />;
+        return sortConfig.direction === 'asc' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />;
     }
 
     const filteredEmployees = useMemo(() => {
@@ -433,23 +434,7 @@ export default function AdminEmployees() {
             </head>
             <body>
                 <div class="print-header">
-                    <h1>📋 Data Karyawan</h1>
-                    <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}  •  Total: ${filteredEmployees.length} karyawan</p>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="text-center">No</th>
-                            <th>ID Karyawan</th>
-                            <th>Nama</th>
-                            <th>Departemen</th>
-                            <th>Jabatan</th>
-                            <th class="text-right">Gaji Pokok</th>
-                            <th class="text-center">Tipe Gaji</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filteredEmployees.map((emp, i) => `
+                    <h1>Data Karyawan</h1> <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • Total: ${filteredEmployees.length} karyawan</p> </div> <table> <thead> <tr> <th class="text-center">No</th> <th>ID Karyawan</th> <th>Nama</th> <th>Departemen</th> <th>Jabatan</th> <th class="text-right">Gaji Pokok</th> <th class="text-center">Tipe Gaji</th> </tr> </thead> <tbody> ${filteredEmployees.map((emp, i) =>`
                             <tr>
                                 <td class="text-center">${i + 1}</td>
                                 <td>${emp.employee_id}</td>
@@ -481,13 +466,13 @@ export default function AdminEmployees() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">👤 Data Karyawan</h1>
+                <h1 className="page-title"><Icon name="User" size={16} inline /> Data Karyawan</h1>
                 <p className="page-subtitle">Kelola data lengkap karyawan</p>
             </div>
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span> {success}
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}
                 </div>
             )}
 
@@ -498,7 +483,7 @@ export default function AdminEmployees() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="🔍 Cari karyawan..."
+                            placeholder="Cari karyawan..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             style={{ maxWidth: 240 }}
@@ -518,7 +503,7 @@ export default function AdminEmployees() {
                                     opacity: downloadingTemplate ? 0.7 : 1
                                 }}
                             >
-                                {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                                {downloadingTemplate ? 'Mengunduh...' : 'Template'}
                             </button>
                             <button
                                 className="btn"
@@ -532,7 +517,7 @@ export default function AdminEmployees() {
                                     cursor: 'pointer'
                                 }}
                             >
-                                📤 Upload Excel
+                                <Icon name="Upload" size={16} inline /> Upload Excel
                             </button>
                             <button
                                 className="btn"
@@ -546,7 +531,7 @@ export default function AdminEmployees() {
                                     transition: 'all 0.2s', cursor: 'pointer'
                                 }}
                             >
-                                🖨️ Print
+                                <Icon name="Printer" size={16} inline /> Print
                             </button>
                             <button
                                 className="btn"
@@ -560,7 +545,7 @@ export default function AdminEmployees() {
                                     transition: 'all 0.2s', cursor: 'pointer'
                                 }}
                             >
-                                📄 PDF
+                                <Icon name="FileText" size={16} inline /> PDF
                             </button>
                             <button
                                 className="btn"
@@ -574,7 +559,7 @@ export default function AdminEmployees() {
                                     transition: 'all 0.2s', cursor: 'pointer'
                                 }}
                             >
-                                📊 Excel
+                                <Icon name="BarChart3" size={16} inline /> Excel
                             </button>
                         </div>
                     </div>
@@ -586,7 +571,7 @@ export default function AdminEmployees() {
                     </div>
                 ) : filteredEmployees.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">👤</div>
+                        <div className="empty-state-icon"><Icon name="User" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada karyawan</p>
                     </div>
                 ) : (
@@ -630,7 +615,7 @@ export default function AdminEmployees() {
                                         </td>
                                         <td>
                                             <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }} onClick={() => openDetail(emp)}>
-                                                📝 Detail
+                                                <Icon name="FileText" size={16} inline /> Detail
                                             </button>
                                         </td>
                                     </tr>
@@ -652,12 +637,12 @@ export default function AdminEmployees() {
                         <div style={{ padding: '1.5rem' }}>
                             {importError && (
                                 <div className="alert alert-danger mb-3">
-                                    ⚠️ {importError}
+                                    <Icon name="AlertTriangle" size={16} inline /> {importError}
                                 </div>
                             )}
 
                             <div className="alert alert-info mb-3">
-                                ℹ️ Unduh template resmi, isi data, lalu unggah file .xlsx.
+                                <Icon name="Info" size={16} inline /> Unduh template resmi, isi data, lalu unggah file .xlsx.
                                 Kolom wajib: <strong>Employee ID</strong> dan <strong>Nama</strong>.
                                 Password wajib hanya untuk karyawan baru (minimal 6 karakter).
                             </div>
@@ -684,7 +669,7 @@ export default function AdminEmployees() {
                             {importResult && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <div className={`alert mb-3 ${(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'alert-success' : 'alert-warning'}`}>
-                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? '✅' : '⚠️'}{' '}
+                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'CheckCircle2' : 'AlertTriangle'}{' '}
                                         Ditambah: <strong>{importResult.imported || 0}</strong>
                                         {' · '}Diperbarui: <strong>{importResult.updated || 0}</strong>
                                         {' · '}Gagal: <strong>{importResult.failed || 0}</strong>
@@ -733,7 +718,7 @@ export default function AdminEmployees() {
                                     onClick={handleDownloadTemplate}
                                     disabled={downloadingTemplate}
                                 >
-                                    {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                    {downloadingTemplate ? 'Mengunduh...' : 'Unduh Template'}
                                 </button>
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>
@@ -761,7 +746,7 @@ export default function AdminEmployees() {
                             <h3 className="modal-title">
                                 Detail: {selectedEmployee.name} ({selectedEmployee.employee_id})
                             </h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
 
                         {/* Tab Navigation */}
@@ -785,7 +770,7 @@ export default function AdminEmployees() {
 
                         <form onSubmit={handleSave}>
                             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon">⚠️</span> {error}</div>}
+                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
 
                                 {/* Tab: Data Pribadi */}
                                 {activeTab === 'personal' && (
@@ -1013,7 +998,7 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.is_driver ? 'var(--primary-300)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                                        🚛 Driver & Kenek
+                                                        <Icon name="Truck" size={16} inline /> Driver & Kenek
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
                                                         Aktifkan jika karyawan ini adalah driver atau kenek. Menu tracking pengiriman ikut terbuka.
@@ -1024,30 +1009,30 @@ export default function AdminEmployees() {
                                             {formData.is_driver && (
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', animation: 'fadeIn 0.3s ease' }}>
                                                     <div className="form-group" style={{ margin: 0 }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🌙 Uang Jalan Subuh (Rp)</label>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Moon" size={16} inline /> Uang Jalan Subuh (Rp)</label>
                                                         <input className="form-input" type="number" value={formData.driver_subuh_allowance} onChange={e => updateField('driver_subuh_allowance', parseFloat(e.target.value) || 0)} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🔄 Uang Mel / RIT (Rp)</label>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="RefreshCw" size={16} inline /> Uang Mel / RIT (Rp)</label>
                                                         <input className="form-input" type="number" value={formData.driver_rit_allowance} onChange={e => updateField('driver_rit_allowance', parseFloat(e.target.value) || 0)} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🏨 Uang Menginap/Hari (Rp)</label>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Building2" size={16} inline /> Uang Menginap/Hari (Rp)</label>
                                                         <input className="form-input" type="number" value={formData.driver_inap_allowance} onChange={e => updateField('driver_inap_allowance', parseFloat(e.target.value) || 0)} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚚 Uang Ritase Jarak Dekat (Rp)</label>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Truck" size={16} inline /> Uang Ritase Jarak Dekat (Rp)</label>
                                                         <input className="form-input" type="number" value={formData.driver_ritase_dekat_allowance || 0} onChange={e => updateField('driver_ritase_dekat_allowance', parseFloat(e.target.value) || 0)} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚚 Uang Ritase Jarak Jauh (Rp)</label>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Truck" size={16} inline /> Uang Ritase Jarak Jauh (Rp)</label>
                                                         <input className="form-input" type="number" value={formData.driver_ritase_jauh_allowance || 0} onChange={e => updateField('driver_ritase_jauh_allowance', parseFloat(e.target.value) || 0)} />
                                                     </div>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', gridColumn: '1 / -1', marginTop: '-0.25rem', marginBottom: '0.25rem', lineHeight: 1.2 }}>
                                                         *Otomatis dihitung mulai dari perjalanan (RIT) ke-2 dan seterusnya
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
-                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}>🚙 Jenis Kendaraan</label>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Car" size={16} inline /> Jenis Kendaraan</label>
                                                         <select className="form-input form-select" value={formData.vehicle_type_id} onChange={e => updateField('vehicle_type_id', e.target.value)}>
                                                             <option value="">Pilih Jenis Kendaraan...</option>
                                                             {masterVehicleTypes.map(vt => (
@@ -1085,7 +1070,7 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.is_collector ? 'var(--warning-400)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                                        💰 Collector / Penagih
+                                                        <Icon name="Wallet" size={16} inline /> Collector / Penagih
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
                                                         Aktifkan jika karyawan ini bertugas menagih ke customer. Menu tracking penagihan ikut terbuka.
@@ -1120,7 +1105,7 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.is_sales ? 'var(--success-400)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                                        🤝 Sales
+                                                        <Icon name="Handshake" size={16} inline /> Sales
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
                                                         Aktifkan jika karyawan ini bertugas kunjungan penjualan ke customer. Menu tracking sales ikut terbuka.
@@ -1155,7 +1140,7 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.use_tracking ? 'var(--teal-400)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                                        📍 Akses Fitur Tracking
+                                                        <Icon name="MapPin" size={16} inline /> Akses Fitur Tracking
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
                                                         Wajib check-in/out GPS di lokasi. Otomatis aktif jika Driver, Collector, atau Sales diaktifkan. Bisa juga untuk tugas lapangan lain.
@@ -1164,7 +1149,7 @@ export default function AdminEmployees() {
                                             </div>
                                         </div>
                                         <div style={{ gridColumn: '1 / -1', padding: '0.75rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--gray-300)' }}>
-                                            ℹ️ <strong>Info tipe gaji:</strong><br />
+                                            <Icon name="Info" size={16} inline /> <strong>Info tipe gaji:</strong><br />
                                             • <strong>Harian</strong> = gaji per hari × jumlah hari hadir (absensi)<br />
                                             • <strong>Mingguan</strong> = gaji per minggu × jumlah minggu bekerja<br />
                                             • <strong>Bulanan</strong> = gaji tetap per bulan
@@ -1176,7 +1161,7 @@ export default function AdminEmployees() {
                                 {activeTab === 'bpjs' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--gray-300)' }}>
-                                            ℹ️ <strong>Pengaturan BPJS & PPh 21 per karyawan.</strong><br />
+                                            <Icon name="Info" size={16} inline /> <strong>Pengaturan BPJS & PPh 21 per karyawan.</strong><br />
                                             Toggle OFF jika karyawan belum terdaftar (misal masih masa percobaan 3 bulan).<br />
                                             Rate kosong = gunakan rate default sesuai peraturan.
                                         </div>
@@ -1209,7 +1194,7 @@ export default function AdminEmployees() {
                                                                     {item.label}
                                                                 </span>
                                                                 <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>
-                                                                    {isActive ? '✅ Aktif' : '❌ Tidak aktif - tidak dipotong saat payroll'}
+                                                                    {isActive ? 'Aktif' : 'Tidak aktif - tidak dipotong saat payroll'}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1243,10 +1228,10 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.pph21_enabled ? 'var(--text-primary)' : 'var(--gray-500)', fontSize: '0.9rem' }}>
-                                                        💰 PPh 21 (Pajak Penghasilan)
+                                                        <Icon name="Wallet" size={16} inline /> PPh 21 (Pajak Penghasilan)
                                                     </span>
                                                     <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>
-                                                        {formData.pph21_enabled ? '✅ Aktif - dihitung otomatis berdasarkan tarif progresif' : '❌ Tidak aktif - PPh 21 tidak dipotong'}
+                                                        {formData.pph21_enabled ? 'Aktif - dihitung otomatis berdasarkan tarif progresif' : 'Tidak aktif - PPh 21 tidak dipotong'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1258,7 +1243,7 @@ export default function AdminEmployees() {
                                 {activeTab === 'locations' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                         <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
-                                            ℹ️ <strong>Pengaturan Lokasi Absen:</strong><br />
+                                            <Icon name="Info" size={16} inline /> <strong>Pengaturan Lokasi Absen:</strong><br />
                                             Centang lokasi mana saja yang diizinkan untuk karyawan ini melakukan absensi. <br/>
                                             <em>Jika tidak ada satupun yang dicentang, maka karyawan diizinkan absen di semua lokasi (Default).</em>
                                         </div>
@@ -1295,7 +1280,7 @@ export default function AdminEmployees() {
                                 {activeTab === 'documents' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--gray-300)' }}>
-                                            📎 <strong>Upload dokumen karyawan</strong> (KTP, KK, Ijazah, dll). Max 10MB per file. Format: JPG, PNG, PDF, DOC.
+                                            <Icon name="Paperclip" size={16} inline /> <strong>Upload dokumen karyawan</strong> (KTP, KK, Ijazah, dll). Max 10MB per file. Format: JPG, PNG, PDF, DOC.
                                         </div>
 
                                         {/* Upload Form */}
@@ -1377,7 +1362,7 @@ export default function AdminEmployees() {
                                                     <div><div className="loading-spinner" style={{ margin: '0 auto', width: 24, height: 24 }} /> <span style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginTop: 4 }}>Mengupload...</span></div>
                                                 ) : (
                                                     <>
-                                                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📤</div>
+                                                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}><Icon name="Upload" size={16} inline /></div>
                                                         <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--gray-300)' }}>Klik atau drag & drop file di sini</div>
                                                         <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 4 }}>JPG, PNG, PDF, DOC • Max 10MB</div>
                                                     </>
@@ -1388,7 +1373,7 @@ export default function AdminEmployees() {
                                         {/* Document List */}
                                         {documents.length === 0 ? (
                                             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
-                                                <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📂</div>
+                                                <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}><Icon name="FolderOpen" size={16} inline /></div>
                                                 <p>Belum ada dokumen yang diupload</p>
                                             </div>
                                         ) : (
@@ -1404,7 +1389,7 @@ export default function AdminEmployees() {
                                                         <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.2s' }}>
                                                             {/* Icon */}
                                                             <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '1.2rem' }}>
-                                                                {isImage ? '🖼️' : isPDF ? '📄' : '📃'}
+                                                                {isImage ? 'Image' : isPDF ? 'FileText' : 'FileText'}
                                                             </div>
                                                             {/* Info */}
                                                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1421,7 +1406,7 @@ export default function AdminEmployees() {
                                                             <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                                                                 <a href={doc.file_path} target="_blank" rel="noopener noreferrer" title="Lihat / Download"
                                                                     style={{ padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}>
-                                                                    👁️
+                                                                    <Icon name="Eye" size={16} inline />
                                                                 </a>
                                                                 <button title="Hapus" onClick={async () => {
                                                                     if (!confirm(`Hapus dokumen "${doc.doc_name}"?`)) return;
@@ -1434,7 +1419,7 @@ export default function AdminEmployees() {
                                                                     }
                                                                 }}
                                                                     style={{ padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
-                                                                    🗑️
+                                                                    <Icon name="Trash2" size={16} inline />
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -1449,7 +1434,7 @@ export default function AdminEmployees() {
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : '💾 Simpan'}
+                                    {saving ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
                         </form>

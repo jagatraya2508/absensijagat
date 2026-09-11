@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { payrollAPI } from '../utils/api';
 
@@ -111,17 +112,17 @@ export default function AdminPayroll() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">💵 Payroll</h1>
+                <h1 className="page-title"><Icon name="Banknote" size={16} inline /> Payroll</h1>
                 <p className="page-subtitle">Kelola penggajian karyawan dengan kalkulasi BPJS & PPh 21</p>
             </div>
 
-            {success && <div className="alert alert-success mb-3"><span className="alert-icon">✓</span> {success}</div>}
+            {success && <div className="alert alert-success mb-3"><span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}</div>}
 
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">Daftar Payroll</h2>
                     <button className="btn btn-primary" onClick={() => { setShowGenerateModal(true); setError(''); }}>
-                        🔄 Generate Payroll
+                        <Icon name="RefreshCw" size={16} inline /> Generate Payroll
                     </button>
                 </div>
 
@@ -131,7 +132,7 @@ export default function AdminPayroll() {
                     </div>
                 ) : runs.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">💵</div>
+                        <div className="empty-state-icon"><Icon name="Banknote" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada data payroll</p>
                         <p style={{ color: 'var(--gray-500)', fontSize: '0.85rem' }}>Klik "Generate Payroll" untuk memulai</p>
                     </div>
@@ -156,17 +157,17 @@ export default function AdminPayroll() {
                                         <td style={{ fontWeight: 600 }}>{formatCurrency(run.total_net_salary)}</td>
                                         <td>
                                             <span className={`badge ${run.status === 'finalized' ? 'badge-success' : 'badge-warning'}`}>
-                                                {run.status === 'finalized' ? '✅ Final' : '📝 Draft'}
+                                                {run.status === 'finalized' ? 'Final' : 'Draft'}
                                             </span>
                                         </td>
                                         <td>{new Date(run.run_date).toLocaleDateString('id-ID')}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                <button className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => openDetail(run)}>📋 Detail</button>
-                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => downloadFile(`/payroll/${run.id}/export/pdf`, `payroll-${run.period_year}-${run.period_month}.pdf`)}>📄 PDF</button>
-                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => downloadFile(`/payroll/${run.id}/export/excel`, `payroll-${run.period_year}-${run.period_month}.xlsx`)}>📊 Excel</button>
+                                                <button className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => openDetail(run)}><Icon name="ClipboardList" size={16} inline /> Detail</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => downloadFile(`/payroll/${run.id}/export/pdf`, `payroll-${run.period_year}-${run.period_month}.pdf`)}><Icon name="FileText" size={16} inline /> PDF</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => downloadFile(`/payroll/${run.id}/export/excel`, `payroll-${run.period_year}-${run.period_month}.xlsx`)}><Icon name="BarChart3" size={16} inline /> Excel</button>
                                                 {run.status === 'draft' && (
-                                                    <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: 'var(--danger-500)' }} onClick={() => handleDelete(run.id)}>🗑️</button>
+                                                    <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: 'var(--danger-500)' }} onClick={() => handleDelete(run.id)}><Icon name="Trash2" size={16} inline /></button>
                                                 )}
                                             </div>
                                         </td>
@@ -183,14 +184,14 @@ export default function AdminPayroll() {
                 <div className="modal-overlay">
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="modal-title">🔄 Generate Payroll</h3>
-                            <button className="modal-close" onClick={() => setShowGenerateModal(false)}>×</button>
+                            <h3 className="modal-title"><Icon name="RefreshCw" size={16} inline /> Generate Payroll</h3>
+                            <button className="modal-close" onClick={() => setShowGenerateModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleGenerate}>
                             <div className="modal-body">
-                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon">⚠️</span> {error}</div>}
+                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
-                                    ℹ️ Payroll akan dihitung otomatis berdasarkan: gaji pokok, tunjangan, lembur (approved), BPJS, PPh 21, dan potongan pinjaman aktif.
+                                    <Icon name="Info" size={16} inline /> Payroll akan dihitung otomatis berdasarkan: gaji pokok, tunjangan, lembur (approved), BPJS, PPh 21, dan potongan pinjaman aktif.
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div className="form-group">
@@ -211,7 +212,7 @@ export default function AdminPayroll() {
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-outline" onClick={() => setShowGenerateModal(false)}>Batal</button>
-                                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Memproses...' : '🔄 Generate'}</button>
+                                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Memproses...' : 'Generate'}</button>
                             </div>
                         </form>
                     </div>
@@ -231,9 +232,9 @@ export default function AdminPayroll() {
                             </h3>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <button className="modal-close" onClick={() => setIsMaximized(!isMaximized)} title={isMaximized ? "Perkecil" : "Perbesar"}>
-                                    {isMaximized ? '🗗' : '🗖'}
+                                    <Icon name={isMaximized ? 'Minimize2' : 'Maximize2'} size={16} />
                                 </button>
-                                <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                                <button className="modal-close" onClick={() => setShowDetailModal(false)}><Icon name="X" size={16} /></button>
                             </div>
                         </div>
                         <div className="modal-body" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
@@ -276,7 +277,7 @@ export default function AdminPayroll() {
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(item.loan_deduction)}</td>
                                                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)', whiteSpace: 'nowrap' }}>{formatCurrency(item.net_salary)}</td>
                                                     <td>
-                                                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }} onClick={() => viewSlip(selectedRun.id, item.user_id)}>📄 Slip</button>
+                                                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }} onClick={() => viewSlip(selectedRun.id, item.user_id)}><Icon name="FileText" size={16} inline /> Slip</button>
                                                     </td>
                                                 </tr>
                                             );
@@ -304,13 +305,13 @@ export default function AdminPayroll() {
                         </div>
                         <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedRun.id}/export/pdf`, `payroll-${selectedRun.period_year}-${selectedRun.period_month}.pdf`)}>📄 Export PDF</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedRun.id}/export/excel`, `payroll-${selectedRun.period_year}-${selectedRun.period_month}.xlsx`)}>📊 Export Excel</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedRun.id}/export/pdf`, `payroll-${selectedRun.period_year}-${selectedRun.period_month}.pdf`)}><Icon name="FileText" size={16} inline /> Export PDF</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedRun.id}/export/excel`, `payroll-${selectedRun.period_year}-${selectedRun.period_month}.xlsx`)}><Icon name="BarChart3" size={16} inline /> Export Excel</button>
                             </div>
                             <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
                                 <button className="btn btn-outline" onClick={() => setShowDetailModal(false)}>Tutup</button>
                                 {selectedRun.status === 'draft' && (
-                                    <button className="btn btn-success" onClick={() => handleFinalize(selectedRun.id)}>✅ Finalisasi Payroll</button>
+                                    <button className="btn btn-success" onClick={() => handleFinalize(selectedRun.id)}><Icon name="CheckCircle2" size={16} inline /> Finalisasi Payroll</button>
                                 )}
                             </div>
                         </div>
@@ -323,8 +324,8 @@ export default function AdminPayroll() {
                 <div className="modal-overlay">
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 550 }}>
                         <div className="modal-header">
-                            <h3 className="modal-title">📄 Slip Gaji</h3>
-                            <button className="modal-close" onClick={() => setShowSlipModal(false)}>×</button>
+                            <h3 className="modal-title"><Icon name="FileText" size={16} inline /> Slip Gaji</h3>
+                            <button className="modal-close" onClick={() => setShowSlipModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                             {/* Header */}
@@ -342,7 +343,7 @@ export default function AdminPayroll() {
                             </div>
 
                             {/* Pendapatan */}
-                            <h4 style={{ color: 'var(--success-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>📈 Pendapatan</h4>
+                            <h4 style={{ color: 'var(--success-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="TrendingUp" size={16} inline /> Pendapatan</h4>
                             <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
                                 {[
                                     ['Gaji Pokok', selectedSlip.basic_salary],
@@ -362,7 +363,7 @@ export default function AdminPayroll() {
                             </div>
 
                             {/* Potongan */}
-                            <h4 style={{ color: 'var(--danger-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>📉 Potongan</h4>
+                            <h4 style={{ color: 'var(--danger-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="TrendingDown" size={16} inline /> Potongan</h4>
                             <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
                                 {(() => {
                                     const base = parseFloat(selectedSlip.basic_salary) || 1;
@@ -388,7 +389,7 @@ export default function AdminPayroll() {
                             </div>
 
                             {/* BPJS Company (info) */}
-                            <h4 style={{ color: 'var(--primary-400)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>🏢 Kontribusi Perusahaan (Info)</h4>
+                            <h4 style={{ color: 'var(--primary-400)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="Building2" size={16} inline /> Kontribusi Perusahaan (Info)</h4>
                             <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
                                 {(() => {
                                     const base = parseFloat(selectedSlip.basic_salary) || 1;
@@ -424,9 +425,9 @@ export default function AdminPayroll() {
                         </div>
                         <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedSlip.payroll_run_id}/slip/${selectedSlip.user_id}/pdf`, `slip-gaji-${selectedSlip.employee_id}.pdf`)}>📄 PDF</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedSlip.payroll_run_id}/slip/${selectedSlip.user_id}/excel`, `slip-gaji-${selectedSlip.employee_id}.xlsx`)}>📊 Excel</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => window.print()}>🖨️ Print</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedSlip.payroll_run_id}/slip/${selectedSlip.user_id}/pdf`, `slip-gaji-${selectedSlip.employee_id}.pdf`)}><Icon name="FileText" size={16} inline /> PDF</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedSlip.payroll_run_id}/slip/${selectedSlip.user_id}/excel`, `slip-gaji-${selectedSlip.employee_id}.xlsx`)}><Icon name="BarChart3" size={16} inline /> Excel</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => window.print()}><Icon name="Printer" size={16} inline /> Print</button>
                             </div>
                             <button className="btn btn-outline" style={{ marginLeft: 'auto' }} onClick={() => setShowSlipModal(false)}>Tutup</button>
                         </div>

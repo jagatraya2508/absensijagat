@@ -603,8 +603,15 @@ INSERT INTO roles (name, label, is_system)
 VALUES 
     ('admin', 'Administrator', true),
     ('employee', 'Karyawan', true),
-    ('manager', 'Pimpinan / Manager', true)
+    ('manager', 'Pimpinan / Manager', true),
+    ('kiosk', 'Operator Kiosk', true)
 ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_key)
+SELECT r.id, 'admin.kiosk'
+FROM roles r
+WHERE r.name = 'kiosk'
+ON CONFLICT (role_id, permission_key) DO NOTHING;
 
 -- Tabel Manual Attendances
 CREATE TABLE IF NOT EXISTS manual_attendances (

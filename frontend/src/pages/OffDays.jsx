@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { authAPI, offDaysAPI } from '../utils/api';
 
@@ -96,38 +97,13 @@ export default function OffDays() {
 
                     {error && (
                         <div className="alert alert-danger mb-3">
-                            <span className="alert-icon">⚠️</span>
-                            {error}
-                            <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
+                            <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer' }}><Icon name="X" size={16} /></button>
                         </div>
                     )}
 
                     {success && (
                         <div className="alert alert-success mb-3">
-                            <span className="alert-icon">✓</span>
-                            {success}
-                        </div>
-                    )}
-
-                    <div className="form-group">
-                        <label className="form-label">Pilih Karyawan</label>
-                        <select
-                            className="form-input form-select"
-                            value={selectedUser}
-                            onChange={(e) => setSelectedUser(e.target.value)}
-                        >
-                            <option value="">-- Pilih Karyawan --</option>
-                            {users.map(user => (
-                                <option key={user.id} value={user.id}>
-                                    {user.name} ({user.employee_id})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {selectedUser && (
-                        <>
-                            <div style={{ margin: '2rem 0', borderTop: '1px solid var(--gray-200)', paddingTop: '1.5rem' }}>
+                            <span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success} </div> )} <div className="form-group"> <label className="form-label">Pilih Karyawan</label> <select className="form-input form-select" value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)} > <option value="">-- Pilih Karyawan --</option> {users.map(user => ( <option key={user.id} value={user.id}> {user.name} ({user.employee_id}) </option> ))} </select> </div> {selectedUser && ( <> <div style={{ margin:'2rem 0', borderTop: '1px solid var(--gray-200)', paddingTop: '1.5rem' }}>
                                 <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Tambah Tanggal Libur</h3>
                                 <form onSubmit={handleAdd} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
                                     <div style={{ flex: 1 }}>
@@ -175,20 +151,4 @@ export default function OffDays() {
                                                                 style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', color: 'var(--danger-500)', borderColor: 'var(--danger-200)' }}
                                                                 title="Hapus"
                                                             >
-                                                                🗑️ Hapus
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
+                                                                Hapus </button> </td> </tr> ))} </tbody> </table> </div> )} </div> </> )} </div> </div> </div> ); }

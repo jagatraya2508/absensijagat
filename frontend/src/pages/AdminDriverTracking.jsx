@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getTrackingTypeMeta, TRACKING_TYPES } from '../utils/tracking';
 import LiveTrackingMap from '../components/LiveTrackingMap';
+import Icon from '../components/Icon';
 
 // Fix default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -148,7 +149,7 @@ export default function AdminDriverTracking() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📍 Tracking Kunjungan</h1>
+                <h1 className="page-title"><Icon name="MapPin" size={16} inline /> Tracking Kunjungan</h1>
                 <p className="page-subtitle">Peta live kendaraan dan riwayat check-in/check-out di lokasi customer</p>
             </div>
 
@@ -158,14 +159,14 @@ export default function AdminDriverTracking() {
                     className={`btn ${viewMode === 'live' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => setViewMode('live')}
                 >
-                    📡 Peta Live
+                    <Icon name="Radio" size={16} inline /> Peta Live
                 </button>
                 <button
                     type="button"
                     className={`btn ${viewMode === 'records' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => setViewMode('records')}
                 >
-                    📋 Data Kunjungan
+                    <Icon name="ClipboardList" size={16} inline /> Data Kunjungan
                 </button>
             </div>
 
@@ -176,28 +177,28 @@ export default function AdminDriverTracking() {
 
             {error && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>{error}
-                    <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>{error}
+                    <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}><Icon name="X" size={16} inline /></button>
                 </div>
             )}
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span>{success}
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span>{success}
                 </div>
             )}
 
             {/* Stats Cards */}
             <div className="grid grid-3 mb-4">
                 <div className="card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))', borderLeft: '4px solid var(--success-500)' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.3rem' }}>🟢 Sedang Aktif</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.3rem' }}><Icon name="Circle" size={16} inline /> Sedang Aktif</div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--success-400)' }}>{totalActive}</div>
                 </div>
                 <div className="card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05))', borderLeft: '4px solid var(--primary-500)' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.3rem' }}>✅ Selesai</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.3rem' }}><Icon name="CheckCircle2" size={16} inline /> Selesai</div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary-400)' }}>{totalCompleted}</div>
                 </div>
                 <div className="card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))', borderLeft: '4px solid var(--warning-500)' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.3rem' }}>📊 Total Data</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.3rem' }}><Icon name="BarChart3" size={16} inline /> Total Data</div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--warning-400)' }}>{records.length}</div>
                 </div>
             </div>
@@ -240,14 +241,14 @@ export default function AdminDriverTracking() {
                             onChange={e => setTypeFilter(e.target.value)}>
                             <option value="">Semua Tugas</option>
                             {Object.values(TRACKING_TYPES).map((t) => (
-                                <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
+                                <option key={t.key} value={t.key}>{t.label}</option>
                             ))}
                         </select>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-primary" onClick={fetchRecords} style={{ height: 42 }}>🔍 Filter</button>
+                        <button className="btn btn-primary" onClick={fetchRecords} style={{ height: 42 }}><Icon name="Search" size={16} inline /> Filter</button>
                         <button className="btn btn-outline" onClick={() => openMapForRecords(records)}
-                            style={{ height: 42 }} title="Lihat semua di peta">🗺️ Peta</button>
+                            style={{ height: 42 }} title="Lihat semua di peta"><Icon name="Map" size={16} inline /> Peta</button>
                     </div>
                 </div>
             </div>
@@ -256,10 +257,10 @@ export default function AdminDriverTracking() {
             {records.length > 0 && records.some(r => r.checkin_latitude) && (
                 <div className="card mb-4" style={{ overflow: 'hidden' }}>
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 className="card-title">🗺️ Peta Lokasi Kunjungan</h2>
+                        <h2 className="card-title"><Icon name="Map" size={16} inline /> Peta Lokasi Kunjungan</h2>
                         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--gray-400)' }}>
-                            <span>🟢 Check-in</span>
-                            <span>🔴 Check-out</span>
+                            <span><Icon name="Circle" size={16} inline /> Check-in</span>
+                            <span><Icon name="Circle" size={16} inline /> Check-out</span>
                         </div>
                     </div>
                     <div style={{ height: 350 }}>
@@ -282,10 +283,10 @@ export default function AdminDriverTracking() {
                                         <Marker position={[parseFloat(rec.checkin_latitude), parseFloat(rec.checkin_longitude)]} icon={checkinIcon}>
                                             <Popup>
                                                 <div style={{ color: '#333', minWidth: 180 }}>
-                                                    <strong>📥 Check-in</strong><br />
+                                                    <strong><Icon name="Download" size={16} inline /> Check-in</strong><br />
                                                     <strong>{rec.driver_name || 'Karyawan'}</strong><br />
-                                                    🏪 {rec.customer_name}<br />
-                                                    🕐 {formatDateTime(rec.checkin_time)}
+                                                    <Icon name="Store" size={16} inline /> {rec.customer_name}<br />
+                                                    <Icon name="Clock" size={16} inline /> {formatDateTime(rec.checkin_time)}
                                                 </div>
                                             </Popup>
                                         </Marker>
@@ -294,10 +295,10 @@ export default function AdminDriverTracking() {
                                         <Marker position={[parseFloat(rec.checkout_latitude), parseFloat(rec.checkout_longitude)]} icon={checkoutIcon}>
                                             <Popup>
                                                 <div style={{ color: '#333', minWidth: 180 }}>
-                                                    <strong>📤 Check-out</strong><br />
+                                                    <strong><Icon name="Upload" size={16} inline /> Check-out</strong><br />
                                                     <strong>{rec.driver_name || 'Karyawan'}</strong><br />
-                                                    🏪 {rec.customer_name}<br />
-                                                    🕐 {formatDateTime(rec.checkout_time)}
+                                                    <Icon name="Store" size={16} inline /> {rec.customer_name}<br />
+                                                    <Icon name="Clock" size={16} inline /> {formatDateTime(rec.checkout_time)}
                                                 </div>
                                             </Popup>
                                         </Marker>
@@ -312,7 +313,7 @@ export default function AdminDriverTracking() {
             {/* Data Table */}
             <div className="card">
                 <div className="card-header">
-                    <h2 className="card-title">📋 Data Tracking ({records.length})</h2>
+                    <h2 className="card-title"><Icon name="ClipboardList" size={16} inline /> Data Tracking ({records.length})</h2>
                 </div>
 
                 {loading ? (
@@ -321,7 +322,7 @@ export default function AdminDriverTracking() {
                     </div>
                 ) : records.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📍</div>
+                        <div className="empty-state-icon"><Icon name="MapPin" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada data tracking untuk filter yang dipilih</p>
                     </div>
                 ) : (
@@ -368,7 +369,7 @@ export default function AdminDriverTracking() {
                                                 <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', cursor: 'pointer', textDecoration: 'underline' }}
                                                     onClick={() => openGoogleMaps(rec.checkin_latitude, rec.checkin_longitude)}
                                                     title="Buka di Google Maps">
-                                                    📍 {formatCoord(rec.checkin_latitude, rec.checkin_longitude)}
+                                                    <Icon name="MapPin" size={16} inline /> {formatCoord(rec.checkin_latitude, rec.checkin_longitude)}
                                                 </div>
                                             )}
                                         </td>
@@ -380,7 +381,7 @@ export default function AdminDriverTracking() {
                                                         <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', cursor: 'pointer', textDecoration: 'underline' }}
                                                             onClick={() => openGoogleMaps(rec.checkout_latitude, rec.checkout_longitude)}
                                                             title="Buka di Google Maps">
-                                                            📍 {formatCoord(rec.checkout_latitude, rec.checkout_longitude)}
+                                                            <Icon name="MapPin" size={16} inline /> {formatCoord(rec.checkout_latitude, rec.checkout_longitude)}
                                                         </div>
                                                     )}
                                                 </>
@@ -408,22 +409,22 @@ export default function AdminDriverTracking() {
                                         </td>
                                         <td>
                                             <span className={`badge ${rec.status === 'checked_in' ? 'badge-success' : 'badge-primary'}`}>
-                                                {rec.status === 'checked_in' ? '🟢 Aktif' : '✅ Selesai'}
+                                                {rec.status === 'checked_in' ? 'Aktif' : 'Selesai'}
                                             </span>
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.3rem' }}>
                                                 <button className="btn btn-outline" onClick={() => setDetailModal({ open: true, record: rec })}
                                                     style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }} title="Detail">
-                                                    👁️
+                                                    <Icon name="Eye" size={16} inline />
                                                 </button>
                                                 <button className="btn btn-outline" onClick={() => openMapForRecords([rec])}
                                                     style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }} title="Peta">
-                                                    🗺️
+                                                    <Icon name="Map" size={16} inline />
                                                 </button>
                                                 <button className="btn btn-outline" onClick={() => handleDelete(rec.id)}
                                                     style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: 'var(--danger-400)' }} title="Hapus">
-                                                    🗑️
+                                                    <Icon name="Trash2" size={16} inline />
                                                 </button>
                                             </div>
                                         </td>
@@ -448,9 +449,9 @@ export default function AdminDriverTracking() {
                         boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
                     }} onClick={e => e.stopPropagation()}>
                         <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--gray-700)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.15rem' }}>📍 Detail Tracking</h3>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem' }}><Icon name="MapPin" size={16} inline /> Detail Tracking</h3>
                             <button onClick={() => setDetailModal({ open: false, record: null })}
-                                style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+                                style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '1.5rem', cursor: 'pointer' }}><Icon name="X" size={16} inline /></button>
                         </div>
                         <div style={{ padding: '1.25rem' }}>
                             {(() => {
@@ -472,20 +473,20 @@ export default function AdminDriverTracking() {
 
                                         <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
                                             <span className={`badge ${r.status === 'checked_in' ? 'badge-success' : 'badge-primary'}`}>
-                                                {r.status === 'checked_in' ? '🟢 Aktif' : '✅ Selesai'}
+                                                {r.status === 'checked_in' ? 'Aktif' : 'Selesai'}
                                             </span>
                                             <span className={`badge ${r.tracking_type === 'collection' ? 'badge-warning' : r.tracking_type === 'sales' ? 'badge-success' : 'badge-outline'}`}>
-                                                {getTrackingTypeMeta(r.tracking_type).icon} {getTrackingTypeMeta(r.tracking_type).label}
+                                                <Icon name={getTrackingTypeMeta(r.tracking_type).icon} size={14} inline /> {getTrackingTypeMeta(r.tracking_type).label}
                                             </span>
                                             <span className="badge badge-outline">{formatDate(r.tracking_date)}</span>
-                                            {r.checkout_time && <span className="badge badge-warning">⏱️ {calcDuration(r.checkin_time, r.checkout_time)}</span>}
+                                            {r.checkout_time && <span className="badge badge-warning"><Icon name="Clock" size={12} inline /> {calcDuration(r.checkin_time, r.checkout_time)}</span>}
                                         </div>
 
                                         {/* Bila jenisnya Collection */}
                                         {r.tracking_type === 'collection' && (
                                             <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: 'var(--radius-lg)', padding: '1rem', marginBottom: '1rem' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                                    <h4 style={{ margin: 0, color: 'var(--warning-400)', fontSize: '0.9rem' }}>💰 Rincian Penagihan</h4>
+                                                    <h4 style={{ margin: 0, color: 'var(--warning-400)', fontSize: '0.9rem' }}><Icon name="Wallet" size={16} inline /> Rincian Penagihan</h4>
                                                     {r.collection_status && (
                                                         <span className={`badge ${r.collection_status === 'Lunas' ? 'badge-success' : r.collection_status === 'Gagal' ? 'badge-danger' : 'badge-warning'}`}>
                                                             {r.collection_status}
@@ -522,7 +523,7 @@ export default function AdminDriverTracking() {
                                                             style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '3px solid var(--success-500)' }}
                                                             onClick={() => setImageModal({ open: true, src: r.checkin_photo_path, caption: `Check-in - ${r.customer_name}` })}
                                                         />
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--success-400)', marginTop: '0.3rem' }}>📥 Check-in</div>
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--success-400)', marginTop: '0.3rem' }}><Icon name="Download" size={16} inline /> Check-in</div>
                                                     </div>
                                                 )}
                                                 {r.checkout_photo_path && (
@@ -531,7 +532,7 @@ export default function AdminDriverTracking() {
                                                             style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '3px solid var(--danger-500)' }}
                                                             onClick={() => setImageModal({ open: true, src: r.checkout_photo_path, caption: `Check-out - ${r.customer_name}` })}
                                                         />
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--danger-400)', marginTop: '0.3rem' }}>📤 Check-out</div>
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--danger-400)', marginTop: '0.3rem' }}><Icon name="Upload" size={16} inline /> Check-out</div>
                                                     </div>
                                                 )}
                                             </div>
@@ -545,13 +546,13 @@ export default function AdminDriverTracking() {
                                             padding: '1rem',
                                             marginBottom: '0.75rem'
                                         }}>
-                                            <div style={{ fontWeight: 700, color: 'var(--success-400)', marginBottom: '0.5rem' }}>📥 Check-in</div>
+                                            <div style={{ fontWeight: 700, color: 'var(--success-400)', marginBottom: '0.5rem' }}><Icon name="Download" size={16} inline /> Check-in</div>
                                             <div style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>
-                                                🕐 <strong>{formatDateTime(r.checkin_time)}</strong>
+                                                <Icon name="Clock" size={16} inline /> <strong>{formatDateTime(r.checkin_time)}</strong>
                                             </div>
                                             {r.checkin_latitude && (
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)' }}>
-                                                    📍 Koordinat: {formatCoord(r.checkin_latitude, r.checkin_longitude)}{' '}
+                                                    <Icon name="MapPin" size={16} inline /> Koordinat: {formatCoord(r.checkin_latitude, r.checkin_longitude)}{' '}
                                                     <span style={{ cursor: 'pointer', color: 'var(--primary-400)', textDecoration: 'underline' }}
                                                         onClick={() => openGoogleMaps(r.checkin_latitude, r.checkin_longitude)}>
                                                         Buka Maps ↗
@@ -569,16 +570,16 @@ export default function AdminDriverTracking() {
                                             marginBottom: '0.75rem'
                                         }}>
                                             <div style={{ fontWeight: 700, color: r.checkout_time ? 'var(--danger-400)' : 'var(--gray-500)', marginBottom: '0.5rem' }}>
-                                                📤 Check-out
+                                                <Icon name="Upload" size={16} inline /> Check-out
                                             </div>
                                             {r.checkout_time ? (
                                                 <>
                                                     <div style={{ fontSize: '0.9rem', marginBottom: '0.3rem' }}>
-                                                        🕐 <strong>{formatDateTime(r.checkout_time)}</strong>
+                                                        <Icon name="Clock" size={16} inline /> <strong>{formatDateTime(r.checkout_time)}</strong>
                                                     </div>
                                                     {r.checkout_latitude && (
                                                         <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)' }}>
-                                                            📍 Koordinat: {formatCoord(r.checkout_latitude, r.checkout_longitude)}{' '}
+                                                            <Icon name="MapPin" size={16} inline /> Koordinat: {formatCoord(r.checkout_latitude, r.checkout_longitude)}{' '}
                                                             <span style={{ cursor: 'pointer', color: 'var(--primary-400)', textDecoration: 'underline' }}
                                                                 onClick={() => openGoogleMaps(r.checkout_latitude, r.checkout_longitude)}>
                                                                 Buka Maps ↗
@@ -598,7 +599,7 @@ export default function AdminDriverTracking() {
                                                 padding: '0.75rem',
                                                 marginBottom: '0.75rem'
                                             }}>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '0.3rem' }}>💬 Catatan</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '0.3rem' }}><Icon name="MessageSquare" size={16} inline /> Catatan</div>
                                                 <div style={{ fontSize: '0.9rem', whiteSpace: 'pre-line' }}>{r.notes}</div>
                                             </div>
                                         )}
@@ -617,18 +618,18 @@ export default function AdminDriverTracking() {
                                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                                         />
                                                         <Marker position={[parseFloat(r.checkin_latitude), parseFloat(r.checkin_longitude)]} icon={checkinIcon}>
-                                                            <Popup><div style={{ color: '#333' }}><strong>📥 Check-in</strong><br />{formatDateTime(r.checkin_time)}</div></Popup>
+                                                            <Popup><div style={{ color: '#333' }}><strong><Icon name="Download" size={16} inline /> Check-in</strong><br />{formatDateTime(r.checkin_time)}</div></Popup>
                                                         </Marker>
                                                         {r.checkout_latitude && (
                                                             <Marker position={[parseFloat(r.checkout_latitude), parseFloat(r.checkout_longitude)]} icon={checkoutIcon}>
-                                                                <Popup><div style={{ color: '#333' }}><strong>📤 Check-out</strong><br />{formatDateTime(r.checkout_time)}</div></Popup>
+                                                                <Popup><div style={{ color: '#333' }}><strong><Icon name="Upload" size={16} inline /> Check-out</strong><br />{formatDateTime(r.checkout_time)}</div></Popup>
                                                             </Marker>
                                                         )}
                                                     </MapContainer>
                                                 </div>
                                                 <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: 'var(--gray-500)', display: 'flex', gap: '1rem', background: 'var(--gray-800)' }}>
-                                                    <span>🟢 Check-in</span>
-                                                    {r.checkout_latitude && <span>🔴 Check-out</span>}
+                                                    <span><Icon name="Circle" size={16} inline /> Check-in</span>
+                                                    {r.checkout_latitude && <span><Icon name="Circle" size={16} inline /> Check-out</span>}
                                                 </div>
                                             </div>
                                         )}
@@ -653,9 +654,9 @@ export default function AdminDriverTracking() {
                         overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
                     }} onClick={e => e.stopPropagation()}>
                         <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--gray-700)' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>🗺️ Peta Lokasi Tracking ({mapModal.records.length} titik)</h3>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}><Icon name="Map" size={16} inline /> Peta Lokasi Tracking ({mapModal.records.length} titik)</h3>
                             <button onClick={() => setMapModal({ ...mapModal, open: false })}
-                                style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+                                style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '1.5rem', cursor: 'pointer' }}><Icon name="X" size={16} inline /></button>
                         </div>
                         <div style={{ height: 500 }}>
                             <MapContainer center={mapModal.center} zoom={12} style={{ height: '100%', width: '100%' }}>
@@ -669,10 +670,10 @@ export default function AdminDriverTracking() {
                                             <Marker position={[parseFloat(rec.checkin_latitude), parseFloat(rec.checkin_longitude)]} icon={checkinIcon}>
                                                 <Popup>
                                                     <div style={{ color: '#333', minWidth: 180 }}>
-                                                        <strong>📥 Check-in</strong><br />
+                                                        <strong><Icon name="Download" size={16} inline /> Check-in</strong><br />
                                                         <strong>{rec.driver_name || 'Karyawan'}</strong><br />
-                                                        🏪 {rec.customer_name}<br />
-                                                        🕐 {formatDateTime(rec.checkin_time)}
+                                                        <Icon name="Store" size={16} inline /> {rec.customer_name}<br />
+                                                        <Icon name="Clock" size={16} inline /> {formatDateTime(rec.checkin_time)}
                                                     </div>
                                                 </Popup>
                                             </Marker>
@@ -681,10 +682,10 @@ export default function AdminDriverTracking() {
                                             <Marker position={[parseFloat(rec.checkout_latitude), parseFloat(rec.checkout_longitude)]} icon={checkoutIcon}>
                                                 <Popup>
                                                     <div style={{ color: '#333', minWidth: 180 }}>
-                                                        <strong>📤 Check-out</strong><br />
+                                                        <strong><Icon name="Upload" size={16} inline /> Check-out</strong><br />
                                                         <strong>{rec.driver_name || 'Karyawan'}</strong><br />
-                                                        🏪 {rec.customer_name}<br />
-                                                        🕐 {formatDateTime(rec.checkout_time)}
+                                                        <Icon name="Store" size={16} inline /> {rec.customer_name}<br />
+                                                        <Icon name="Clock" size={16} inline /> {formatDateTime(rec.checkout_time)}
                                                     </div>
                                                 </Popup>
                                             </Marker>
@@ -694,8 +695,8 @@ export default function AdminDriverTracking() {
                             </MapContainer>
                         </div>
                         <div style={{ padding: '0.75rem 1.25rem', display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: 'var(--gray-400)', borderTop: '1px solid var(--gray-700)' }}>
-                            <span>🟢 = Check-in</span>
-                            <span>🔴 = Check-out</span>
+                            <span><Icon name="Circle" size={16} inline /> = Check-in</span>
+                            <span><Icon name="Circle" size={16} inline /> = Check-out</span>
                         </div>
                     </div>
                 </div>
@@ -713,7 +714,7 @@ export default function AdminDriverTracking() {
                             style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 'var(--radius-lg)', border: '2px solid var(--gray-600)' }} />
                         <p style={{ marginTop: '0.75rem', color: 'var(--gray-300)', fontSize: '0.9rem' }}>{imageModal.caption}</p>
                         <button className="btn btn-outline" onClick={() => setImageModal({ ...imageModal, open: false })}
-                            style={{ marginTop: '0.5rem' }}>✕ Tutup</button>
+                            style={{ marginTop: '0.5rem' }}><Icon name="X" size={16} inline /> Tutup</button>
                     </div>
                 </div>
             )}

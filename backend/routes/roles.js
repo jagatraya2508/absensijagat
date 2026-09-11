@@ -547,7 +547,13 @@ router.put('/:id', async (req, res) => {
 
         await client.query('UPDATE roles SET label = $1 WHERE id = $2', [label, id]);
 
-        if (role.name !== 'admin') {
+        if (role.name === 'kiosk') {
+            await client.query('DELETE FROM role_permissions WHERE role_id = $1', [id]);
+            await client.query(
+                'INSERT INTO role_permissions (role_id, permission_key) VALUES ($1, $2)',
+                [id, 'admin.kiosk']
+            );
+        } else if (role.name !== 'admin') {
             await client.query('DELETE FROM role_permissions WHERE role_id = $1', [id]);
 
             if (permissions && Array.isArray(permissions) && permissions.length > 0) {
@@ -586,9 +592,9 @@ router.delete('/:id', async (req, res) => {
 
         const role = roleResult.rows[0];
 
-        if (role.name === 'admin') {
+        if (role.name === 'admin' || role.name === 'kiosk') {
             await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Role admin tidak dapat dihapus' });
+            return res.status(403).json({ error: 'Role sistem ini tidak dapat dihapus' });
         }
 
         const usersResult = await client.query('SELECT id FROM users WHERE role = $1 LIMIT 1', [role.name]);

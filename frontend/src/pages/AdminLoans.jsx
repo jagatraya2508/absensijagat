@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { loansAPI, authAPI } from '../utils/api';
 
@@ -129,23 +130,23 @@ export default function AdminLoans() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">💰 Pinjaman Karyawan</h1>
+                <h1 className="page-title"><Icon name="Wallet" size={16} inline /> Pinjaman Karyawan</h1>
                 <p className="page-subtitle">Kelola pinjaman dan cicilan karyawan</p>
             </div>
 
-            {success && <div className="alert alert-success mb-3"><span className="alert-icon">✓</span> {success}</div>}
+            {success && <div className="alert alert-success mb-3"><span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}</div>}
 
             {/* Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div className="card status-card">
-                    <div className="status-card-icon warning">💰</div>
+                    <div className="status-card-icon warning"><Icon name="Wallet" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Pinjaman Aktif</h3>
                         <p>{loans.filter(l => l.status === 'active').length}</p>
                     </div>
                 </div>
                 <div className="card status-card">
-                    <div className="status-card-icon danger">📊</div>
+                    <div className="status-card-icon danger"><Icon name="BarChart3" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Total Sisa Pinjaman</h3>
                         <p style={{ fontSize: '1.1rem' }}>{formatCurrency(totalActive)}</p>
@@ -173,7 +174,7 @@ export default function AdminLoans() {
                     </div>
                 ) : loans.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">💰</div>
+                        <div className="empty-state-icon"><Icon name="Wallet" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada pinjaman</p>
                     </div>
                 ) : (
@@ -214,9 +215,9 @@ export default function AdminLoans() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }} onClick={() => openDetail(loan)}>📋</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }} onClick={() => openDetail(loan)}><Icon name="ClipboardList" size={16} inline /></button>
                                                 {loan.status === 'active' && (
-                                                    <button className="btn btn-success" style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }} onClick={() => openPayment(loan)}>💵 Bayar</button>
+                                                    <button className="btn btn-success" style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }} onClick={() => openPayment(loan)}><Icon name="Banknote" size={16} inline /> Bayar</button>
                                                 )}
                                                 <button
                                                     className="btn btn-outline"
@@ -224,7 +225,7 @@ export default function AdminLoans() {
                                                     onClick={() => handleDelete(loan.id)}
                                                     title="Hapus Pinjaman"
                                                 >
-                                                    🗑️
+                                                    <Icon name="Trash2" size={16} inline />
                                                 </button>
                                             </div>
                                         </td>
@@ -242,11 +243,11 @@ export default function AdminLoans() {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">Buat Pinjaman Baru</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
-                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon">⚠️</span> {error}</div>}
+                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div className="form-group">
                                     <label className="form-label">Karyawan *</label>
                                     <select className="form-input form-select" value={formData.user_id} onChange={e => setFormData({ ...formData, user_id: e.target.value })} required>
@@ -290,11 +291,11 @@ export default function AdminLoans() {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">Catat Pembayaran - {selectedLoan.user_name}</h3>
-                            <button className="modal-close" onClick={() => setShowPaymentModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowPaymentModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handlePayment}>
                             <div className="modal-body">
-                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon">⚠️</span> {error}</div>}
+                                {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
                                     <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>Sisa pinjaman: <strong style={{ color: 'white' }}>{formatCurrency(selectedLoan.remaining_balance)}</strong></p>
                                 </div>
@@ -313,7 +314,7 @@ export default function AdminLoans() {
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-outline" onClick={() => setShowPaymentModal(false)}>Batal</button>
-                                <button type="submit" className="btn btn-success" disabled={saving}>{saving ? 'Memproses...' : '💵 Bayar'}</button>
+                                <button type="submit" className="btn btn-success" disabled={saving}>{saving ? 'Memproses...' : 'Bayar'}</button>
                             </div>
                         </form>
                     </div>
@@ -326,7 +327,7 @@ export default function AdminLoans() {
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
                         <div className="modal-header">
                             <h3 className="modal-title">Detail Pinjaman - {selectedLoan.user_name}</h3>
-                            <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowDetailModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>

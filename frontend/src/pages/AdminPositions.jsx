@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { positionsAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminPositions() {
     const [positions, setPositions] = useState([]);
@@ -137,18 +138,18 @@ export default function AdminPositions() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🏅 Master Jabatan</h1>
+                <h1 className="page-title"><Icon name="Award" size={16} inline /> Master Jabatan</h1>
                 <p className="page-subtitle">Kelola daftar jabatan perusahaan</p>
             </div>
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span> {success}
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}
                 </div>
             )}
             {error && !showModal && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span> {error}
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}
                 </div>
             )}
 
@@ -170,7 +171,7 @@ export default function AdminPositions() {
                                 opacity: downloadingTemplate ? 0.7 : 1
                             }}
                         >
-                            {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                            {downloadingTemplate ? 'Mengunduh...' : 'Template'}
                         </button>
                         <button
                             className="btn"
@@ -184,16 +185,16 @@ export default function AdminPositions() {
                                 cursor: 'pointer'
                             }}
                         >
-                            📤 Upload Excel
+                            <Icon name="Upload" size={16} inline /> Upload Excel
                         </button>
                         <button className="btn btn-primary" onClick={() => openModal()}>
-                            ➕ Tambah Jabatan
+                            <Icon name="Plus" size={16} inline /> Tambah Jabatan
                         </button>
                     </div>
                     <input
                         type="text"
                         className="form-input"
-                        placeholder="🔍 Cari jabatan..."
+                        placeholder="Cari jabatan..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         style={{ maxWidth: 300, margin: 0 }}
@@ -206,7 +207,7 @@ export default function AdminPositions() {
                     </div>
                 ) : filteredData.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🏅</div>
+                        <div className="empty-state-icon"><Icon name="Award" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada data jabatan</p>
                         <button className="btn btn-outline" onClick={() => openModal()}>
                             Tambah Jabatan Sekarang
@@ -236,14 +237,14 @@ export default function AdminPositions() {
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
                                                     onClick={() => openModal(pos)}
                                                 >
-                                                    ✏️ Edit
+                                                    <Icon name="Pencil" size={16} inline /> Edit
                                                 </button>
                                                 <button 
                                                     className="btn btn-outline" 
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', color: 'var(--danger-500)', borderColor: 'var(--danger-500)' }}
                                                     onClick={() => handleDelete(pos.id)}
                                                 >
-                                                    🗑️ Hapus
+                                                    <Icon name="Trash2" size={16} inline /> Hapus
                                                 </button>
                                             </div>
                                         </td>
@@ -265,12 +266,12 @@ export default function AdminPositions() {
                         <div style={{ padding: '1.5rem' }}>
                             {importError && (
                                 <div className="alert alert-danger mb-3">
-                                    ⚠️ {importError}
+                                    <Icon name="AlertTriangle" size={16} inline /> {importError}
                                 </div>
                             )}
 
                             <div className="alert alert-info mb-3">
-                                ℹ️ Unduh template resmi, isi <strong>Nama</strong> jabatan, lalu unggah file .xlsx.
+                                <Icon name="Info" size={16} inline /> Unduh template resmi, isi <strong>Nama</strong> jabatan, lalu unggah file .xlsx.
                                 Keterangan opsional. Nama yang sudah ada akan diperbarui.
                             </div>
 
@@ -296,7 +297,7 @@ export default function AdminPositions() {
                             {importResult && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <div className={`alert mb-3 ${(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'alert-success' : 'alert-warning'}`}>
-                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? '✅' : '⚠️'}{' '}
+                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'CheckCircle2' : 'AlertTriangle'}{' '}
                                         Ditambah: <strong>{importResult.imported || 0}</strong>
                                         {' · '}Diperbarui: <strong>{importResult.updated || 0}</strong>
                                         {' · '}Gagal: <strong>{importResult.failed || 0}</strong>
@@ -345,7 +346,7 @@ export default function AdminPositions() {
                                     onClick={handleDownloadTemplate}
                                     disabled={downloadingTemplate}
                                 >
-                                    {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                    {downloadingTemplate ? 'Mengunduh...' : 'Unduh Template'}
                                 </button>
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>
@@ -372,13 +373,13 @@ export default function AdminPositions() {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">{formData.id ? 'Edit Jabatan' : 'Tambah Jabatan'}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <form onSubmit={handleSave}>
                             <div className="modal-body">
                                 {error && (
                                     <div className="alert alert-danger mb-3">
-                                        <span className="alert-icon">⚠️</span> {error}
+                                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}
                                     </div>
                                 )}
                                 <div className="form-group">
@@ -407,7 +408,7 @@ export default function AdminPositions() {
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : '💾 Simpan'}
+                                    {saving ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
                         </form>

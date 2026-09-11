@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from '../components/Icon';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -86,18 +87,18 @@ export default function ManagerApprovals() {
     return (
         <div className="fade-in">
             <div className="page-header">
-                <h1 className="page-title">✅ Persetujuan Pimpinan</h1>
+                <h1 className="page-title"><Icon name="CheckCircle2" size={16} inline /> Persetujuan Pimpinan</h1>
                 <p className="page-subtitle">Persetujuan pengajuan lembur tim (SPL)</p>
             </div>
 
-            {error && <div className="alert alert-danger mb-4">⚠️ {error}</div>}
-            {success && <div className="alert alert-success mb-4">✅ {success}</div>}
+            {error && <div className="alert alert-danger mb-4"><Icon name="AlertTriangle" size={16} inline /> {error}</div>}
+            {success && <div className="alert alert-success mb-4"><Icon name="CheckCircle2" size={16} inline /> {success}</div>}
 
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">Daftar Menunggu Persetujuan</h2>
                     <button className="btn btn-outline" onClick={fetchRequests} disabled={loading}>
-                        🔄 Refresh
+                        <Icon name="RefreshCw" size={16} inline /> Refresh
                     </button>
                 </div>
 
@@ -107,7 +108,7 @@ export default function ManagerApprovals() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🎉</div>
+                        <div className="empty-state-icon"><Icon name="Trophy" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada pengajuan lembur yang perlu disetujui saat ini.</p>
                     </div>
                 ) : (
@@ -142,12 +143,12 @@ export default function ManagerApprovals() {
                                 </div>
 
                                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
-                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--gray-200)' }}>📝 Alasan / Pekerjaan:</h4>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--gray-200)' }}><Icon name="FileText" size={16} inline /> Alasan / Pekerjaan:</h4>
                                     <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--gray-300)', whiteSpace: 'pre-wrap' }}>{req.reason}</p>
                                 </div>
 
                                 <div style={{ marginBottom: '1.25rem' }}>
-                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--gray-200)' }}>👥 Anggota Lembur ({req.employees?.length || 0}):</h4>
+                                    <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--gray-200)' }}><Icon name="Users" size={16} inline /> Anggota Lembur ({req.employees?.length || 0}):</h4>
                                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                         {req.employees?.map(emp => (
                                             <span key={emp.id} style={{ 
@@ -179,14 +180,14 @@ export default function ManagerApprovals() {
                                             onClick={() => handleApprove(req.id, false)}
                                             disabled={actionLoading === req.id}
                                         >
-                                            {actionLoading === req.id ? '...' : '❌ Tolak'}
+                                            {actionLoading === req.id ? '...' : 'Tolak'}
                                         </button>
                                         <button 
                                             className="btn btn-success" 
                                             onClick={() => handleApprove(req.id, true)}
                                             disabled={actionLoading === req.id}
                                         >
-                                            {actionLoading === req.id ? '...' : '✅ Setujui'}
+                                            {actionLoading === req.id ? '...' : 'Setujui'}
                                         </button>
                                     </div>
                                 </div>

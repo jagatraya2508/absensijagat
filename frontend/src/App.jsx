@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Sidebar from './components/Sidebar';
+import Icon from './components/Icon';
 import { useLiveLocationShare } from './hooks/useLiveLocationShare';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -47,7 +48,8 @@ import AdminOrganization from './pages/AdminOrganization';
 import LeaveApprovals from './pages/LeaveApprovals';
 
 function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, permission = null, anyPermission = null, allowSupervisor = false }) {
-    const { user, loading, hasPermission } = useAuth();
+    const { user, loading, hasPermission, isKioskOnly } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return (
@@ -59,6 +61,10 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
 
     if (!user) {
         return <Navigate to="/login" replace />;
+    }
+
+    if (isKioskOnly() && location.pathname !== '/kiosk') {
+        return <Navigate to="/kiosk" replace />;
     }
 
     if (adminOnly && user.role !== 'admin') {
@@ -101,7 +107,7 @@ function AppLayout({ children }) {
                 onClick={() => setSidebarOpen((open) => !open)}
                 aria-label={sidebarOpen ? 'Tutup menu' : 'Buka menu'}
             >
-                {sidebarOpen ? '✕' : '☰'}
+                {sidebarOpen ? <Icon name="X" size={22} /> : <Icon name="Menu" size={22} />}
             </button>
             {sidebarOpen && (
                 <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { organizationAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 function OrgNode({ node, depth = 0 }) {
     const [open, setOpen] = useState(depth < 2);
@@ -25,7 +26,7 @@ function OrgNode({ node, depth = 0 }) {
                         onClick={() => setOpen((v) => !v)}
                         style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem', minWidth: 28 }}
                     >
-                        {open ? '▼' : '▶'}
+                        {open ? <Icon name="ChevronDown" size={12} /> : <Icon name="ChevronRight" size={12} />}
                     </button>
                 ) : (
                     <span style={{ width: 28, textAlign: 'center', opacity: 0.35 }}>•</span>
@@ -112,30 +113,30 @@ export default function AdminOrganization() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🏢 Struktur Organisasi</h1>
+                <h1 className="page-title"><Icon name="Building2" size={16} inline /> Struktur Organisasi</h1>
                 <p className="page-subtitle">Tentukan atasan tiap karyawan. Rantai ini dipakai untuk approval izin & cuti bertingkat.</p>
             </div>
 
-            {error && <div className="alert alert-danger mb-4">⚠️ {error}</div>}
-            {success && <div className="alert alert-success mb-4">✅ {success}</div>}
+            {error && <div className="alert alert-danger mb-4"><Icon name="AlertTriangle" size={16} inline /> {error}</div>}
+            {success && <div className="alert alert-success mb-4"><Icon name="CheckCircle2" size={16} inline /> {success}</div>}
 
             <div className="grid grid-3 mb-4">
                 <div className="card status-card">
-                    <div className="status-card-icon primary">👥</div>
+                    <div className="status-card-icon primary"><Icon name="Users" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>{data.stats?.total || 0}</h3>
                         <p>Total orang</p>
                     </div>
                 </div>
                 <div className="card status-card">
-                    <div className="status-card-icon warning">🔗</div>
+                    <div className="status-card-icon warning"><Icon name="Link" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>{data.stats?.with_supervisor || 0}</h3>
                         <p>Sudah punya atasan</p>
                     </div>
                 </div>
                 <div className="card status-card">
-                    <div className="status-card-icon danger">⚠️</div>
+                    <div className="status-card-icon danger"><Icon name="AlertTriangle" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>{data.stats?.unassigned || 0}</h3>
                         <p>Belum punya atasan</p>
@@ -145,8 +146,8 @@ export default function AdminOrganization() {
 
             <div className="card mb-4">
                 <div className="card-header">
-                    <h2 className="card-title">🌳 Bagan Organisasi</h2>
-                    <button className="btn btn-outline" onClick={fetchOrg} disabled={loading}>🔄 Refresh</button>
+                    <h2 className="card-title"><Icon name="TreePine" size={16} inline /> Bagan Organisasi</h2>
+                    <button className="btn btn-outline" onClick={fetchOrg} disabled={loading}><Icon name="RefreshCw" size={16} inline /> Refresh</button>
                 </div>
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -154,7 +155,7 @@ export default function AdminOrganization() {
                     </div>
                 ) : (data.tree || []).length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🏢</div>
+                        <div className="empty-state-icon"><Icon name="Building2" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada data karyawan</p>
                     </div>
                 ) : (
@@ -171,7 +172,7 @@ export default function AdminOrganization() {
 
             <div className="card">
                 <div className="card-header">
-                    <h2 className="card-title">👤 Tetapkan Atasan</h2>
+                    <h2 className="card-title"><Icon name="User" size={16} inline /> Tetapkan Atasan</h2>
                     <input
                         className="form-input"
                         placeholder="Cari nama / NIK / departemen..."

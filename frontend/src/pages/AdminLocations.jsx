@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { locationsAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminLocations() {
     const [locations, setLocations] = useState([]);
@@ -111,7 +112,7 @@ export default function AdminLocations() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📍 Kelola Lokasi Absensi</h1>
+                <h1 className="page-title"><Icon name="MapPin" size={16} inline /> Kelola Lokasi Absensi</h1>
                 <p className="page-subtitle">Atur lokasi kantor untuk validasi absensi</p>
             </div>
 
@@ -129,7 +130,7 @@ export default function AdminLocations() {
                     </div>
                 ) : locations.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📍</div>
+                        <div className="empty-state-icon"><Icon name="MapPin" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada lokasi terdaftar</p>
                     </div>
                 ) : (
@@ -164,14 +165,14 @@ export default function AdminLocations() {
                                                     style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
                                                     onClick={() => openEditModal(loc)}
                                                 >
-                                                    ✏️ Edit
+                                                    <Icon name="Pencil" size={16} inline /> Edit
                                                 </button>
                                                 <button
                                                     className="btn btn-outline"
                                                     style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', color: 'var(--danger-500)' }}
                                                     onClick={() => handleDelete(loc.id)}
                                                 >
-                                                    🗑️
+                                                    <Icon name="Trash2" size={16} inline />
                                                 </button>
                                             </div>
                                         </td>
@@ -191,14 +192,14 @@ export default function AdminLocations() {
                             <h3 className="modal-title">
                                 {editingLocation ? 'Edit Lokasi' : 'Tambah Lokasi Baru'}
                             </h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
 
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 {error && (
                                     <div className="alert alert-danger mb-3">
-                                        <span className="alert-icon">⚠️</span>
+                                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                                         {error}
                                     </div>
                                 )}
@@ -247,7 +248,7 @@ export default function AdminLocations() {
                                     className="btn btn-outline btn-block mb-3"
                                     onClick={getCurrentLocation}
                                 >
-                                    📍 Gunakan Lokasi Saat Ini
+                                    <Icon name="MapPin" size={16} inline /> Gunakan Lokasi Saat Ini
                                 </button>
 
                                 <div className="form-group">

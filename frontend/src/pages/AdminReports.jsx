@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { reportsAPI, authAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminReports() {
     const [reportType, setReportType] = useState('daily');
@@ -133,7 +134,7 @@ export default function AdminReports() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📊 Laporan Absensi</h1>
+                <h1 className="page-title"><Icon name="BarChart3" size={16} inline /> Laporan Absensi</h1>
                 <p className="page-subtitle">Lihat rekapitulasi absensi karyawan</p>
             </div>
 
@@ -239,28 +240,28 @@ export default function AdminReports() {
             {report && report.summary && reportType === 'daily' && (
                 <div className="grid grid-4 mb-4">
                     <div className="card status-card">
-                        <div className="status-card-icon primary">👥</div>
+                        <div className="status-card-icon primary"><Icon name="Users" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Total Karyawan</h3>
                             <p>{report.summary.total_employees}</p>
                         </div>
                     </div>
                     <div className="card status-card">
-                        <div className="status-card-icon success">✓</div>
+                        <div className="status-card-icon success"><Icon name="Check" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Hadir</h3>
                             <p>{report.summary.present}</p>
                         </div>
                     </div>
                     <div className="card status-card">
-                        <div className="status-card-icon danger">✗</div>
+                        <div className="status-card-icon danger"><Icon name="X" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Tidak Hadir</h3>
                             <p>{report.summary.absent}</p>
                         </div>
                     </div>
                     <div className="card status-card">
-                        <div className="status-card-icon warning">✓✓</div>
+                        <div className="status-card-icon warning"><Icon name="Check" size={16} inline /><Icon name="Check" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Lengkap</h3>
                             <p>{report.summary.completed}</p>
@@ -268,7 +269,7 @@ export default function AdminReports() {
                     </div>
                     {report.summary.on_off > 0 && (
                         <div className="card status-card">
-                            <div className="status-card-icon primary">🏖️</div>
+                            <div className="status-card-icon primary"><Icon name="Palmtree" size={16} inline /></div>
                             <div className="status-card-content">
                                 <h3>OFF</h3>
                                 <p>{report.summary.on_off}</p>
@@ -282,28 +283,28 @@ export default function AdminReports() {
             {report && reportType === 'history' && report.records && (
                 <div className="grid grid-4 mb-4">
                     <div className="card status-card">
-                        <div className="status-card-icon primary">📋</div>
+                        <div className="status-card-icon primary"><Icon name="ClipboardList" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Total Record</h3>
                             <p>{report.total || report.records.length}</p>
                         </div>
                     </div>
                     <div className="card status-card">
-                        <div className="status-card-icon success">✓</div>
+                        <div className="status-card-icon success"><Icon name="Check" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Hadir</h3>
                             <p>{report.records.filter(r => r.check_in_time).length}</p>
                         </div>
                     </div>
                     <div className="card status-card">
-                        <div className="status-card-icon warning">✓✓</div>
+                        <div className="status-card-icon warning"><Icon name="Check" size={16} inline /><Icon name="Check" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>Lengkap</h3>
                             <p>{report.records.filter(r => r.check_in_time && r.check_out_time).length}</p>
                         </div>
                     </div>
                     <div className="card status-card">
-                        <div className="status-card-icon primary">🏖️</div>
+                        <div className="status-card-icon primary"><Icon name="Palmtree" size={16} inline /></div>
                         <div className="status-card-content">
                             <h3>OFF</h3>
                             <p>{report.records.filter(r => r.is_off_day).length}</p>
@@ -311,7 +312,7 @@ export default function AdminReports() {
                     </div>
                     {report.records.some(r => r.leave_type) && (
                         <div className="card status-card">
-                            <div className="status-card-icon secondary">📝</div>
+                            <div className="status-card-icon secondary"><Icon name="FileText" size={16} inline /></div>
                             <div className="status-card-content">
                                 <h3>Izin/Cuti</h3>
                                 <p>{report.records.filter(r => r.leave_type).length}</p>
@@ -341,7 +342,7 @@ export default function AdminReports() {
                             disabled={exporting || !report || report.records?.length === 0}
                             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                         >
-                            {exporting ? '⏳' : '📄'} PDF
+                            {exporting ? 'Hourglass' : 'FileText'} PDF
                         </button>
                         <button
                             className="btn btn-success"
@@ -349,7 +350,7 @@ export default function AdminReports() {
                             disabled={exporting || !report || report.records?.length === 0}
                             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                         >
-                            {exporting ? '⏳' : '📊'} Excel
+                            {exporting ? 'Hourglass' : 'BarChart3'} Excel
                         </button>
                     </div>
                 </div>
@@ -360,7 +361,7 @@ export default function AdminReports() {
                     </div>
                 ) : !report || report.records?.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📊</div>
+                        <div className="empty-state-icon"><Icon name="BarChart3" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada data untuk periode ini</p>
                     </div>
                 ) : (
@@ -391,19 +392,19 @@ export default function AdminReports() {
                                             <thead>
                                                 <tr>
                                                     <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                        Employee ID {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Employee ID {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('check_in_time')} style={{ cursor: 'pointer' }}>
-                                                        Check-in {sortConfig.key === 'check_in_time' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Check-in {sortConfig.key === 'check_in_time' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('check_out_time')} style={{ cursor: 'pointer' }}>
-                                                        Check-out {sortConfig.key === 'check_out_time' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Check-out {sortConfig.key === 'check_out_time' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('location_name')} style={{ cursor: 'pointer' }}>
-                                                        Lokasi {sortConfig.key === 'location_name' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Lokasi {sortConfig.key === 'location_name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th>Status</th>
                                                 </tr>
@@ -419,7 +420,7 @@ export default function AdminReports() {
                                                                     <span>{formatTime(record.check_in_time)}</span>
                                                                     {!record.check_in_valid && (
                                                                         <span className="badge badge-warning" style={{ marginLeft: '0.5rem' }}>
-                                                                            ⚠
+                                                                            <Icon name="AlertTriangle" size={16} inline />
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -433,7 +434,7 @@ export default function AdminReports() {
                                                                     <span>{formatTime(record.check_out_time)}</span>
                                                                     {!record.check_out_valid && (
                                                                         <span className="badge badge-warning" style={{ marginLeft: '0.5rem' }}>
-                                                                            ⚠
+                                                                            <Icon name="AlertTriangle" size={16} inline />
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -444,23 +445,23 @@ export default function AdminReports() {
                                                         <td>{record.location_name || '-'}</td>
                                                         <td>
                                                             {record.is_off_day ? (
-                                                                <span className="badge badge-primary">🏖️ OFF</span>
+                                                                <span className="badge badge-primary"><Icon name="Palmtree" size={16} inline /> OFF</span>
                                                             ) : record.check_in_time && record.check_out_time ? (
-                                                                <span className="badge badge-success">✅ Lengkap</span>
+                                                                <span className="badge badge-success"><Icon name="CheckCircle2" size={16} inline /> Lengkap</span>
                                                             ) : record.check_in_time ? (
                                                                 record.leave_type === 'late' ? (
-                                                                    <span className="badge badge-warning">⏰ Terlambat</span>
+                                                                    <span className="badge badge-warning"><Icon name="Clock" size={16} inline /> Terlambat</span>
                                                                 ) : (
-                                                                    <span className="badge badge-warning">⏳ Belum Pulang</span>
+                                                                    <span className="badge badge-warning"><Icon name="Hourglass" size={16} inline /> Belum Pulang</span>
                                                                 )
                                                             ) : record.leave_type === 'sick' ? (
-                                                                <span className="badge badge-danger">🏥 Sakit</span>
+                                                                <span className="badge badge-danger"><Icon name="HeartPulse" size={16} inline /> Sakit</span>
                                                             ) : record.leave_type === 'leave' ? (
-                                                                <span className="badge badge-primary">🏖️ Cuti</span>
+                                                                <span className="badge badge-primary"><Icon name="Palmtree" size={16} inline /> Cuti</span>
                                                             ) : record.leave_type === 'late' ? (
-                                                                <span className="badge badge-warning">⏰ Izin Terlambat</span>
+                                                                <span className="badge badge-warning"><Icon name="Clock" size={16} inline /> Izin Terlambat</span>
                                                             ) : (
-                                                                <span className="badge badge-danger">❌ Tidak Hadir</span>
+                                                                <span className="badge badge-danger"><Icon name="XCircle" size={16} inline /> Tidak Hadir</span>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -478,25 +479,25 @@ export default function AdminReports() {
                                             <thead>
                                                 <tr>
                                                     <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                        Employee ID {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Employee ID {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('total_present')} style={{ cursor: 'pointer' }}>
-                                                        Hadir {sortConfig.key === 'total_present' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Hadir {sortConfig.key === 'total_present' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('total_absent')} style={{ cursor: 'pointer' }}>
-                                                        Tidak Hadir {sortConfig.key === 'total_absent' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Tidak Hadir {sortConfig.key === 'total_absent' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('valid_checkins')} style={{ cursor: 'pointer' }}>
-                                                        Valid {sortConfig.key === 'valid_checkins' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Valid {sortConfig.key === 'valid_checkins' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('invalid_checkins')} style={{ cursor: 'pointer' }}>
-                                                        Diluar Area {sortConfig.key === 'invalid_checkins' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Diluar Area {sortConfig.key === 'invalid_checkins' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('attendance_rate')} style={{ cursor: 'pointer' }}>
-                                                        Persentase {sortConfig.key === 'attendance_rate' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Persentase {sortConfig.key === 'attendance_rate' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -546,18 +547,18 @@ export default function AdminReports() {
                                             <thead>
                                                 <tr>
                                                     <th onClick={() => requestSort('attendance_date')} style={{ cursor: 'pointer' }}>
-                                                        Tanggal {sortConfig.key === 'attendance_date' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Tanggal {sortConfig.key === 'attendance_date' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                        ID Karyawan {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        ID Karyawan {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th>Check-in</th>
                                                     <th>Check-out</th>
                                                     <th onClick={() => requestSort('location_name')} style={{ cursor: 'pointer' }}>
-                                                        Lokasi {sortConfig.key === 'location_name' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                        Lokasi {sortConfig.key === 'location_name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                     </th>
                                                     <th>Status</th>
                                                 </tr>
@@ -578,7 +579,7 @@ export default function AdminReports() {
                                                                     <span>{formatTime(record.check_in_time)}</span>
                                                                     {!record.check_in_valid && (
                                                                         <span className="badge badge-warning" style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>
-                                                                            ⚠
+                                                                            <Icon name="AlertTriangle" size={16} inline />
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -600,23 +601,23 @@ export default function AdminReports() {
                                                         <td>{record.location_name || '-'}</td>
                                                         <td>
                                                             {record.is_off_day ? (
-                                                                <span className="badge badge-primary">🏖️ OFF</span>
+                                                                <span className="badge badge-primary"><Icon name="Palmtree" size={16} inline /> OFF</span>
                                                             ) : record.leave_type === 'late' ? (
-                                                                <span className="badge badge-warning">⏰ Izin Terlambat</span>
+                                                                <span className="badge badge-warning"><Icon name="Clock" size={16} inline /> Izin Terlambat</span>
                                                             ) : record.leave_type === 'sick' ? (
-                                                                <span className="badge badge-danger">🏥 Izin Sakit</span>
+                                                                <span className="badge badge-danger"><Icon name="HeartPulse" size={16} inline /> Izin Sakit</span>
                                                             ) : record.leave_type === 'leave' ? (
-                                                                <span className="badge badge-primary">🏖️ Cuti</span>
+                                                                <span className="badge badge-primary"><Icon name="Palmtree" size={16} inline /> Cuti</span>
                                                             ) : record.leave_type === 'change_off' ? (
-                                                                <span className="badge badge-secondary">🔁 Tukar Libur</span>
+                                                                <span className="badge badge-secondary"><Icon name="Repeat" size={16} inline /> Tukar Libur</span>
                                                             ) : record.leave_type ? (
-                                                                <span className="badge badge-secondary">📝 Izin</span>
+                                                                <span className="badge badge-secondary"><Icon name="FileText" size={16} inline /> Izin</span>
                                                             ) : record.check_in_time && record.check_out_time ? (
-                                                                <span className="badge badge-success">✅ Lengkap</span>
+                                                                <span className="badge badge-success"><Icon name="CheckCircle2" size={16} inline /> Lengkap</span>
                                                             ) : record.check_in_time ? (
-                                                                <span className="badge badge-warning">⏳ Belum Pulang</span>
+                                                                <span className="badge badge-warning"><Icon name="Hourglass" size={16} inline /> Belum Pulang</span>
                                                             ) : (
-                                                                <span className="badge badge-danger">❌ Tidak Hadir</span>
+                                                                <span className="badge badge-danger"><Icon name="XCircle" size={16} inline /> Tidak Hadir</span>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -633,19 +634,19 @@ export default function AdminReports() {
                                         <thead>
                                             <tr>
                                                 <th onClick={() => requestSort('off_date')} style={{ cursor: 'pointer' }}>
-                                                    Tanggal {sortConfig.key === 'off_date' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                    Tanggal {sortConfig.key === 'off_date' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                 </th>
                                                 <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                    ID Karyawan {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                    ID Karyawan {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                 </th>
                                                 <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                    Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                    Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                 </th>
                                                 <th onClick={() => requestSort('type')} style={{ cursor: 'pointer' }}>
-                                                    Kategori {sortConfig.key === 'type' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                    Kategori {sortConfig.key === 'type' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                 </th>
                                                 <th onClick={() => requestSort('reason')} style={{ cursor: 'pointer' }}>
-                                                    Keterangan {sortConfig.key === 'reason' && (sortConfig.direction === 'ascending' ? '▲' : '▼')}
+                                                    Keterangan {sortConfig.key === 'reason' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
                                                 </th>
                                             </tr>
                                         </thead>

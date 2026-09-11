@@ -4,6 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { attendanceAPI, announcementsAPI, scheduleAPI } from '../utils/api';
 import ImageModal from '../components/ImageModal';
+import Icon from '../components/Icon';
+
+function MenuIcon({ name, className }) {
+    return (
+        <div className={`menu-icon ${className}`}>
+            <Icon name={name} size={22} />
+        </div>
+    );
+}
 
 
 export default function Dashboard() {
@@ -74,7 +83,7 @@ export default function Dashboard() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title" style={{ color: 'var(--theme-primary)' }}>Selamat Datang, {user?.name?.split(' ')[0]}! 👋</h1>
+                <h1 className="page-title" style={{ color: 'var(--theme-primary)' }}>Selamat Datang, {user?.name?.split(' ')[0]}! <Icon name="Hand" size={16} inline /></h1>
                 <p className="page-subtitle" style={{ color: 'var(--gray-600)' }}>{today}</p>
             </div>
 
@@ -83,7 +92,7 @@ export default function Dashboard() {
             <div className="grid grid-2 mb-4">
                 <div className="card status-card">
                     <div className={`status-card-icon ${todayStatus?.is_off_day ? 'primary' : todayStatus?.checked_in ? 'success' : 'warning'}`}>
-                        {todayStatus?.is_off_day ? '🏖️' : todayStatus?.checked_in ? '✓' : '○'}
+                        {todayStatus?.is_off_day ? <Icon name="Palmtree" size={22} /> : todayStatus?.checked_in ? <Icon name="Check" size={22} /> : <Icon name="Circle" size={22} />}
                     </div>
                     <div className="status-card-content">
                         <h3>Check-in</h3>
@@ -93,7 +102,7 @@ export default function Dashboard() {
 
                 <div className="card status-card">
                     <div className={`status-card-icon ${todayStatus?.is_off_day ? 'primary' : todayStatus?.checked_out ? 'success' : 'warning'}`}>
-                        {todayStatus?.is_off_day ? '🏖️' : todayStatus?.checked_out ? '✓' : '○'}
+                        {todayStatus?.is_off_day ? <Icon name="Palmtree" size={22} /> : todayStatus?.checked_out ? <Icon name="Check" size={22} /> : <Icon name="Circle" size={22} />}
                     </div>
                     <div className="status-card-content">
                         <h3>Check-out</h3>
@@ -107,7 +116,9 @@ export default function Dashboard() {
             {Array.isArray(history) && history.length > 0 && (
                 <div className="card mb-4">
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-                        <h2 className="card-title" style={{ margin: 0 }}>📋 Riwayat Absensi</h2>
+                        <h2 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Icon name="History" size={18} /> Riwayat Absensi
+                        </h2>
                         <Link to="/history" className="btn btn-outline" style={{ width: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}>
                             Lihat Semua
                         </Link>
@@ -128,7 +139,7 @@ export default function Dashboard() {
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                         <span className={`badge ${record.type === 'check_out' ? 'badge-warning' : record.type === 'leave' ? 'badge-primary' : record.type === 'off_day' ? 'badge-secondary' : 'badge-primary'}`}>
-                                            {record.type === 'check_in' ? '📥 Masuk' : record.type === 'check_out' ? '📤 Pulang' : record.type === 'leave' ? '📝 Izin' : record.type === 'off_day' ? '🏖️ Libur' : record.type}
+                                            {record.type === 'check_in' ? 'Masuk' : record.type === 'check_out' ? 'Pulang' : record.type === 'leave' ? 'Izin' : record.type === 'off_day' ? 'Libur' : record.type}
                                         </span>
                                         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
                                             {record.recorded_at ? formatTime(record.recorded_at) : ''}
@@ -163,7 +174,7 @@ export default function Dashboard() {
                                 gap: '0.75rem'
                             }}
                         >
-                            <span style={{ fontSize: '1.8rem' }}>🏖️</span>
+                            <span style={{ fontSize: '1.8rem' }}><Icon name="Palmtree" size={16} inline /></span>
                             <div>
                                 <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--theme-primary)' }}>Hari Ini Libur</div>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--gray-700)' }}>Absensi tidak diperlukan hari ini</div>
@@ -177,13 +188,13 @@ export default function Dashboard() {
                                 style={{ pointerEvents: todayStatus?.checked_in ? 'none' : 'auto' }}
                             >
                                 <div className="icon-wrapper">
-                                    <span className="icon">📥</span>
+                                    <span className="icon"><Icon name="Download" size={16} inline /></span>
                                 </div>
                                 <div className="text-wrapper">
                                     <span className="label">Check-in</span>
                                     <span className="sub-label">{todayStatus?.checked_in ? 'Sudah Absen' : 'Masuk Kerja'}</span>
                                 </div>
-                                {todayStatus?.checked_in && <div className="status-badge">✓</div>}
+                                {todayStatus?.checked_in && <div className="status-badge"><Icon name="Check" size={16} inline /></div>}
                             </Link>
 
                             <Link
@@ -192,13 +203,13 @@ export default function Dashboard() {
                                 style={{ pointerEvents: (!todayStatus?.checked_in || todayStatus?.checked_out) ? 'none' : 'auto' }}
                             >
                                 <div className="icon-wrapper">
-                                    <span className="icon">📤</span>
+                                    <span className="icon"><Icon name="Upload" size={16} inline /></span>
                                 </div>
                                 <div className="text-wrapper">
                                     <span className="label">Check-out</span>
                                     <span className="sub-label">{todayStatus?.checked_out ? 'Sudah Absen' : 'Pulang Kerja'}</span>
                                 </div>
-                                {todayStatus?.checked_out && <div className="status-badge">✓</div>}
+                                {todayStatus?.checked_out && <div className="status-badge"><Icon name="Check" size={16} inline /></div>}
                             </Link>
                         </>
                     )}
@@ -207,53 +218,53 @@ export default function Dashboard() {
                 {/* ===== MENU KARYAWAN ===== */}
                 <div className="menu-grid">
                     <Link to="/attendance" className="menu-item">
-                        <div className="menu-icon bg-blue-100 text-blue-600">📸</div>
+                        <MenuIcon name="Camera" className="bg-blue-100 text-blue-600" />
                         <span className="menu-label">Absensi</span>
                     </Link>
                     {/* Kiosk Mode */}
                     {hasPermission('admin.kiosk') && (
                         <Link to="/kiosk" className="menu-item">
-                            <div className="menu-icon bg-blue-100 text-blue-600">🖥️</div>
+                            <MenuIcon name="Monitor" className="bg-blue-100 text-blue-600" />
                             <span className="menu-label">Mode Kiosk</span>
                         </Link>
                     )}
                     <Link to="/manual-attendance" className="menu-item">
-                        <div className="menu-icon bg-amber-100 text-amber-600">📝</div>
+                        <MenuIcon name="ClipboardPen" className="bg-amber-100 text-amber-600" />
                         <span className="menu-label">Pengajuan Absen</span>
                     </Link>
                     <Link to="/history" className="menu-item">
-                        <div className="menu-icon bg-cyan-100 text-cyan-600">📋</div>
+                        <MenuIcon name="History" className="bg-cyan-100 text-cyan-600" />
                         <span className="menu-label">Riwayat</span>
                     </Link>
                     <Link to="/schedule" className="menu-item">
-                        <div className="menu-icon bg-purple-100 text-purple-600">🗓️</div>
+                        <MenuIcon name="Calendar" className="bg-purple-100 text-purple-600" />
                         <span className="menu-label">Kalender</span>
                     </Link>
                     <Link to="/leaves" className="menu-item">
-                        <div className="menu-icon bg-green-100 text-green-600">📝</div>
+                        <MenuIcon name="FileText" className="bg-green-100 text-green-600" />
                         <span className="menu-label">Izin & Cuti</span>
                     </Link>
                     <Link to="/overtime" className="menu-item">
-                        <div className="menu-icon bg-orange-100 text-orange-600">⏰</div>
+                        <MenuIcon name="Clock" className="bg-orange-100 text-orange-600" />
                         <span className="menu-label">Lembur</span>
                     </Link>
                     {/* Tracking - sesuai tugas yang diaktifkan */}
                     {(user?.use_tracking || user?.role === 'admin') && (
                         <Link to="/driver-tracking" className="menu-item">
-                            <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
+                            <MenuIcon name="MapPin" className="bg-teal-100 text-teal-600" />
                             <span className="menu-label">Tracking</span>
                         </Link>
                     )}
 
                     {hasPermission('admin.assets') && (
                         <Link to="/admin/assets" className="menu-item">
-                            <div className="menu-icon bg-slate-100 text-slate-600">📦</div>
+                            <MenuIcon name="Package" className="bg-slate-100 text-slate-600" />
                             <span className="menu-label">Manajemen Aset</span>
                         </Link>
                     )}
 
                     <Link to="/change-password" className="menu-item">
-                        <div className="menu-icon bg-slate-100 text-slate-600">🔑</div>
+                        <MenuIcon name="KeyRound" className="bg-slate-100 text-slate-600" />
                         <span className="menu-label">Ubah Password</span>
                     </Link>
 
@@ -263,7 +274,7 @@ export default function Dashboard() {
                         onClick={() => { logout(); navigate('/login'); }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
                     >
-                        <div className="menu-icon bg-red-100 text-red-600">🚪</div>
+                        <MenuIcon name="LogOut" className="bg-red-100 text-red-600" />
                         <span className="menu-label">Logout</span>
                     </button>
                 </div>
@@ -272,85 +283,87 @@ export default function Dashboard() {
                 {(hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports')) && (
                     <>
                         <div className="dashboard-section-header">
-                            <span className="dashboard-section-title">✅ Task Pimpinan</span>
+                            <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Icon name="CheckCircle2" size={16} /> Task Pimpinan
+                            </span>
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
                             {hasPermission('manager.approvals') && (
                                 <Link to="/approvals" className="menu-item">
-                                    <div className="menu-icon bg-emerald-100 text-emerald-600">✅</div>
+                                    <MenuIcon name="CheckCircle2" className="bg-emerald-100 text-emerald-600" />
                                     <span className="menu-label">Persetujuan Lembur</span>
                                 </Link>
                             )}
                             {(hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves')) && (
                                 <Link to="/leave-approvals" className="menu-item">
-                                    <div className="menu-icon bg-lime-100 text-lime-600">✅</div>
+                                    <MenuIcon name="ClipboardCheck" className="bg-lime-100 text-lime-600" />
                                     <span className="menu-label">Persetujuan Izin</span>
                                 </Link>
                             )}
                             {hasPermission('admin.leaves') && (
                                 <Link to="/admin/leaves" className="menu-item">
-                                    <div className="menu-icon bg-green-100 text-green-600">📝</div>
+                                    <MenuIcon name="FileText" className="bg-green-100 text-green-600" />
                                     <span className="menu-label">Kelola Izin</span>
                                 </Link>
                             )}
                             {hasPermission('admin.manual_attendance') && (
                                 <Link to="/admin/manual-attendance" className="menu-item">
-                                    <div className="menu-icon bg-cyan-100 text-cyan-600">📋</div>
+                                    <MenuIcon name="ClipboardList" className="bg-cyan-100 text-cyan-600" />
                                     <span className="menu-label">Persetujuan Absen</span>
                                 </Link>
                             )}
                             {hasPermission('admin.off_days') && (
                                 <Link to="/off-days" className="menu-item">
-                                    <div className="menu-icon bg-red-100 text-red-600">📅</div>
+                                    <MenuIcon name="CalendarOff" className="bg-red-100 text-red-600" />
                                     <span className="menu-label">Atur Libur</span>
                                 </Link>
                             )}
                             {hasPermission('admin.announcements') && (
                                 <Link to="/admin/announcements" className="menu-item">
-                                    <div className="menu-icon bg-yellow-100 text-yellow-600">📢</div>
+                                    <MenuIcon name="Megaphone" className="bg-yellow-100 text-yellow-600" />
                                     <span className="menu-label">Pengumuman</span>
                                 </Link>
                             )}
                             {hasPermission('admin.driver_activities') && (
                                 <Link to="/admin/driver-activities" className="menu-item">
-                                    <div className="menu-icon bg-orange-100 text-orange-600">🚛</div>
+                                    <MenuIcon name="Truck" className="bg-orange-100 text-orange-600" />
                                     <span className="menu-label">Aktivitas Driver</span>
                                 </Link>
                             )}
                             {hasPermission('admin.driver_tracking') && (
                                 <Link to="/admin/driver-tracking" className="menu-item">
-                                    <div className="menu-icon bg-teal-100 text-teal-600">📍</div>
+                                    <MenuIcon name="MapPin" className="bg-teal-100 text-teal-600" />
                                     <span className="menu-label">Tracking Kunjungan</span>
                                 </Link>
                             )}
                             {hasPermission('admin.loans') && (
                                 <Link to="/admin/loans" className="menu-item">
-                                    <div className="menu-icon bg-amber-100 text-amber-600">💰</div>
+                                    <MenuIcon name="Wallet" className="bg-amber-100 text-amber-600" />
                                     <span className="menu-label">Pinjaman</span>
                                 </Link>
                             )}
                             {hasPermission('admin.payroll') && (
                                 <Link to="/admin/payroll" className="menu-item">
-                                    <div className="menu-icon bg-emerald-100 text-emerald-600">💵</div>
+                                    <MenuIcon name="Banknote" className="bg-emerald-100 text-emerald-600" />
                                     <span className="menu-label">Payroll</span>
                                 </Link>
                             )}
                             {hasPermission('admin.assessments') && (
                                 <Link to="/admin/assessments" className="menu-item">
-                                    <div className="menu-icon bg-indigo-100 text-indigo-600">📋</div>
+                                    <MenuIcon name="ClipboardList" className="bg-indigo-100 text-indigo-600" />
                                     <span className="menu-label">Penilaian</span>
                                 </Link>
                             )}
                             {hasPermission('admin.recruitment') && (
                                 <Link to="/admin/recruitment" className="menu-item">
-                                    <div className="menu-icon bg-purple-100 text-purple-600">🧑‍💼</div>
+                                    <MenuIcon name="Briefcase" className="bg-purple-100 text-purple-600" />
                                     <span className="menu-label">Recruitment</span>
                                 </Link>
                             )}
                             {hasPermission('admin.reports') && (
                                 <Link to="/admin/reports" className="menu-item">
-                                    <div className="menu-icon bg-orange-100 text-orange-600">📊</div>
+                                    <MenuIcon name="BarChart3" className="bg-orange-100 text-orange-600" />
                                     <span className="menu-label">Laporan</span>
                                 </Link>
                             )}
@@ -362,61 +375,63 @@ export default function Dashboard() {
                 {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.organization') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
                     <>
                         <div className="dashboard-section-header">
-                            <span className="dashboard-section-title">📦 Master Data</span>
+                            <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Icon name="Box" size={16} /> Master Data
+                            </span>
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
                             {hasPermission('admin.locations') && (
                                 <Link to="/admin/locations" className="menu-item">
-                                    <div className="menu-icon bg-red-100 text-red-600">📍</div>
+                                    <MenuIcon name="MapPin" className="bg-red-100 text-red-600" />
                                     <span className="menu-label">Kelola Lokasi</span>
                                 </Link>
                             )}
                             {hasPermission('admin.departments') && (
                                 <Link to="/admin/departments" className="menu-item">
-                                    <div className="menu-icon bg-blue-100 text-blue-600">🏢</div>
+                                    <MenuIcon name="Building2" className="bg-blue-100 text-blue-600" />
                                     <span className="menu-label">Departemen</span>
                                 </Link>
                             )}
                             {hasPermission('admin.positions') && (
                                 <Link to="/admin/positions" className="menu-item">
-                                    <div className="menu-icon bg-amber-100 text-amber-600">🏅</div>
+                                    <MenuIcon name="Award" className="bg-amber-100 text-amber-600" />
                                     <span className="menu-label">Jabatan</span>
                                 </Link>
                             )}
                             {hasPermission('admin.vehicle_types') && (
                                 <Link to="/admin/vehicle-types" className="menu-item">
-                                    <div className="menu-icon bg-cyan-100 text-cyan-600">🚚</div>
+                                    <MenuIcon name="Truck" className="bg-cyan-100 text-cyan-600" />
                                     <span className="menu-label">Kendaraan</span>
                                 </Link>
                             )}
                             {hasPermission('admin.employees') && (
                                 <Link to="/admin/employees" className="menu-item">
-                                    <div className="menu-icon bg-purple-100 text-purple-600">👤</div>
+                                    <MenuIcon name="User" className="bg-purple-100 text-purple-600" />
                                     <span className="menu-label">Data Karyawan</span>
                                 </Link>
                             )}
                             {(hasPermission('admin.employees') || hasPermission('admin.organization')) && (
                                 <Link to="/admin/organization" className="menu-item">
-                                    <div className="menu-icon bg-slate-100 text-slate-600">🗂️</div>
+                                    <MenuIcon name="Network" className="bg-slate-100 text-slate-600" />
                                     <span className="menu-label">Struktur Organisasi</span>
                                 </Link>
                             )}
                             {hasPermission('admin.face_registration') && (
                                 <Link to="/admin/face-registration" className="menu-item">
-                                    <div className="menu-icon bg-indigo-100 text-indigo-600">🔐</div>
+                                    <MenuIcon name="ScanFace" className="bg-indigo-100 text-indigo-600" />
                                     <span className="menu-label">Registrasi Wajah</span>
                                 </Link>
                             )}
                             {hasPermission('admin.work_schedule') && (
                                 <Link to="/admin/work-schedule" className="menu-item">
-                                    <div className="menu-icon bg-teal-100 text-teal-600">🕐</div>
+                                    <MenuIcon name="CalendarClock" className="bg-teal-100 text-teal-600" />
                                     <span className="menu-label">Jadwal Kerja</span>
                                 </Link>
                             )}
                             {hasPermission('admin.customers') && (
                                 <Link to="/admin/customers" className="menu-item">
-                                    <div className="menu-icon bg-rose-100 text-rose-600">🏪</div>
+                                    <MenuIcon name="Store" className="bg-rose-100 text-rose-600" />
                                     <span className="menu-label">Customer</span>
                                 </Link>
                             )}
@@ -428,31 +443,33 @@ export default function Dashboard() {
                 {(hasPermission('admin.users') || hasPermission('admin.roles') || hasPermission('admin.settings') || hasPermission('admin.license')) && (
                     <>
                         <div className="dashboard-section-header">
-                            <span className="dashboard-section-title">⚙️ Admin Panel</span>
+                            <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Icon name="Settings" size={16} /> Admin Panel
+                            </span>
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
                             {hasPermission('admin.users') && (
                                 <Link to="/admin/users" className="menu-item">
-                                    <div className="menu-icon bg-pink-100 text-pink-600">👥</div>
+                                    <MenuIcon name="Users" className="bg-pink-100 text-pink-600" />
                                     <span className="menu-label">Kelola User</span>
                                 </Link>
                             )}
                             {hasPermission('admin.roles') && (
                                 <Link to="/admin/roles" className="menu-item">
-                                    <div className="menu-icon bg-rose-100 text-rose-600">🔑</div>
+                                    <MenuIcon name="Shield" className="bg-rose-100 text-rose-600" />
                                     <span className="menu-label">Kelola Role</span>
                                 </Link>
                             )}
                             {hasPermission('admin.settings') && (
                                 <Link to="/admin/settings" className="menu-item">
-                                    <div className="menu-icon bg-slate-100 text-slate-600">⚙️</div>
+                                    <MenuIcon name="Settings" className="bg-slate-100 text-slate-600" />
                                     <span className="menu-label">Pengaturan</span>
                                 </Link>
                             )}
                             {hasPermission('admin.license') && (
                                 <Link to="/admin/license" className="menu-item">
-                                    <div className="menu-icon bg-amber-100 text-amber-600">🔑</div>
+                                    <MenuIcon name="KeyRound" className="bg-amber-100 text-amber-600" />
                                     <span className="menu-label">License</span>
                                 </Link>
                             )}
@@ -581,7 +598,9 @@ export default function Dashboard() {
             {announcements.length > 0 && (
                 <div className="mb-4">
                     <div style={{ marginBottom: '0.75rem' }}>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)', margin: 0 }}>📢 Pengumuman</h2>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <Icon name="Megaphone" size={18} /> Pengumuman
+                        </h2>
                     </div>
                     {announcements.map(item => (
                         <div key={item.id} className="card-glass mb-3" style={{
@@ -591,8 +610,8 @@ export default function Dashboard() {
                             position: 'relative',
                             overflow: 'hidden'
                         }}>
-                            <div style={{ position: 'absolute', top: -10, right: -10, fontSize: '5rem', opacity: 0.05, transform: 'rotate(15deg)' }}>
-                                📢
+                            <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}>
+                                <Icon name="Megaphone" size={72} />
                             </div>
                             <div className="d-flex align-items-center gap-3 mb-2">
                                 <div style={{
@@ -603,10 +622,9 @@ export default function Dashboard() {
                                     borderRadius: '50%',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '0.9rem'
+                                    justifyContent: 'center'
                                 }}>
-                                    📢
+                                    <Icon name="Megaphone" size={16} />
                                 </div>
                                 <div>
                                     <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)' }}>

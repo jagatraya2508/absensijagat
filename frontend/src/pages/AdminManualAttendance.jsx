@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { manualAttendanceAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminManualAttendance() {
     const [requests, setRequests] = useState([]);
@@ -94,7 +95,7 @@ export default function AdminManualAttendance() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📋 Persetujuan Absen Manual</h1>
+                <h1 className="page-title"><Icon name="ClipboardList" size={16} inline /> Persetujuan Absen Manual</h1>
                 <p className="page-subtitle">Kelola pengajuan absensi manual dari karyawan</p>
             </div>
 
@@ -106,10 +107,10 @@ export default function AdminManualAttendance() {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         style={{ width: 'auto', minWidth: 200 }}
                     >
-                        <option value="all">📋 Semua Status</option>
-                        <option value="pending">⏳ Menunggu</option>
-                        <option value="approved">✅ Disetujui</option>
-                        <option value="rejected">❌ Ditolak</option>
+                        <option value="all">Semua Status</option>
+                        <option value="pending">Menunggu</option>
+                        <option value="approved">Disetujui</option>
+                        <option value="rejected">Ditolak</option>
                     </select>
                 </div>
             </div>
@@ -117,9 +118,9 @@ export default function AdminManualAttendance() {
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">
-                        {filterStatus === 'pending' ? '⏳ Pengajuan Menunggu Persetujuan' :
-                         filterStatus === 'approved' ? '✅ Pengajuan Disetujui' :
-                         filterStatus === 'rejected' ? '❌ Pengajuan Ditolak' : '📋 Semua Pengajuan'}
+                        {filterStatus === 'pending' ? 'Pengajuan Menunggu Persetujuan' :
+                         filterStatus === 'approved' ? 'Pengajuan Disetujui' :
+                         filterStatus === 'rejected' ? 'Pengajuan Ditolak' : 'Semua Pengajuan'}
                     </h2>
                     <span className="badge badge-primary">{requests.length}</span>
                 </div>
@@ -130,7 +131,7 @@ export default function AdminManualAttendance() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📋</div>
+                        <div className="empty-state-icon"><Icon name="ClipboardList" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada pengajuan ditemukan</p>
                     </div>
                 ) : (
@@ -148,7 +149,7 @@ export default function AdminManualAttendance() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                            <span style={{ fontSize: '1.25rem' }}>👤</span>
+                                            <span style={{ fontSize: '1.25rem' }}><Icon name="User" size={16} inline /></span>
                                             <strong style={{ color: 'white' }}>{request.employee_name}</strong>
                                             <span style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>({request.employee_id})</span>
                                         </div>
@@ -187,7 +188,7 @@ export default function AdminManualAttendance() {
                                                 className="btn btn-outline"
                                                 style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                                             >
-                                                📎 Lihat Lampiran
+                                                <Icon name="Paperclip" size={16} inline /> Lihat Lampiran
                                             </a>
                                         </div>
                                     )}
@@ -214,14 +215,14 @@ export default function AdminManualAttendance() {
                                                 onClick={() => openProcessModal(request, 'approved')}
                                                 style={{ padding: '0.5rem 1rem' }}
                                             >
-                                                ✅ Setujui
+                                                <Icon name="CheckCircle2" size={16} inline /> Setujui
                                             </button>
                                             <button
                                                 className="btn btn-danger"
                                                 onClick={() => openProcessModal(request, 'rejected')}
                                                 style={{ padding: '0.5rem 1rem' }}
                                             >
-                                                ❌ Tolak
+                                                <Icon name="XCircle" size={16} inline /> Tolak
                                             </button>
                                         </div>
                                     </div>
@@ -235,7 +236,7 @@ export default function AdminManualAttendance() {
                                             disabled={processing}
                                             style={{ padding: '0.5rem 1rem', color: 'var(--danger-500)', borderColor: 'var(--danger-500)' }}
                                         >
-                                            {processing ? '⏳ Memproses...' : '⛔ Batalkan Persetujuan'}
+                                            {processing ? 'Memproses...' : 'Batalkan Persetujuan'}
                                         </button>
                                     </div>
                                 )}
@@ -268,9 +269,9 @@ export default function AdminManualAttendance() {
                         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                     }}>
                         <div className="card-header" style={{ position: 'sticky', top: 0, background: 'var(--theme-card-bg)', zIndex: 1, paddingBottom: '1rem', borderBottom: '1px solid var(--gray-200)', marginBottom: '1rem' }}>
-                            <h2 className="card-title" style={{ margin: 0 }}>{processStatus === 'approved' ? '✅ Setujui Pengajuan' : '❌ Tolak Pengajuan'}</h2>
+                            <h2 className="card-title" style={{ margin: 0 }}>{processStatus === 'approved' ? 'Setujui Pengajuan' : 'Tolak Pengajuan'}</h2>
                             <button type="button" className="btn btn-outline" onClick={() => setShowProcessModal(false)} style={{ padding: '0.4rem 0.8rem' }}>
-                                ✕
+                                <Icon name="X" size={16} inline />
                             </button>
                         </div>
                         <form onSubmit={handleProcess}>
@@ -320,7 +321,7 @@ export default function AdminManualAttendance() {
                                 className={`btn ${processStatus === 'approved' ? 'btn-success' : 'btn-danger'}`}
                                 disabled={processing}
                             >
-                                {processing ? '⏳ Memproses...' : (processStatus === 'approved' ? '✅ Setujui' : '❌ Tolak')}
+                                {processing ? 'Memproses...' : (processStatus === 'approved' ? 'Setujui' : 'Tolak')}
                             </button>
                         </div>
                     </form>

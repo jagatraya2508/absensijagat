@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { rolesAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminRoles() {
     const [roles, setRoles] = useState([]);
@@ -202,7 +203,7 @@ export default function AdminRoles() {
                             opacity: downloadingTemplate ? 0.7 : 1
                         }}
                     >
-                        {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                        {downloadingTemplate ? 'Mengunduh...' : 'Template'}
                     </button>
                     <button
                         className="btn"
@@ -216,10 +217,10 @@ export default function AdminRoles() {
                             cursor: 'pointer'
                         }}
                     >
-                        📤 Upload Excel
+                        <Icon name="Upload" size={16} inline /> Upload Excel
                     </button>
                     <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-                        ➕ Tambah Role
+                        <Icon name="Plus" size={16} inline /> Tambah Role
                     </button>
                 </div>
             </div>
@@ -247,6 +248,8 @@ export default function AdminRoles() {
                                     <td>
                                         {role.name === 'admin' ? (
                                             <span className="badge badge-primary">Akses Penuh</span>
+                                        ) : role.name === 'kiosk' ? (
+                                            <span className="badge badge-warning">Hanya Mode Kiosk</span>
                                         ) : (
                                             <span className="badge badge-info">{role.permissions?.length || 0} Menu</span>
                                         )}
@@ -265,15 +268,15 @@ export default function AdminRoles() {
                                                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
                                                 onClick={() => handleOpenModal(role)}
                                             >
-                                                ✏️ Edit
+                                                <Icon name="Pencil" size={16} inline /> Edit
                                             </button>
-                                            {role.name !== 'admin' && (
+                                            {role.name !== 'admin' && role.name !== 'kiosk' && (
                                                 <button
                                                     className="btn btn-outline"
                                                     style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', color: 'var(--danger-500)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
                                                     onClick={() => handleDelete(role.id, role.label)}
                                                 >
-                                                    🗑️
+                                                    <Icon name="Trash2" size={16} inline />
                                                 </button>
                                             )}
                                         </div>
@@ -295,12 +298,12 @@ export default function AdminRoles() {
                         <div style={{ padding: '1.5rem' }}>
                             {importError && (
                                 <div className="alert alert-danger mb-3">
-                                    ⚠️ {importError}
+                                    <Icon name="AlertTriangle" size={16} inline /> {importError}
                                 </div>
                             )}
 
                             <div className="alert alert-info mb-3">
-                                ℹ️ Unduh template resmi, isi <strong>Nama</strong> dan <strong>Label</strong>, lalu unggah file .xlsx.
+                                <Icon name="Info" size={16} inline /> Unduh template resmi, isi <strong>Nama</strong> dan <strong>Label</strong>, lalu unggah file .xlsx.
                                 Hak akses default <strong>Tidak</strong> — atur kemudian lewat Edit Role.
                             </div>
 
@@ -326,7 +329,7 @@ export default function AdminRoles() {
                             {importResult && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <div className={`alert mb-3 ${(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'alert-success' : 'alert-warning'}`}>
-                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? '✅' : '⚠️'}{' '}
+                                        {(importResult.imported || 0) + (importResult.updated || 0) > 0 ? 'CheckCircle2' : 'AlertTriangle'}{' '}
                                         Ditambah: <strong>{importResult.imported || 0}</strong>
                                         {' · '}Diperbarui: <strong>{importResult.updated || 0}</strong>
                                         {' · '}Gagal: <strong>{importResult.failed || 0}</strong>
@@ -375,7 +378,7 @@ export default function AdminRoles() {
                                     onClick={handleDownloadTemplate}
                                     disabled={downloadingTemplate}
                                 >
-                                    {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                    {downloadingTemplate ? 'Mengunduh...' : 'Unduh Template'}
                                 </button>
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>
@@ -437,6 +440,10 @@ export default function AdminRoles() {
                             {editingRole?.name === 'admin' ? (
                                 <div className="alert alert-info">
                                     Role <strong>Admin</strong> memiliki akses penuh ke semua fitur secara otomatis. Anda tidak perlu mengatur hak akses satu per satu.
+                                </div>
+                            ) : editingRole?.name === 'kiosk' ? (
+                                <div className="alert alert-info">
+                                    Role <strong>Operator Kiosk</strong> hanya bisa membuka Mode Kiosk. Dipakai untuk tablet di pos security / luar kantor, tanpa akses menu lain.
                                 </div>
                             ) : (
                                 <>

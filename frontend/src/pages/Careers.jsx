@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import Icon from '../components/Icon';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -147,7 +148,7 @@ export default function Careers() {
                     </div>
                 ) : positions.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '4rem', background: 'white', borderRadius: '1rem', border: '1px dashed var(--gray-300)' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Inbox" size={16} inline /></div>
                         <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '0.5rem' }}>Belum Ada Lowongan</h3>
                         <p style={{ color: 'var(--gray-500)' }}>Maaf, saat ini belum ada posisi yang terbuka. Silakan kunjungi kembali halaman ini nanti.</p>
                     </div>
@@ -161,15 +162,15 @@ export default function Careers() {
                                         <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>{pos.employment_type}</span>
                                     </div>
                                     <div style={{ color: 'var(--gray-500)', fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                        {pos.department && <span>🏢 {pos.department}</span>}
+                                        {pos.department && <span><Icon name="Building2" size={16} inline /> {pos.department}</span>}
                                         {(pos.salary_range_min || pos.salary_range_max) && (
                                             <span>
-                                                💰 {pos.salary_range_min ? `Rp ${Number(pos.salary_range_min).toLocaleString('id-ID')}` : ''}
+                                                <Icon name="Wallet" size={16} inline /> {pos.salary_range_min ? `Rp ${Number(pos.salary_range_min).toLocaleString('id-ID')}` : ''}
                                                 {pos.salary_range_min && pos.salary_range_max ? ' - ' : ''}
                                                 {pos.salary_range_max ? `Rp ${Number(pos.salary_range_max).toLocaleString('id-ID')}` : ''}
                                             </span>
                                         )}
-                                        <span>🕒 Diposting: {new Date(pos.created_at).toLocaleDateString('id-ID')}</span>
+                                        <span><Icon name="Clock" size={16} inline /> Diposting: {new Date(pos.created_at).toLocaleDateString('id-ID')}</span>
                                     </div>
                                     {pos.description && (
                                         <div style={{ fontSize: '0.95rem', color: 'var(--gray-700)', marginBottom: '1rem', whiteSpace: 'pre-line' }}>
@@ -213,7 +214,7 @@ export default function Careers() {
                             <h2 className="modal-title" style={{ fontSize: '1.25rem', margin: 0, color: 'var(--gray-900)' }}>
                                 Lamar Posisi: {selectedPosition.title}
                             </h2>
-                            <button className="modal-close" onClick={handleCloseModal} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--gray-500)' }}>✕</button>
+                            <button className="modal-close" onClick={handleCloseModal} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--gray-500)' }}><Icon name="X" size={16} inline /></button>
                         </div>
                         
                         <div style={{ padding: '1.5rem' }}>

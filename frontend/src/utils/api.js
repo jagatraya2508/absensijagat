@@ -423,6 +423,13 @@ export const leavesAPI = {
     // Get my leave quota info
     getQuota: () => request('/leaves/my-quota'),
 
+    kioskCreate: (formData) => request('/leaves/kiosk', {
+        method: 'POST',
+        body: formData,
+    }),
+
+    kioskQuota: (userId) => request(`/leaves/kiosk-quota/${userId}`),
+
     // Delete leave request
     delete: (id) => request(`/leaves/${id}`, { method: 'DELETE' }),
 };

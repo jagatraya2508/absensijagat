@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import Icon from '../components/Icon';
 
 const THEME_PRESETS = [
-    { name: 'Merah Marun', icon: '🔴', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
-    { name: 'Biru Navy', icon: '🔵', primary: '#0A1929', bg: '#f0f4ff', card_bg: '#ffffff', btn_bg: '#3b82f6' },
-    { name: 'Hijau Emerald', icon: '🟢', primary: '#064E3B', bg: '#f0fdf4', card_bg: '#ffffff', btn_bg: '#10b981' },
-    { name: 'Ungu Royal', icon: '🟣', primary: '#4C1D95', bg: '#faf5ff', card_bg: '#ffffff', btn_bg: '#8b5cf6' },
-    { name: 'Slate Dark', icon: '⚫', primary: '#1E293B', bg: '#f8fafc', card_bg: '#ffffff', btn_bg: '#64748b' },
-    { name: 'Amber Gold', icon: '🟠', primary: '#78350F', bg: '#fffbeb', card_bg: '#ffffff', btn_bg: '#f59e0b' },
+    { name: 'Merah Marun', icon: 'Circle', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
+    { name: 'Biru Navy', icon: 'Circle', primary: '#0A1929', bg: '#f0f4ff', card_bg: '#ffffff', btn_bg: '#3b82f6' },
+    { name: 'Hijau Emerald', icon: 'Circle', primary: '#064E3B', bg: '#f0fdf4', card_bg: '#ffffff', btn_bg: '#10b981' },
+    { name: 'Ungu Royal', icon: 'Circle', primary: '#4C1D95', bg: '#faf5ff', card_bg: '#ffffff', btn_bg: '#8b5cf6' },
+    { name: 'Slate Dark', icon: 'Circle', primary: '#1E293B', bg: '#f8fafc', card_bg: '#ffffff', btn_bg: '#64748b' },
+    { name: 'Amber Gold', icon: 'Circle', primary: '#78350F', bg: '#fffbeb', card_bg: '#ffffff', btn_bg: '#f59e0b' },
 ];
 
 function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
@@ -67,7 +68,7 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
             </h3>
             {message.text && (
                 <div className={`alert alert-${message.type}`} style={{ marginBottom: '1.5rem' }}>
-                    <span className="alert-icon">{message.type === 'success' ? '✅' : '⚠️'}</span>
+                    <span className="alert-icon">{message.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                     {message.text}
                 </div>
             )}
@@ -438,7 +439,7 @@ export default function AdminSettings() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">⚙️ Pengaturan Aplikasi</h1>
+                <h1 className="page-title"><Icon name="Settings" size={16} inline /> Pengaturan Aplikasi</h1>
                 <p className="page-subtitle">Kelola konfigurasi sistem dan tampilan</p>
             </div>
 
@@ -447,13 +448,13 @@ export default function AdminSettings() {
                 {/* ============ COMPANY NAME SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
                     <div className="card-header">
-                        <h2 className="card-title">🏢 Nama Perusahaan</h2>
+                        <h2 className="card-title"><Icon name="Building2" size={16} inline /> Nama Perusahaan</h2>
                     </div>
 
                     <div style={{ padding: '0.5rem 0' }}>
                         {companyMessage.text && (
                             <div className={`alert alert-${companyMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                <span className="alert-icon">{companyMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                <span className="alert-icon">{companyMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                                 {companyMessage.text}
                             </div>
                         )}
@@ -489,7 +490,7 @@ export default function AdminSettings() {
                                         <span>Simpan...</span>
                                     </>
                                 ) : (
-                                    '💾 Simpan'
+                                    'Simpan'
                                 )}
                             </button>
                         </div>
@@ -499,13 +500,13 @@ export default function AdminSettings() {
                 {/* ============ THEME COLOR SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
                     <div className="card-header">
-                        <h2 className="card-title">🎨 Kustomisasi Warna Tema</h2>
+                        <h2 className="card-title"><Icon name="Palette" size={16} inline /> Kustomisasi Warna Tema</h2>
                     </div>
 
                     <div style={{ padding: '0.5rem 0' }}>
                         {themeMessage.text && (
                             <div className={`alert alert-${themeMessage.type}`} style={{ marginBottom: '1.5rem' }}>
-                                <span className="alert-icon">{themeMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                <span className="alert-icon">{themeMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                                 {themeMessage.text}
                             </div>
                         )}
@@ -591,7 +592,7 @@ export default function AdminSettings() {
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 fontWeight: 700,
-                                            }}>✓</div>
+                                            }}><Icon name="Check" size={16} inline /></div>
                                         )}
                                     </button>
                                 ))}
@@ -897,7 +898,7 @@ export default function AdminSettings() {
                                         <span>Menyimpan...</span>
                                     </>
                                 ) : (
-                                    '💾 Simpan Tema'
+                                    'Simpan Tema'
                                 )}
                             </button>
                             <button
@@ -906,7 +907,7 @@ export default function AdminSettings() {
                                 disabled={themeLoading}
                                 style={{ minWidth: '140px' }}
                             >
-                                🔄 Reset Default
+                                <Icon name="RefreshCw" size={16} inline /> Reset Default
                             </button>
                         </div>
                     </div>
@@ -916,7 +917,7 @@ export default function AdminSettings() {
                 {/* ============ LOGO SECTION ============ */}
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">🖼️ Manajemen Logo</h2>
+                        <h2 className="card-title"><Icon name="Image" size={16} inline /> Manajemen Logo</h2>
                     </div>
                     
                     <div style={{ padding: '0 0.5rem' }}>
@@ -946,13 +947,13 @@ export default function AdminSettings() {
                 {/* ============ SMTP SETTINGS SECTION ============ */}
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">📧 Konfigurasi SMTP Email</h2>
+                        <h2 className="card-title"><Icon name="Mail" size={16} inline /> Konfigurasi SMTP Email</h2>
                     </div>
 
                     <div style={{ padding: '1.5rem 0' }}>
                         {smtpMessage.text && (
                             <div className={`alert alert-${smtpMessage.type}`} style={{ marginBottom: '1.5rem' }}>
-                                <span className="alert-icon">{smtpMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                <span className="alert-icon">{smtpMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                                 {smtpMessage.text}
                             </div>
                         )}
@@ -1034,7 +1035,7 @@ export default function AdminSettings() {
                                         <span>Menyimpan...</span>
                                     </>
                                 ) : (
-                                    '💾 Simpan SMTP'
+                                    'Simpan SMTP'
                                 )}
                             </button>
                         </form>
@@ -1044,7 +1045,7 @@ export default function AdminSettings() {
                 {/* ============ BACKUP & RESTORE SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
                     <div className="card-header">
-                        <h2 className="card-title">💾 Backup & Restore Database</h2>
+                        <h2 className="card-title"><Icon name="Save" size={16} inline /> Backup & Restore Database</h2>
                     </div>
 
                     <div style={{ padding: '0.5rem 0' }}>
@@ -1074,7 +1075,7 @@ export default function AdminSettings() {
                             </p>
                             {backupMessage.text && (
                                 <div className={`alert alert-${backupMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                    <span className="alert-icon">{backupMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                    <span className="alert-icon">{backupMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                                     {backupMessage.text}
                                 </div>
                             )}
@@ -1090,7 +1091,7 @@ export default function AdminSettings() {
                                         <span>Membuat backup...</span>
                                     </>
                                 ) : (
-                                    '⬇️ Unduh Backup (.sql)'
+                                    'Unduh Backup (.sql)'
                                 )}
                             </button>
                         </div>
@@ -1109,7 +1110,7 @@ export default function AdminSettings() {
                             </p>
                             {restoreMessage.text && (
                                 <div className={`alert alert-${restoreMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                    <span className="alert-icon">{restoreMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                    <span className="alert-icon">{restoreMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                                     {restoreMessage.text}
                                 </div>
                             )}
@@ -1157,7 +1158,7 @@ export default function AdminSettings() {
                                             <span>Merestore...</span>
                                         </>
                                     ) : (
-                                        '⚠️ Restore & Timpa Database'
+                                        'Restore & Timpa Database'
                                     )}
                                 </button>
                             </form>
@@ -1168,13 +1169,13 @@ export default function AdminSettings() {
                 {/* ============ LEAVE SETTINGS SECTION ============ */}
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">🏖️ Pengaturan Cuti & Izin</h2>
+                        <h2 className="card-title"><Icon name="Palmtree" size={16} inline /> Pengaturan Cuti & Izin</h2>
                     </div>
 
                     <div style={{ padding: '1.5rem 0' }}>
                         {leaveMessage.text && (
                             <div className={`alert alert-${leaveMessage.type}`} style={{ marginBottom: '1.5rem' }}>
-                                <span className="alert-icon">{leaveMessage.type === 'success' ? '✅' : '⚠️'}</span>
+                                <span className="alert-icon">{leaveMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
                                 {leaveMessage.text}
                             </div>
                         )}
@@ -1262,11 +1263,11 @@ export default function AdminSettings() {
                                 </p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                     {[
-                                        { type: 'late', label: '⏰ Izin Terlambat' },
-                                        { type: 'sick', label: '🏥 Izin Sakit' },
-                                        { type: 'permission', label: '📝 Izin Tidak Masuk' },
-                                        { type: 'leave', label: '🏖️ Cuti' },
-                                        { type: 'change_off', label: '🔄 Tukar Libur' }
+                                        { type: 'late', label: 'Izin Terlambat' },
+                                        { type: 'sick', label: 'Izin Sakit' },
+                                        { type: 'permission', label: 'Izin Tidak Masuk' },
+                                        { type: 'leave', label: 'Cuti' },
+                                        { type: 'change_off', label: 'Tukar Libur' }
                                     ].map((item) => {
                                         const cfg = approvalConfig.find((c) => c.leave_type === item.type) || { approval_levels: 1, fallback_to_admin: true };
                                         return (
@@ -1385,7 +1386,7 @@ export default function AdminSettings() {
                                                     style={{ height: '42px', padding: '0 1rem' }}
                                                     title="Hapus"
                                                 >
-                                                    🗑️
+                                                    <Icon name="Trash2" size={16} inline />
                                                 </button>
                                             </div>
                                         ))}

@@ -44,10 +44,19 @@ async function migrateRoles() {
             VALUES 
                 ('admin', 'Administrator', true),
                 ('employee', 'Karyawan', true),
-                ('manager', 'Pimpinan / Manager', true)
+                ('manager', 'Pimpinan / Manager', true),
+                ('kiosk', 'Operator Kiosk', true)
             ON CONFLICT (name) DO NOTHING;
         `);
         console.log('Inserted default system roles');
+
+        await client.query(`
+            INSERT INTO role_permissions (role_id, permission_key)
+            SELECT r.id, 'admin.kiosk'
+            FROM roles r
+            WHERE r.name = 'kiosk'
+            ON CONFLICT (role_id, permission_key) DO NOTHING
+        `);
 
         // 4. Update existing users role values if needed
         // Assuming current users have 'admin', 'employee', 'manager'

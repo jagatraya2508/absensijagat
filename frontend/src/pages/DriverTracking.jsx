@@ -5,6 +5,7 @@ import Camera from '../components/Camera';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import Icon from '../components/Icon';
 import {
     getAllowedTrackingTypes,
     getDefaultTrackingType,
@@ -316,7 +317,7 @@ export default function DriverTracking() {
 
             await driverTrackingAPI.checkin(formData);
 
-            setSuccess('✅ Check-in berhasil!');
+            setSuccess('Check-in berhasil!');
             setCustomerName('');
             setAddress('');
             setNotes('');
@@ -361,7 +362,7 @@ export default function DriverTracking() {
 
             await driverTrackingAPI.checkout(checkoutTargetId, formData);
 
-            setSuccess('✅ Check-out berhasil!');
+            setSuccess('Check-out berhasil!');
             setShowCamera(false);
             resetPhoto();
             setCameraMode(null);
@@ -417,12 +418,12 @@ export default function DriverTracking() {
         return (
             <div>
                  <div className="page-header">
-                    <h1 className="page-title">💰 Detail Penagihan</h1>
+                    <h1 className="page-title"><Icon name="Wallet" size={16} inline /> Detail Penagihan</h1>
                     <p className="page-subtitle">Isi rincian pembayaran untuk {checkoutTarget.customer_name}</p>
                 </div>
                 {error && (
                     <div className="alert alert-danger mb-3">
-                        <span className="alert-icon">⚠️</span>{error}
+                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>{error}
                     </div>
                 )}
                 
@@ -465,7 +466,7 @@ export default function DriverTracking() {
 
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                             <button className="btn btn-outline" onClick={() => { setCameraMode(null); setCheckoutTargetId(null); }} style={{ flex: 1 }}>Batal</button>
-                            <button className="btn btn-success" onClick={() => setShowCamera(true)} style={{ flex: 2 }}>Lanjut Foto Selfie 📸</button>
+                            <button className="btn btn-success" onClick={() => setShowCamera(true)} style={{ flex: 2 }}>Lanjut Foto Selfie <Icon name="Camera" size={16} inline /></button>
                         </div>
                     </div>
                 </div>
@@ -489,7 +490,7 @@ export default function DriverTracking() {
             <div>
                 <div className="page-header">
                     <h1 className="page-title">
-                        📸 {cameraMode === 'checkin' ? 'Foto Selfie Check-in' : 'Foto Selfie Check-out'}
+                        <Icon name="Camera" size={16} inline /> {cameraMode === 'checkin' ? 'Foto Selfie Check-in' : 'Foto Selfie Check-out'}
                     </h1>
                     <p className="page-subtitle">
                         {cameraMode === 'checkin' ? `Customer: ${customerName}` : 'Ambil foto selfie untuk check-out'}
@@ -498,14 +499,14 @@ export default function DriverTracking() {
 
                 {error && (
                     <div className="alert alert-danger mb-3">
-                        <span className="alert-icon">⚠️</span>{error}
+                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>{error}
                     </div>
                 )}
 
                 {/* GPS Info */}
                 <div className="card mb-3" style={{ padding: '0.75rem 1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                        <span>{gpsLocation ? '🟢' : '🔴'}</span>
+                        <span>{gpsLocation ? 'Circle' : 'Circle'}</span>
                         <span style={{ color: 'var(--gray-400)' }}>
                             {gpsLocation
                                 ? `GPS: ${gpsLocation.latitude.toFixed(6)}, ${gpsLocation.longitude.toFixed(6)}`
@@ -524,13 +525,13 @@ export default function DriverTracking() {
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button className="btn btn-outline" onClick={() => { setShowCamera(false); resetPhoto(); }}
                         style={{ flex: 1 }} disabled={submitting}>
-                        ← Kembali
+                        <Icon name="ArrowLeft" size={16} inline /> Kembali
                     </button>
                     {photoBlob && (
                         <button className="btn btn-success" style={{ flex: 2 }}
                             onClick={cameraMode === 'checkin' ? handleCheckinSubmit : handleCheckoutSubmit}
                             disabled={submitting || !gpsLocation}>
-                            {submitting ? '⏳ Memproses...' : cameraMode === 'checkin' ? '📥 Kirim Check-in' : '📤 Kirim Check-out'}
+                            {submitting ? 'Memproses...' : cameraMode === 'checkin' ? 'Kirim Check-in' : 'Kirim Check-out'}
                         </button>
                     )}
                 </div>
@@ -544,25 +545,25 @@ export default function DriverTracking() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📍 {pageCopy.title}</h1>
+                <h1 className="page-title"><Icon name="MapPin" size={16} inline /> {pageCopy.title}</h1>
                 <p className="page-subtitle">{pageCopy.subtitle}</p>
             </div>
 
             {error && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>{error}
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>{error}
                 </div>
             )}
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span>{success}
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span>{success}
                 </div>
             )}
 
             {/* GPS Status */}
             <div className="card mb-4" style={{ padding: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '1.3rem' }}>{gpsLocation ? '🟢' : gpsError ? '🔴' : '🟡'}</span>
+                    <span style={{ fontSize: '1.3rem' }}>{gpsLocation ? 'Circle' : gpsError ? 'Circle' : 'Circle'}</span>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
                             {gpsLoading ? 'Mencari lokasi GPS...' : gpsLocation ? 'GPS Aktif' : 'GPS Tidak Tersedia'}
@@ -576,13 +577,13 @@ export default function DriverTracking() {
                         {gpsError && <div style={{ fontSize: '0.8rem', color: 'var(--danger-400)' }}>{gpsError}</div>}
                         {user?.use_tracking && (
                             <div style={{ fontSize: '0.78rem', color: 'var(--success-400)', marginTop: 4 }}>
-                                📡 Posisi Anda dibagikan ke peta live admin selama aplikasi terbuka
+                                <Icon name="Radio" size={16} inline /> Posisi Anda dibagikan ke peta live admin selama aplikasi terbuka
                             </div>
                         )}
                     </div>
                     <button className="btn btn-outline" onClick={() => getGPS().catch(() => {})}
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                        🔄 Refresh GPS
+                        <Icon name="RefreshCw" size={16} inline /> Refresh GPS
                     </button>
                 </div>
             </div>
@@ -591,11 +592,11 @@ export default function DriverTracking() {
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <button className={`btn ${activeTab === 'today' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => setActiveTab('today')}>
-                    📍 Hari Ini ({todayRecords.length})
+                    <Icon name="MapPin" size={16} inline /> Hari Ini ({todayRecords.length})
                 </button>
                 <button className={`btn ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => setActiveTab('history')}>
-                    📋 Riwayat
+                    <Icon name="ClipboardList" size={16} inline /> Riwayat
                 </button>
             </div>
 
@@ -604,7 +605,7 @@ export default function DriverTracking() {
                     {/* Check-in Form */}
                     <div className="card mb-4">
                         <div className="card-header">
-                            <h2 className="card-title">📥 Check-in Customer</h2>
+                            <h2 className="card-title"><Icon name="Download" size={16} inline /> Check-in Customer</h2>
                         </div>
                         <div style={{ padding: '1.25rem' }}>
                             {allowedTypes.length > 1 && (
@@ -621,7 +622,7 @@ export default function DriverTracking() {
                                                     style={{ fontSize: '0.85rem' }}
                                                     onClick={() => setSelectedType(type)}
                                                 >
-                                                    {meta.icon} {meta.label}
+                                                    <Icon name={meta.icon} size={16} inline /> {meta.label}
                                                 </button>
                                             );
                                         })}
@@ -642,7 +643,7 @@ export default function DriverTracking() {
                                         setCustomerSearch('');
                                     }}
                                 >
-                                    📋 Pilih Customer Lama
+                                    <Icon name="ClipboardList" size={16} inline /> Pilih Customer Lama
                                 </button>
                                 <button
                                     className={`btn ${customerMode === 'new' ? 'btn-primary' : 'btn-outline'}`}
@@ -655,7 +656,7 @@ export default function DriverTracking() {
                                         setCustomerSearch('');
                                     }}
                                 >
-                                    ✏️ Customer Baru
+                                    <Icon name="Pencil" size={16} inline /> Customer Baru
                                 </button>
                             </div>
 
@@ -665,7 +666,7 @@ export default function DriverTracking() {
                                     <label className="form-label">Cari & Pilih Customer *</label>
                                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
                                         <input type="text" className="form-input"
-                                            placeholder="🔍 Ketik nama atau kode customer..."
+                                            placeholder="Ketik nama atau kode customer..."
                                             value={customerSearch}
                                             onChange={e => {
                                                 setCustomerSearch(e.target.value);
@@ -688,7 +689,7 @@ export default function DriverTracking() {
                                                 fontWeight: 600
                                             }}
                                         >
-                                            📋 Daftar
+                                            <Icon name="ClipboardList" size={16} inline /> Daftar
                                         </button>
                                     </div>
                                     {showDropdown && customers.length > 0 && (
@@ -716,14 +717,14 @@ export default function DriverTracking() {
                                                         background: 'rgba(var(--theme-primary-rgb), 0.1)',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         fontSize: '1rem', flexShrink: 0
-                                                    }}>🏪</div>
+                                                    }}><Icon name="Store" size={16} inline /></div>
                                                     <div style={{ flex: 1, minWidth: 0 }}>
                                                         <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>
                                                             {c.name}
                                                         </div>
                                                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.1rem' }}>
                                                             {c.customer_code && <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--primary-500)', fontWeight: 600 }}>{c.customer_code}</span>}
-                                                            {c.address && <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {c.address}</span>}
+                                                            {c.address && <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Icon name="MapPin" size={16} inline /> {c.address}</span>}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -740,17 +741,17 @@ export default function DriverTracking() {
                                             borderRadius: 'var(--radius-md)',
                                             display: 'flex', alignItems: 'center', gap: '0.5rem'
                                         }}>
-                                            <span>✅</span>
+                                            <span><Icon name="CheckCircle2" size={16} inline /></span>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedCustomer.name}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
                                                     {selectedCustomer.customer_code && <span style={{ fontFamily: 'monospace', marginRight: 8 }}>{selectedCustomer.customer_code}</span>}
-                                                    {selectedCustomer.address && <span>📍 {selectedCustomer.address}</span>}
+                                                    {selectedCustomer.address && <span><Icon name="MapPin" size={16} inline /> {selectedCustomer.address}</span>}
                                                 </div>
                                             </div>
                                             <button className="btn btn-outline" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
                                                 onClick={() => { setSelectedCustomer(null); setCustomerName(''); setCustomerSearch(''); setAddress(''); }}>
-                                                ✕
+                                                <Icon name="X" size={16} inline />
                                             </button>
                                         </div>
                                     )}
@@ -767,7 +768,7 @@ export default function DriverTracking() {
                                         onChange={e => setCustomerName(e.target.value)}
                                     />
                                     <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem' }}>
-                                        💡 Customer baru akan otomatis tersimpan di Master Customer dengan kode otomatis
+                                        <Icon name="Lightbulb" size={16} inline /> Customer baru akan otomatis tersimpan di Master Customer dengan kode otomatis
                                     </small>
                                 </div>
                             )}
@@ -800,7 +801,7 @@ export default function DriverTracking() {
                             </div>
                             <button className="btn btn-success btn-block" onClick={openCameraForCheckin}
                                 disabled={!customerName.trim() || !gpsLocation || gpsLoading}>
-                                📸 Ambil Foto & Check-in
+                                <Icon name="Camera" size={16} inline /> Ambil Foto & Check-in
                             </button>
                         </div>
                     </div>
@@ -809,7 +810,7 @@ export default function DriverTracking() {
                     {activeRecords.length > 0 && (
                         <div className="card mb-4">
                             <div className="card-header">
-                                <h2 className="card-title">🟢 Sedang di Lokasi ({activeRecords.length})</h2>
+                                <h2 className="card-title"><Icon name="Circle" size={16} inline /> Sedang di Lokasi ({activeRecords.length})</h2>
                             </div>
                             <div style={{ padding: '0.5rem' }}>
                                 {activeRecords.map(rec => (
@@ -823,7 +824,7 @@ export default function DriverTracking() {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--success-400)' }}>
-                                                    🏪 {rec.customer_name} 
+                                                    <Icon name="Store" size={16} inline /> {rec.customer_name} 
                                                     {rec.tracking_type === 'collection' && <span className="badge badge-warning" style={{ marginLeft: 6 }}>Tagihan</span>}
                                                     {rec.tracking_type === 'sales' && <span className="badge badge-success" style={{ marginLeft: 6 }}>Sales</span>}
                                                     {rec.tracking_type === 'visit' && <span className="badge badge-outline" style={{ marginLeft: 6 }}>Kunjungan</span>}
@@ -832,18 +833,18 @@ export default function DriverTracking() {
                                                 {rec.address && <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)', marginTop: '0.2rem' }}>{rec.address}</div>}
                                                 {rec.tracking_type === 'collection' && rec.invoice_number && (
                                                     <div style={{ fontSize: '0.8rem', color: 'var(--gray-300)', marginTop: '0.2rem' }}>
-                                                        📄 INV: {rec.invoice_number} {rec.amount_billed ? `(Rp ${formatCurrencyHelper(rec.amount_billed)})` : ''}
+                                                        <Icon name="FileText" size={16} inline /> INV: {rec.invoice_number} {rec.amount_billed ? `(Rp ${formatCurrencyHelper(rec.amount_billed)})` : ''}
                                                     </div>
                                                 )}
                                                 <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginTop: '0.5rem' }}>
-                                                    📥 Check-in: <strong>{formatTime(rec.checkin_time)}</strong>
+                                                    <Icon name="Download" size={16} inline /> Check-in: <strong>{formatTime(rec.checkin_time)}</strong>
                                                 </div>
                                                 <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                                    📍 {parseFloat(rec.checkin_latitude).toFixed(6)}, {parseFloat(rec.checkin_longitude).toFixed(6)}
+                                                    <Icon name="MapPin" size={16} inline /> {parseFloat(rec.checkin_latitude).toFixed(6)}, {parseFloat(rec.checkin_longitude).toFixed(6)}
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
-                                                <span className="badge badge-success" style={{ animation: 'pulse 2s infinite' }}>🟢 Aktif</span>
+                                                <span className="badge badge-success" style={{ animation: 'pulse 2s infinite' }}><Icon name="Circle" size={16} inline /> Aktif</span>
                                                 {rec.checkin_photo_path && (
                                                     <img src={rec.checkin_photo_path} alt="Check-in"
                                                         className="photo-thumb-lg"
@@ -853,7 +854,7 @@ export default function DriverTracking() {
                                                 )}
                                             </div>
                                         </div>
-                                        {rec.notes && <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.5rem', fontStyle: 'italic' }}>💬 {rec.notes}</div>}
+                                        {rec.notes && <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.5rem', fontStyle: 'italic' }}><Icon name="MessageSquare" size={16} inline /> {rec.notes}</div>}
 
                                         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                                             <button className="btn btn-danger" onClick={() => openCameraForCheckout(rec)}
@@ -862,7 +863,7 @@ export default function DriverTracking() {
                                             </button>
                                             <button className="btn btn-outline" onClick={() => openMapForRecords([rec])}
                                                 style={{ padding: '0.5rem 0.75rem' }} title="Lihat di peta">
-                                                🗺️
+                                                <Icon name="Map" size={16} inline />
                                             </button>
                                         </div>
                                     </div>
@@ -875,10 +876,10 @@ export default function DriverTracking() {
                     {completedRecords.length > 0 && (
                         <div className="card mb-4">
                             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h2 className="card-title">✅ Selesai Hari Ini ({completedRecords.length})</h2>
+                                <h2 className="card-title"><Icon name="CheckCircle2" size={16} inline /> Selesai Hari Ini ({completedRecords.length})</h2>
                                 <button className="btn btn-outline" onClick={() => openMapForRecords(completedRecords)}
                                     style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                                    🗺️ Lihat Semua di Peta
+                                    <Icon name="Map" size={16} inline /> Lihat Semua di Peta
                                 </button>
                             </div>
                             <div style={{ padding: '0.5rem' }}>
@@ -893,7 +894,7 @@ export default function DriverTracking() {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 700, fontSize: '1rem' }}>
-                                                    🏪 {rec.customer_name}
+                                                    <Icon name="Store" size={16} inline /> {rec.customer_name}
                                                     {rec.tracking_type === 'collection' && <span className="badge badge-warning" style={{ marginLeft: 6 }}>Tagihan</span>}
                                                     {rec.tracking_type === 'sales' && <span className="badge badge-success" style={{ marginLeft: 6 }}>Sales</span>}
                                                     {rec.tracking_type === 'visit' && <span className="badge badge-outline" style={{ marginLeft: 6 }}>Kunjungan</span>}
@@ -904,7 +905,7 @@ export default function DriverTracking() {
                                                 {rec.tracking_type === 'collection' && rec.collection_status && (
                                                     <div style={{ marginTop: '0.35rem', background: 'var(--gray-800)', padding: '0.4rem 0.6rem', borderRadius: 4, display: 'inline-block' }}>
                                                         <span style={{ fontSize: '0.8rem', color: rec.collection_status === 'Lunas' ? 'var(--success-400)' : rec.collection_status === 'Gagal' ? 'var(--danger-400)' : 'var(--warning-400)' }}>
-                                                            {rec.collection_status === 'Lunas' ? '✅' : rec.collection_status === 'Gagal' ? '❌' : '⚠️'} <strong>{rec.collection_status}</strong>
+                                                            {rec.collection_status === 'Lunas' ? 'CheckCircle2' : rec.collection_status === 'Gagal' ? 'XCircle' : 'AlertTriangle'} <strong>{rec.collection_status}</strong>
                                                         </span>
                                                         {parseFloat(rec.amount_collected) > 0 && <span style={{ fontSize: '0.8rem', color: 'var(--gray-300)', marginLeft: 8 }}>Rp {formatCurrencyHelper(rec.amount_collected)} ({rec.payment_method})</span>}
                                                     </div>
@@ -928,18 +929,18 @@ export default function DriverTracking() {
                                                 </div>
                                                 <span className="badge badge-primary">{calcDuration(rec.checkin_time, rec.checkout_time)}</span>
                                                 <button className="btn btn-outline" onClick={() => openMapForRecords([rec])}
-                                                    style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}>🗺️</button>
+                                                    style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}><Icon name="Map" size={16} inline /></button>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                                             <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>
-                                                📥 In: <strong style={{ color: 'var(--success-400)' }}>{formatTime(rec.checkin_time)}</strong>
+                                                <Icon name="Download" size={16} inline /> In: <strong style={{ color: 'var(--success-400)' }}>{formatTime(rec.checkin_time)}</strong>
                                             </div>
                                             <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)' }}>
-                                                📤 Out: <strong style={{ color: 'var(--danger-400)' }}>{formatTime(rec.checkout_time)}</strong>
+                                                <Icon name="Upload" size={16} inline /> Out: <strong style={{ color: 'var(--danger-400)' }}>{formatTime(rec.checkout_time)}</strong>
                                             </div>
                                         </div>
-                                        {rec.notes && <div style={{ fontSize: '0.82rem', color: 'var(--gray-400)', marginTop: '0.4rem', fontStyle: 'italic' }}>💬 {rec.notes}</div>}
+                                        {rec.notes && <div style={{ fontSize: '0.82rem', color: 'var(--gray-400)', marginTop: '0.4rem', fontStyle: 'italic' }}><Icon name="MessageSquare" size={16} inline /> {rec.notes}</div>}
                                     </div>
                                 ))}
                             </div>
@@ -949,7 +950,7 @@ export default function DriverTracking() {
                     {todayRecords.length === 0 && !loading && (
                         <div className="card">
                             <div className="empty-state">
-                                <div className="empty-state-icon">📍</div>
+                                <div className="empty-state-icon"><Icon name="MapPin" size={16} inline /></div>
                                 <p className="empty-state-text">Belum ada tracking hari ini. Silakan check-in di lokasi customer pertama Anda.</p>
                             </div>
                         </div>
@@ -972,17 +973,17 @@ export default function DriverTracking() {
                                 <input type="date" className="form-input" value={endDate}
                                     onChange={e => setEndDate(e.target.value)} />
                             </div>
-                            <button className="btn btn-primary" onClick={fetchHistory} style={{ height: 42 }}>🔍 Cari</button>
+                            <button className="btn btn-primary" onClick={fetchHistory} style={{ height: 42 }}><Icon name="Search" size={16} inline /> Cari</button>
                         </div>
                     </div>
 
                     {historyRecords.length > 0 ? (
                         <div className="card">
                             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h2 className="card-title">📋 Riwayat Tracking ({historyRecords.length})</h2>
+                                <h2 className="card-title"><Icon name="ClipboardList" size={16} inline /> Riwayat Tracking ({historyRecords.length})</h2>
                                 <button className="btn btn-outline" onClick={() => openMapForRecords(historyRecords)}
                                     style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                                    🗺️ Peta Semua
+                                    <Icon name="Map" size={16} inline /> Peta Semua
                                 </button>
                             </div>
                             <div className="table-container">
@@ -1032,7 +1033,7 @@ export default function DriverTracking() {
                                                 </td>
                                                 <td>
                                                     <button className="btn btn-outline" onClick={() => openMapForRecords([rec])}
-                                                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}>🗺️</button>
+                                                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}><Icon name="Map" size={16} inline /></button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -1043,7 +1044,7 @@ export default function DriverTracking() {
                     ) : (
                         <div className="card">
                             <div className="empty-state">
-                                <div className="empty-state-icon">📋</div>
+                                <div className="empty-state-icon"><Icon name="ClipboardList" size={16} inline /></div>
                                 <p className="empty-state-text">Belum ada riwayat tracking. Pilih rentang tanggal untuk mencari.</p>
                             </div>
                         </div>
@@ -1070,10 +1071,11 @@ export default function DriverTracking() {
                             onClick={() => setShowCustomerPicker(false)}
                             style={{
                                 background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
-                                width: 36, height: 36, borderRadius: 8, fontSize: '1.1rem', cursor: 'pointer'
+                                width: 36, height: 36, borderRadius: 8, fontSize: '1.1rem', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}
                         >
-                            ←
+                            <Icon name="ArrowLeft" size={18} />
                         </button>
                         <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 700, fontSize: '1rem' }}>Master Customer</div>
@@ -1085,7 +1087,7 @@ export default function DriverTracking() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="🔍 Cari nama, kode, alamat, atau telepon..."
+                            placeholder="Cari nama, kode, alamat, atau telepon..."
                             value={pickerQuery}
                             onChange={(e) => handlePickerSearch(e.target.value)}
                         />
@@ -1098,7 +1100,7 @@ export default function DriverTracking() {
                             </div>
                         ) : pickerCustomers.length === 0 ? (
                             <div className="empty-state" style={{ padding: '2rem 1rem' }}>
-                                <div className="empty-state-icon">🏪</div>
+                                <div className="empty-state-icon"><Icon name="Store" size={16} inline /></div>
                                 <p className="empty-state-text">Customer tidak ditemukan</p>
                             </div>
                         ) : (
@@ -1118,7 +1120,7 @@ export default function DriverTracking() {
                                         width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
                                         background: 'rgba(185, 28, 28, 0.08)',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>🏪</div>
+                                    }}><Icon name="Store" size={16} inline /></div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{c.name}</div>
                                         <div style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginTop: 2 }}>
@@ -1130,7 +1132,7 @@ export default function DriverTracking() {
                                                 fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2,
                                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                                             }}>
-                                                📍 {c.address}
+                                                <Icon name="MapPin" size={16} inline /> {c.address}
                                             </div>
                                         )}
                                     </div>
@@ -1153,7 +1155,7 @@ export default function DriverTracking() {
                             onClick={() => fetchCustomerDirectory(pickerPage - 1, pickerQuery)}
                             style={{ minWidth: 88 }}
                         >
-                            ← Kiri
+                            <Icon name="ArrowLeft" size={14} inline /> Kiri
                         </button>
                         <div style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
                             Halaman {pickerPage} / {pickerTotalPages}
@@ -1165,7 +1167,7 @@ export default function DriverTracking() {
                             onClick={() => fetchCustomerDirectory(pickerPage + 1, pickerQuery)}
                             style={{ minWidth: 88 }}
                         >
-                            Kanan →
+                            Kanan <Icon name="ArrowRight" size={14} inline />
                         </button>
                     </div>
                 </div>
@@ -1184,9 +1186,9 @@ export default function DriverTracking() {
                         overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
                     }} onClick={e => e.stopPropagation()}>
                         <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--gray-700)' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>🗺️ Peta Lokasi Tracking</h3>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}><Icon name="Map" size={16} inline /> Peta Lokasi Tracking</h3>
                             <button onClick={() => setMapModal({ ...mapModal, open: false })}
-                                style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+                                style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: '1.5rem', cursor: 'pointer' }}><Icon name="X" size={16} inline /></button>
                         </div>
                         <div style={{ height: 450 }}>
                             <MapContainer center={mapModal.center} zoom={13} style={{ height: '100%', width: '100%' }}>
@@ -1200,7 +1202,7 @@ export default function DriverTracking() {
                                             <Marker position={[parseFloat(rec.checkin_latitude), parseFloat(rec.checkin_longitude)]} icon={checkinIcon}>
                                                 <Popup>
                                                     <div style={{ color: '#333' }}>
-                                                        <strong>📥 Check-in</strong><br />
+                                                        <strong><Icon name="Download" size={16} inline /> Check-in</strong><br />
                                                         {rec.customer_name}<br />
                                                         {formatDateTime(rec.checkin_time)}
                                                     </div>
@@ -1211,7 +1213,7 @@ export default function DriverTracking() {
                                             <Marker position={[parseFloat(rec.checkout_latitude), parseFloat(rec.checkout_longitude)]} icon={checkoutIcon}>
                                                 <Popup>
                                                     <div style={{ color: '#333' }}>
-                                                        <strong>📤 Check-out</strong><br />
+                                                        <strong><Icon name="Upload" size={16} inline /> Check-out</strong><br />
                                                         {rec.customer_name}<br />
                                                         {formatDateTime(rec.checkout_time)}
                                                     </div>
@@ -1223,8 +1225,8 @@ export default function DriverTracking() {
                             </MapContainer>
                         </div>
                         <div style={{ padding: '0.75rem 1.25rem', display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: 'var(--gray-400)', borderTop: '1px solid var(--gray-700)' }}>
-                            <span>🟢 = Check-in</span>
-                            <span>🔴 = Check-out</span>
+                            <span><Icon name="Circle" size={16} inline /> = Check-in</span>
+                            <span><Icon name="Circle" size={16} inline /> = Check-out</span>
                         </div>
                     </div>
                 </div>
@@ -1242,7 +1244,7 @@ export default function DriverTracking() {
                             style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 'var(--radius-lg)', border: '2px solid var(--gray-600)' }} />
                         <p style={{ marginTop: '0.75rem', color: 'var(--gray-300)', fontSize: '0.9rem' }}>{imageModal.caption}</p>
                         <button className="btn btn-outline" onClick={() => setImageModal({ ...imageModal, open: false })}
-                            style={{ marginTop: '0.5rem' }}>✕ Tutup</button>
+                            style={{ marginTop: '0.5rem' }}><Icon name="X" size={16} inline /> Tutup</button>
                     </div>
                 </div>
             )}

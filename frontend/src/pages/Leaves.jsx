@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { leavesAPI } from '../utils/api';
 import ApprovalTimeline from '../components/ApprovalTimeline';
+import Icon from '../components/Icon';
 
 export default function Leaves() {
     const [requests, setRequests] = useState([]);
@@ -19,17 +20,17 @@ export default function Leaves() {
     const [attachment, setAttachment] = useState(null);
 
     const leaveTypes = {
-        late: { label: 'Izin Terlambat', icon: '⏰', color: 'warning' },
-        sick: { label: 'Izin Sakit', icon: '🏥', color: 'danger' },
-        permission: { label: 'Izin Tidak Masuk', icon: '📝', color: 'secondary' },
-        leave: { label: 'Cuti', icon: '🏖️', color: 'primary' },
-        change_off: { label: 'Tukar Libur', icon: '🔄', color: 'info' }
+        late: { label: 'Izin Terlambat', icon: 'Clock', color: 'warning' },
+        sick: { label: 'Izin Sakit', icon: 'HeartPulse', color: 'danger' },
+        permission: { label: 'Izin Tidak Masuk', icon: 'FileText', color: 'secondary' },
+        leave: { label: 'Cuti', icon: 'Palmtree', color: 'primary' },
+        change_off: { label: 'Tukar Libur', icon: 'RefreshCw', color: 'info' }
     };
 
     const statusLabels = {
-        pending: { label: 'Menunggu', color: 'warning', icon: '⏳' },
-        approved: { label: 'Disetujui', color: 'success', icon: '✅' },
-        rejected: { label: 'Ditolak', color: 'danger', icon: '❌' }
+        pending: { label: 'Menunggu', color: 'warning', icon: 'Hourglass' },
+        approved: { label: 'Disetujui', color: 'success', icon: 'CheckCircle2' },
+        rejected: { label: 'Ditolak', color: 'danger', icon: 'XCircle' }
     };
 
     useEffect(() => {
@@ -129,7 +130,7 @@ export default function Leaves() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📝 Pengajuan Izin & Cuti</h1>
+                <h1 className="page-title"><Icon name="FileText" size={16} inline /> Pengajuan Izin & Cuti</h1>
                 <p className="page-subtitle">Ajukan izin terlambat, sakit, atau cuti</p>
             </div>
 
@@ -140,7 +141,7 @@ export default function Leaves() {
                     onClick={() => { setType('late'); setShowForm(true); }}
                     style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
                 >
-                    <div className="status-card-icon warning">⏰</div>
+                    <div className="status-card-icon warning"><Icon name="Clock" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Izin Terlambat</h3>
                         <p style={{ fontSize: '0.85rem' }}>Datang tidak tepat waktu</p>
@@ -151,7 +152,7 @@ export default function Leaves() {
                     onClick={() => { setType('sick'); setShowForm(true); }}
                     style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
                 >
-                    <div className="status-card-icon danger">🏥</div>
+                    <div className="status-card-icon danger"><Icon name="HeartPulse" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Izin Sakit</h3>
                         <p style={{ fontSize: '0.85rem' }}>Tidak masuk karena sakit</p>
@@ -162,7 +163,7 @@ export default function Leaves() {
                     onClick={() => { setType('permission'); setShowForm(true); }}
                     style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
                 >
-                    <div className="status-card-icon secondary">📝</div>
+                    <div className="status-card-icon secondary"><Icon name="FileText" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Izin Tidak Masuk</h3>
                         <p style={{ fontSize: '0.85rem' }}>Izin absen seharian penuh</p>
@@ -174,7 +175,7 @@ export default function Leaves() {
                     style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
                     disabled={quota && quota.remaining <= 0}
                 >
-                    <div className="status-card-icon primary">🏖️</div>
+                    <div className="status-card-icon primary"><Icon name="Palmtree" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Cuti</h3>
                         <p style={{ fontSize: '0.85rem' }}>
@@ -191,7 +192,7 @@ export default function Leaves() {
                     onClick={() => { setType('change_off'); setShowForm(true); }}
                     style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
                 >
-                    <div className="status-card-icon info">🔄</div>
+                    <div className="status-card-icon info"><Icon name="RefreshCw" size={16} inline /></div>
                     <div className="status-card-content">
                         <h3>Tukar Libur</h3>
                         <p style={{ fontSize: '0.85rem' }}>Ganti hari libur/off</p>
@@ -204,14 +205,14 @@ export default function Leaves() {
                 <div className="card mb-4" style={{ border: '2px solid var(--primary-500)' }}>
                     <div className="card-header">
                         <h2 className="card-title">
-                            {leaveTypes[type].icon} Ajukan {leaveTypes[type].label}
+                            <Icon name={leaveTypes[type].icon} size={18} inline /> Ajukan {leaveTypes[type].label}
                         </h2>
                         <button
                             className="btn btn-outline"
                             onClick={() => setShowForm(false)}
                             style={{ padding: '0.5rem 1rem' }}
                         >
-                            ✕
+                            <Icon name="X" size={16} inline />
                         </button>
                     </div>
 
@@ -297,7 +298,7 @@ export default function Leaves() {
                                 className="btn btn-primary"
                                 disabled={submitting}
                             >
-                                {submitting ? '⏳ Mengirim...' : '📤 Kirim Pengajuan'}
+                                {submitting ? 'Mengirim...' : 'Kirim Pengajuan'}
                             </button>
                         </div>
                     </form>
@@ -307,7 +308,7 @@ export default function Leaves() {
             {/* Filter & List */}
             <div className="card">
                 <div className="card-header">
-                    <h2 className="card-title">📋 Riwayat Pengajuan</h2>
+                    <h2 className="card-title"><Icon name="ClipboardList" size={16} inline /> Riwayat Pengajuan</h2>
                     <select
                         className="form-input form-select"
                         value={filter}
@@ -327,7 +328,7 @@ export default function Leaves() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📝</div>
+                        <div className="empty-state-icon"><Icon name="FileText" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada pengajuan</p>
                     </div>
                 ) : (
@@ -344,7 +345,7 @@ export default function Leaves() {
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <span style={{ fontSize: '1.5rem' }}>{leaveTypes[req.type].icon}</span>
+                                        <span style={{ fontSize: '1.5rem' }}><Icon name={leaveTypes[req.type].icon} size={18} inline /></span>
                                         <div>
                                             <h4 style={{ margin: 0, color: 'white' }}>{leaveTypes[req.type].label}</h4>
                                             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--gray-400)' }}>
@@ -357,7 +358,7 @@ export default function Leaves() {
                                         </div>
                                     </div>
                                     <span className={`badge badge-${statusLabels[req.status].color}`}>
-                                        {statusLabels[req.status].icon} {statusLabels[req.status].label}
+                                        <Icon name={statusLabels[req.status].icon} size={14} inline /> {statusLabels[req.status].label}
                                         {req.status === 'pending' && req.total_steps > 1 ? ` (${req.current_step || 1}/${req.total_steps})` : ''}
                                     </span>
                                 </div>
@@ -390,7 +391,7 @@ export default function Leaves() {
                                         style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
                                         onClick={() => handleDelete(req.id)}
                                     >
-                                        🗑️ Hapus
+                                        <Icon name="Trash2" size={16} inline /> Hapus
                                     </button>
                                 </div>
                             </div>

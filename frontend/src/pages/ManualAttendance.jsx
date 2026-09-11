@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { manualAttendanceAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function ManualAttendance() {
     const [requests, setRequests] = useState([]);
@@ -121,19 +122,19 @@ export default function ManualAttendance() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📝 Pengajuan Absen Manual</h1>
+                <h1 className="page-title"><Icon name="FileText" size={16} inline /> Pengajuan Absen Manual</h1>
                 <p className="page-subtitle">Ajukan absensi jika Anda lupa absen masuk atau pulang</p>
             </div>
 
             <div className="card mb-4">
                 <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-                    ➕ Buat Pengajuan
+                    <Icon name="Plus" size={16} inline /> Buat Pengajuan
                 </button>
             </div>
 
             <div className="card">
                 <div className="card-header">
-                    <h2 className="card-title">📋 Riwayat Pengajuan</h2>
+                    <h2 className="card-title"><Icon name="ClipboardList" size={16} inline /> Riwayat Pengajuan</h2>
                 </div>
 
                 {loading ? (
@@ -142,7 +143,7 @@ export default function ManualAttendance() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📝</div>
+                        <div className="empty-state-icon"><Icon name="FileText" size={16} inline /></div>
                         <p className="empty-state-text">Belum ada riwayat pengajuan absen manual</p>
                     </div>
                 ) : (
@@ -159,7 +160,7 @@ export default function ManualAttendance() {
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <span style={{ fontSize: '1.5rem' }}>⏰</span>
+                                        <span style={{ fontSize: '1.5rem' }}><Icon name="Clock" size={16} inline /></span>
                                         <div>
                                             <h4 style={{ margin: 0, color: 'white' }}>{format(new Date(request.date), 'dd MMMM yyyy', { locale: id })}</h4>
                                             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--gray-400)' }}>
@@ -186,7 +187,7 @@ export default function ManualAttendance() {
                                             className="btn btn-outline"
                                             style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                                         >
-                                            📎 Lihat Lampiran
+                                            <Icon name="Paperclip" size={16} inline /> Lihat Lampiran
                                         </a>
                                     </div>
                                 )}
@@ -214,7 +215,7 @@ export default function ManualAttendance() {
                                             style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
                                             onClick={() => handleDelete(request.id)}
                                         >
-                                            🗑️ Hapus
+                                            <Icon name="Trash2" size={16} inline /> Hapus
                                         </button>
                                     )}
                                 </div>
@@ -247,14 +248,14 @@ export default function ManualAttendance() {
                         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                     }}>
                         <div className="card-header" style={{ position: 'sticky', top: 0, background: 'var(--theme-card-bg)', zIndex: 1, paddingBottom: '1rem', borderBottom: '1px solid var(--gray-200)', marginBottom: '1rem' }}>
-                            <h2 className="card-title" style={{ margin: 0 }}>⏰ Buat Pengajuan Absen Manual</h2>
+                            <h2 className="card-title" style={{ margin: 0 }}><Icon name="Clock" size={16} inline /> Buat Pengajuan Absen Manual</h2>
                             <button
                                 type="button"
                                 className="btn btn-outline"
                                 onClick={() => setShowModal(false)}
                                 style={{ padding: '0.4rem 0.8rem' }}
                             >
-                                ✕
+                                <Icon name="X" size={16} inline />
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} style={{ padding: '0 1rem 1rem' }}>
@@ -328,7 +329,7 @@ export default function ManualAttendance() {
                                     Batal
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? '⏳ Menyimpan...' : '📤 Ajukan Absen'}
+                                    {submitting ? 'Menyimpan...' : 'Ajukan Absen'}
                                 </button>
                             </div>
                         </form>

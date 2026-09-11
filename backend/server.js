@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('./db');
 const { ensureOrgApprovalSchema } = require('./utils/leaveApproval');
+const { ensureSystemRoles } = require('./utils/systemRoles');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -79,6 +80,7 @@ async function initDatabase() {
         const schema = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schema);
         await ensureOrgApprovalSchema(pool);
+        await ensureSystemRoles(pool);
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Error initializing database:', error);

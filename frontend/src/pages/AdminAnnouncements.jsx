@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { announcementsAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminAnnouncements() {
     const [announcements, setAnnouncements] = useState([]);
@@ -89,7 +90,7 @@ export default function AdminAnnouncements() {
         <div className="fade-in">
             <div className="page-header d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 className="page-title">📢 Kelola Pengumuman</h1>
+                    <h1 className="page-title"><Icon name="Megaphone" size={16} inline /> Kelola Pengumuman</h1>
                     <p className="page-subtitle">Buat informasi untuk karyawan</p>
                 </div>
                 <button className="btn btn-primary" onClick={handleCreate}>
@@ -141,14 +142,14 @@ export default function AdminAnnouncements() {
                                                     onClick={() => handleEdit(item)}
                                                     title="Edit"
                                                 >
-                                                    ✏️
+                                                    <Icon name="Pencil" size={16} inline />
                                                 </button>
                                                 <button
                                                     className="btn-icon text-danger"
                                                     onClick={() => handleDelete(item.id)}
                                                     title="Hapus"
                                                 >
-                                                    🗑️
+                                                    <Icon name="Trash2" size={16} inline />
                                                 </button>
                                             </div>
                                         </td>
@@ -168,7 +169,7 @@ export default function AdminAnnouncements() {
                             <h3 className="modal-title">
                                 {editingItem ? 'Edit Pengumuman' : 'Buat Pengumuman Baru'}
                             </h3>
-                            <button className="btn-icon" onClick={() => setShowModal(false)}>✕</button>
+                            <button className="btn-icon" onClick={() => setShowModal(false)}><Icon name="X" size={16} inline /></button>
                         </div>
                         <div className="modal-body">
                             <form onSubmit={handleSubmit}>

@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
+import Icon from './Icon';
 
 const IS_MOBILE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -265,7 +266,7 @@ export default function Camera({ onCapture, onReset }) {
     const filePicker = (
         <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
             <button type="button" className="btn btn-outline" style={{ pointerEvents: 'none' }}>
-                {IS_MOBILE ? '📸 Ambil dari Kamera HP' : '📁 Pilih Foto dari Komputer'}
+                {IS_MOBILE ? 'Ambil dari Kamera HP' : 'Pilih Foto dari Komputer'}
             </button>
             <input
                 type="file"
@@ -295,13 +296,13 @@ export default function Camera({ onCapture, onReset }) {
                     textAlign: 'center',
                     boxSizing: 'border-box'
                 }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Camera" size={16} inline /></div>
                     <p style={{ marginBottom: '1.25rem', fontSize: '0.85rem', lineHeight: '1.4' }}>
                         Webcam live tidak tersedia. {IS_MOBILE ? 'Ambil foto selfie dari kamera HP.' : 'Pilih foto dari komputer, atau izinkan kamera di browser lalu coba lagi.'}
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
                         <button type="button" className="btn btn-primary" onClick={startCamera}>
-                            🔄 Coba Buka Webcam
+                            <Icon name="RefreshCw" size={16} inline /> Coba Buka Webcam
                         </button>
                         {filePicker}
                     </div>
@@ -314,7 +315,7 @@ export default function Camera({ onCapture, onReset }) {
         return (
             <div className="camera-container">
                 <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</div>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Camera" size={16} inline /></div>
                     <p className="text-danger" style={{ marginBottom: '1rem' }}>{error}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
                         <button className="btn btn-primary" onClick={startCamera} disabled={starting}>
@@ -365,7 +366,7 @@ export default function Camera({ onCapture, onReset }) {
                             onClick={switchCamera}
                             title="Ganti Kamera"
                         >
-                            🔄
+                            <Icon name="RefreshCw" size={16} inline />
                         </button>
                         <button className="camera-btn" onClick={capturePhoto}>
                             <div className="camera-btn-inner" />
@@ -380,7 +381,7 @@ export default function Camera({ onCapture, onReset }) {
                             className="btn btn-outline"
                             onClick={retakePhoto}
                         >
-                            🔄 Ambil Ulang
+                            <Icon name="RefreshCw" size={16} inline /> Ambil Ulang
                         </button>
                     </div>
                 </>

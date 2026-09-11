@@ -39,13 +39,18 @@ export function AuthProvider({ children }) {
 
     function hasPermission(permissionKey) {
         if (!user) return false;
-        if (user.role === 'admin') return true; // Admin always has all permissions
+        if (user.role === 'admin') return true;
+        if (user.role === 'kiosk') return permissionKey === 'admin.kiosk';
         if (!user.permissions) return false;
         return user.permissions.includes(permissionKey);
     }
 
+    function isKioskOnly() {
+        return user?.role === 'kiosk';
+    }
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, setUser, hasPermission }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, setUser, hasPermission, isKioskOnly }}>
             {children}
         </AuthContext.Provider>
     );

@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
 const {
     ensureOrgApprovalSchema,
     createApprovalSteps,
@@ -103,58 +103,70 @@ async function getUserLeaveQuota(userId, year) {
     return { quota, settings };
 }
 
-// Create new leave request (Employee)
-router.post('/', authenticateToken, upload.single('attachment'), async (req, res) => {
+async function createLeaveRequestForUser({ userId, type, start_date, end_date, reason, replacement_date, file }) {
+    if (!['late', 'sick', 'leave', 'change_off', 'permission'].includes(type)) {
+        const err = new Error('Jenis izin tidak valid');
+        err.status = 400;
+        throw err;
+    }
+
+    if (!start_date || !end_date) {
+        const err = new Error('Tanggal mulai dan selesai harus diisi');
+        err.status = 400;
+        throw err;
+    }
+
+    if (new Date(start_date) > new Date(end_date)) {
+        const err = new Error('Tanggal mulai tidak boleh lebih dari tanggal selesai');
+        err.status = 400;
+        throw err;
+    }
+
+    if (type === 'change_off' && !replacement_date) {
+        const err = new Error('Tanggal pengganti harus diisi untuk tukar libur');
+        err.status = 400;
+        throw err;
+    }
+
+    if (!reason || reason.trim().length < 10) {
+        const err = new Error('Alasan harus diisi minimal 10 karakter');
+        err.status = 400;
+        throw err;
+    }
+
+    const userCheck = await pool.query('SELECT id, name FROM users WHERE id = $1', [userId]);
+    if (userCheck.rows.length === 0) {
+        const err = new Error('Karyawan tidak ditemukan');
+        err.status = 404;
+        throw err;
+    }
+
+    const year = new Date(start_date).getFullYear();
+    const { quota, settings } = await getUserLeaveQuota(userId, year);
+
+    let deductsLeave = false;
+    if (type === 'leave') deductsLeave = true;
+    if (type === 'late' && settings.late_deducts_leave) deductsLeave = true;
+    if (type === 'sick' && settings.sick_deducts_leave) deductsLeave = true;
+    if (type === 'permission' && settings.permission_deducts_leave) deductsLeave = true;
+
+    if (deductsLeave) {
+        const requestedDays = calculateDays(start_date, end_date);
+        const usedDays = await getUsedLeaveDays(userId, year, settings);
+        const remainingDays = quota - usedDays;
+
+        if (requestedDays > remainingDays) {
+            const err = new Error(
+                `Sisa cuti tahun ${year} adalah ${remainingDays} hari. Pengajuan ${requestedDays} hari.`
+            );
+            err.status = 400;
+            throw err;
+        }
+    }
+
+    const attachmentPath = file ? `/uploads/leave/${file.filename}` : null;
     const client = await pool.connect();
     try {
-        const { type, start_date, end_date, reason, replacement_date } = req.body;
-        const userId = req.user.id;
-
-        if (!['late', 'sick', 'leave', 'change_off', 'permission'].includes(type)) {
-            return res.status(400).json({ error: 'Jenis izin tidak valid' });
-        }
-
-        if (!start_date || !end_date) {
-            return res.status(400).json({ error: 'Tanggal mulai dan selesai harus diisi' });
-        }
-
-        if (new Date(start_date) > new Date(end_date)) {
-            return res.status(400).json({ error: 'Tanggal mulai tidak boleh lebih dari tanggal selesai' });
-        }
-
-        if (type === 'change_off' && !replacement_date) {
-            return res.status(400).json({ error: 'Tanggal pengganti harus diisi untuk tukar libur' });
-        }
-
-        if (!reason || reason.trim().length < 10) {
-            return res.status(400).json({ error: 'Alasan harus diisi minimal 10 karakter' });
-        }
-
-        const year = new Date(start_date).getFullYear();
-        const { quota, settings } = await getUserLeaveQuota(userId, year);
-
-        let deductsLeave = false;
-        if (type === 'leave') deductsLeave = true;
-        if (type === 'late' && settings.late_deducts_leave) deductsLeave = true;
-        if (type === 'sick' && settings.sick_deducts_leave) deductsLeave = true;
-        if (type === 'permission' && settings.permission_deducts_leave) deductsLeave = true;
-
-        if (deductsLeave) {
-            const requestedDays = calculateDays(start_date, end_date);
-            const usedDays = await getUsedLeaveDays(userId, year, settings);
-            const remainingDays = quota - usedDays;
-
-            if (requestedDays > remainingDays) {
-                return res.status(400).json({
-                    error: `Sisa cuti Anda tahun ${year} adalah ${remainingDays} hari. Anda mengajukan ${requestedDays} hari. (Dipotong oleh pengajuan ini)`,
-                    remaining_days: remainingDays,
-                    requested_days: requestedDays
-                });
-            }
-        }
-
-        const attachmentPath = req.file ? `/uploads/leave/${req.file.filename}` : null;
-
         await client.query('BEGIN');
 
         const result = await client.query(
@@ -176,19 +188,86 @@ router.post('/', authenticateToken, upload.single('attachment'), async (req, res
         );
 
         await client.query('COMMIT');
-
         const [payload] = await attachApprovalSteps(pool, withSteps.rows);
-
-        res.status(201).json({
+        return {
             message: 'Pengajuan izin berhasil dibuat',
-            data: payload
-        });
+            data: payload,
+            user_name: userCheck.rows[0].name,
+        };
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Create leave request error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        throw error;
     } finally {
         client.release();
+    }
+}
+
+// Create new leave request (Employee)
+router.post('/', authenticateToken, upload.single('attachment'), async (req, res) => {
+    try {
+        const { type, start_date, end_date, reason, replacement_date } = req.body;
+        const payload = await createLeaveRequestForUser({
+            userId: req.user.id,
+            type,
+            start_date,
+            end_date,
+            reason,
+            replacement_date,
+            file: req.file,
+        });
+        res.status(201).json(payload);
+    } catch (error) {
+        console.error('Create leave request error:', error);
+        res.status(error.status || 500).json({
+            error: error.status ? error.message : 'Terjadi kesalahan server',
+        });
+    }
+});
+
+// Kiosk: create leave on behalf of recognized employee
+router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.single('attachment'), async (req, res) => {
+    try {
+        const { user_id, type, start_date, end_date, reason, replacement_date } = req.body;
+        if (!user_id) {
+            return res.status(400).json({ error: 'User ID tidak ditemukan' });
+        }
+        const payload = await createLeaveRequestForUser({
+            userId: user_id,
+            type,
+            start_date,
+            end_date,
+            reason,
+            replacement_date,
+            file: req.file,
+        });
+        res.status(201).json({
+            ...payload,
+            message: `Pengajuan ${type} berhasil untuk ${payload.user_name}. Menunggu persetujuan.`,
+        });
+    } catch (error) {
+        console.error('Kiosk leave request error:', error);
+        res.status(error.status || 500).json({
+            error: error.status ? error.message : 'Terjadi kesalahan server',
+        });
+    }
+});
+
+router.get('/kiosk-quota/:userId', authenticateToken, hasPermission('admin.kiosk'), async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const year = new Date().getFullYear();
+        const { quota, settings } = await getUserLeaveQuota(userId, year);
+        const usedDays = await getUsedLeaveDays(userId, year, settings);
+        res.json({
+            year,
+            quota,
+            used: usedDays,
+            remaining: quota - usedDays,
+            settings,
+        });
+    } catch (error) {
+        console.error('Kiosk quota error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
 

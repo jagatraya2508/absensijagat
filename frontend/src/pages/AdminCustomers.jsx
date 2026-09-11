@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { customersAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function AdminCustomers() {
     const [customers, setCustomers] = useState([]);
@@ -183,13 +184,13 @@ export default function AdminCustomers() {
     return (
         <div className="fade-in">
             <div className="page-header">
-                <h1 className="page-title">🏪 Master Customer</h1>
+                <h1 className="page-title"><Icon name="Store" size={16} inline /> Master Customer</h1>
                 <p className="page-subtitle">Kelola data customer / pelanggan perusahaan</p>
             </div>
 
             {message.text && (
                 <div className={`alert alert-${message.type} mb-4`}>
-                    {message.type === 'success' ? '✅' : '⚠️'} {message.text}
+                    {message.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'} {message.text}
                 </div>
             )}
 
@@ -200,7 +201,7 @@ export default function AdminCustomers() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="🔍 Cari nama, kode, telepon, atau alamat..."
+                            placeholder="Cari nama, kode, telepon, atau alamat..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             style={{ flex: 1 }}
@@ -208,7 +209,7 @@ export default function AdminCustomers() {
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button className="btn btn-outline" onClick={() => { fetchCodeSettings(); setShowCodeSettings(true); }}>
-                            ⚙️ Pengaturan Kode
+                            <Icon name="Settings" size={16} inline /> Pengaturan Kode
                         </button>
                         <button
                             className="btn"
@@ -224,7 +225,7 @@ export default function AdminCustomers() {
                                 opacity: downloadingTemplate ? 0.7 : 1
                             }}
                         >
-                            {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                            {downloadingTemplate ? 'Mengunduh...' : 'Template'}
                         </button>
                         <button
                             className="btn"
@@ -238,7 +239,7 @@ export default function AdminCustomers() {
                                 cursor: 'pointer'
                             }}
                         >
-                            📤 Upload Excel
+                            <Icon name="Upload" size={16} inline /> Upload Excel
                         </button>
                         <button className="btn btn-primary" onClick={openAdd}>
                             + Tambah Customer
@@ -278,7 +279,7 @@ export default function AdminCustomers() {
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🏪</div>
+                        <div className="empty-state-icon"><Icon name="Store" size={16} inline /></div>
                         <p className="empty-state-text">{searchQuery ? 'Tidak ditemukan customer yang cocok' : 'Belum ada data customer'}</p>
                         {!searchQuery && <button className="btn btn-primary mt-3" onClick={openAdd}>+ Tambah Customer Pertama</button>}
                     </div>
@@ -321,9 +322,9 @@ export default function AdminCustomers() {
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.25rem' }}>
                                                 <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
-                                                    onClick={() => openEdit(cust)}>✏️</button>
+                                                    onClick={() => openEdit(cust)}><Icon name="Pencil" size={16} inline /></button>
                                                 <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: 'var(--danger-500)' }}
-                                                    onClick={() => deleteCustomer(cust.id, cust.name)}>🗑️</button>
+                                                    onClick={() => deleteCustomer(cust.id, cust.name)}><Icon name="Trash2" size={16} inline /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -339,8 +340,8 @@ export default function AdminCustomers() {
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '550px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">{editId ? '✏️ Edit Customer' : '🏪 Tambah Customer Baru'}</h2>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <h2 className="modal-title">{editId ? 'Edit Customer' : 'Tambah Customer Baru'}</h2>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <div style={{ padding: '1.5rem' }}>
                             <div className="form-group">
@@ -386,8 +387,8 @@ export default function AdminCustomers() {
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">⚙️ Pengaturan Kode Customer</h2>
-                            <button className="modal-close" onClick={() => setShowCodeSettings(false)}>×</button>
+                            <h2 className="modal-title"><Icon name="Settings" size={16} inline /> Pengaturan Kode Customer</h2>
+                            <button className="modal-close" onClick={() => setShowCodeSettings(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <div style={{ padding: '1.5rem' }}>
                             <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
@@ -437,7 +438,7 @@ export default function AdminCustomers() {
 
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                                 <button className="btn btn-outline" onClick={() => setShowCodeSettings(false)}>Batal</button>
-                                <button className="btn btn-primary" onClick={saveCodeSettings}>💾 Simpan Pengaturan</button>
+                                <button className="btn btn-primary" onClick={saveCodeSettings}><Icon name="Save" size={16} inline /> Simpan Pengaturan</button>
                             </div>
                         </div>
                     </div>
@@ -450,17 +451,17 @@ export default function AdminCustomers() {
                     <div className="modal-content" style={{ maxWidth: '680px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">Upload Customer dari Excel</h2>
-                            <button className="modal-close" onClick={() => setShowImportModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowImportModal(false)}><Icon name="X" size={16} /></button>
                         </div>
                         <div style={{ padding: '1.5rem' }}>
                             {importError && (
                                 <div className="alert alert-danger mb-3">
-                                    ⚠️ {importError}
+                                    <Icon name="AlertTriangle" size={16} inline /> {importError}
                                 </div>
                             )}
 
                             <div className="alert alert-info mb-3">
-                                ℹ️ Unduh template resmi, isi data customer, lalu unggah file .xlsx.
+                                <Icon name="Info" size={16} inline /> Unduh template resmi, isi data customer, lalu unggah file .xlsx.
                                 Kolom wajib: <strong>Nama</strong>. Kode dikosongkan akan dibuat otomatis.
                             </div>
 
@@ -486,7 +487,7 @@ export default function AdminCustomers() {
                             {importResult && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <div className={`alert mb-3 ${importResult.imported > 0 ? 'alert-success' : 'alert-warning'}`}>
-                                        {importResult.imported > 0 ? '✅' : '⚠️'}{' '}
+                                        {importResult.imported > 0 ? 'CheckCircle2' : 'AlertTriangle'}{' '}
                                         Berhasil: <strong>{importResult.imported}</strong>
                                         {' · '}Gagal: <strong>{importResult.failed}</strong>
                                     </div>
@@ -534,7 +535,7 @@ export default function AdminCustomers() {
                                     onClick={handleDownloadTemplate}
                                     disabled={downloadingTemplate}
                                 >
-                                    {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                    {downloadingTemplate ? 'Mengunduh...' : 'Unduh Template'}
                                 </button>
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>

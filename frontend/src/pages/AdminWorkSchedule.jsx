@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import CompanyCalendar from '../components/CompanyCalendar';
@@ -7,9 +8,9 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
 const TAB_ITEMS = [
-    { key: 'schedules', icon: '🕐', label: 'Jadwal Kerja' },
-    { key: 'assignments', icon: '📅', label: 'Penugasan Shift' },
-    { key: 'calendar', icon: '🗓️', label: 'Kalender' },
+    { key: 'schedules', icon: 'Clock', label: 'Jadwal Kerja' },
+    { key: 'assignments', icon: 'Calendar', label: 'Penugasan Shift' },
+    { key: 'calendar', icon: 'Calendar', label: 'Kalender' },
 ];
 
 function formatTime(t) {
@@ -574,8 +575,7 @@ export default function AdminWorkSchedule() {
 
                 {schedules.length === 0 ? (
                     <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🕐</div>
-                        <p style={{ color: 'var(--gray-600)' }}>Belum ada jadwal kerja. Klik "Tambah Jadwal" untuk membuat.</p>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div> <p style={{ color:'var(--gray-600)' }}>Belum ada jadwal kerja. Klik "Tambah Jadwal" untuk membuat.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
@@ -591,20 +591,19 @@ export default function AdminWorkSchedule() {
                                             {sched.is_default && <span className="badge badge-success">Default</span>}
                                         </div>
                                         {sched.department && (
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>🏢 {sched.department}</span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>{sched.department}</span>
                                         )}
                                         {sched.position && (
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginLeft: '0.5rem' }}>👔 {sched.position}</span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginLeft: '0.5rem' }}>{sched.position}</span>
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openDuplicateSchedule(sched)} title="Duplikasi Jadwal">📄</button>
-                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openEditSchedule(sched)} title="Edit Jadwal">✏️</button>
-                                        <button className="btn btn-danger" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => deleteSchedule(sched.id)} title="Hapus Jadwal">🗑️</button>
+                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openDuplicateSchedule(sched)} title="Duplikasi Jadwal"><Icon name="Copy" size={14} /></button>
+                                        <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => openEditSchedule(sched)} title="Edit Jadwal"><Icon name="Pencil" size={14} /></button>
+                                        <button className="btn btn-danger" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => deleteSchedule(sched.id)} title="Hapus Jadwal"><Icon name="Trash2" size={14} /></button>
                                     </div>
                                 </div>
 
-                                {/* Shifts list */}
                                 <div style={{ marginBottom: '1rem' }}>
                                     {sched.shifts && sched.shifts.map((s, i) => (
                                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
@@ -615,18 +614,15 @@ export default function AdminWorkSchedule() {
                                             <span style={{ fontSize: '0.85rem', color: 'var(--gray-700)', fontFamily: 'monospace' }}>
                                                 {formatTime(s.start_time)} - {formatTime(s.end_time)}
                                             </span>
-                                            {s.is_overnight && <span style={{ fontSize: '0.7rem', color: 'var(--warning-500)' }}>🌙</span>}
+                                            {s.is_overnight && <span style={{ fontSize: '0.7rem', color: 'var(--warning-500)' }}><Icon name="Moon" size={12} inline /> Overnight</span>}
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* Timeline */}
                                 <ShiftTimeline shifts={sched.shifts} />
-
-                                {/* Overtime rule summary */}
                                 {sched.overtime_rule && sched.overtime_rule.id && (
                                     <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(245,158,11,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--warning-500)' }}>
-                                        ⏱️ Lembur: {sched.overtime_rule.overtime_type === 'immediate' ? 'Langsung setelah jam kerja' : `Setelah ${sched.overtime_rule.grace_period_minutes} menit`}
+                                        <Icon name="Clock" size={14} inline /> Lembur: {sched.overtime_rule.overtime_type === 'immediate' ? 'Langsung setelah jam kerja' : `Setelah ${sched.overtime_rule.grace_period_minutes} menit`}
                                         {' • '}Min {sched.overtime_rule.min_overtime_minutes} menit
                                         {' • '}Maks {sched.overtime_rule.max_overtime_hours} jam
                                         {' • '}{sched.overtime_rule.rate_multiplier}x rate
@@ -676,11 +672,10 @@ export default function AdminWorkSchedule() {
                                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
                             </select>
                         </div>
-                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchAssignments}>🔍 Filter</button>
+                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchAssignments}>Filter</button>
                     </div>
                 </div>
 
-                {/* Assignments table */}
                 <div className="card">
                     <div className="table-container">
                         <table className="table">
@@ -719,8 +714,8 @@ export default function AdminWorkSchedule() {
                                                     const localStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                                     setEditAssignForm({ id: a.id, user_id: a.user_id, shift_id: a.shift_id, assignment_date: localStr, user_name: a.user_name });
                                                     setShowEditAssignModal(true);
-                                                }}>✏️</button>
-                                                <button className="btn btn-danger" style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }} onClick={() => deleteAssignment(a.id)}>🗑️</button>
+                                                }}><Icon name="Pencil" size={14} /></button>
+                                                <button className="btn btn-danger" style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }} onClick={() => deleteAssignment(a.id)}><Icon name="Trash2" size={14} /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -733,7 +728,6 @@ export default function AdminWorkSchedule() {
         );
     }
 
-    // --- TAB 3: OVERTIME REQUESTS ---
     function renderOvertimeTab() {
         const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger', completed: 'primary' };
         const statusLabels = { pending: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak', completed: 'Selesai' };
@@ -779,15 +773,8 @@ export default function AdminWorkSchedule() {
                                 <option value="completed">Selesai</option>
                             </select>
                         </div>
-                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchOvertimeRequests}>🔍 Filter</button>
-                    </div>
-                </div>
-
-                {/* SPL Cards */}
-                {overtimeRequests.length === 0 ? (
-                    <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
-                        <p style={{ color: 'var(--gray-600)' }}>Belum ada pengajuan lembur untuk periode ini.</p>
+                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchOvertimeRequests}>Filter</button> </div> </div> {/* SPL Cards */} {overtimeRequests.length === 0 ? ( <div className="card" style={{ textAlign:'center', padding: '3rem' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div> <p style={{ color:'var(--gray-600)' }}>Belum ada pengajuan lembur untuk periode ini.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -801,10 +788,10 @@ export default function AdminWorkSchedule() {
                                             <span className={`badge badge-${statusColors[ot.status]}`}>{statusLabels[ot.status]}</span>
                                         </div>
                                         <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--gray-700)', flexWrap: 'wrap' }}>
-                                            <span>📅 {formatDate(ot.date)}</span>
-                                            <span>⏰ {formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)}</span>
-                                            <span>⏱️ {ot.estimated_hours} jam</span>
-                                            {ot.department && <span>🏢 {ot.department}</span>}
+                                            <span>{formatDate(ot.date)}</span>
+                                            <span>{formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)}</span>
+                                            <span><Icon name="Clock" size={14} inline /> {ot.estimated_hours} jam</span>
+                                            {ot.department && <span>{ot.department}</span>}
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
@@ -813,7 +800,7 @@ export default function AdminWorkSchedule() {
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
-                                    📝 {ot.reason?.substring(0, 100)}{ot.reason?.length > 100 ? '...' : ''}
+                                    {ot.reason?.substring(0, 100)}{ot.reason?.length > 100 ?'...' : ''}
                                 </div>
                             </div>
                         ))}
@@ -858,14 +845,15 @@ export default function AdminWorkSchedule() {
                                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                             </select>
                         </div>
-                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchCalendarEvents}>🔍 Filter</button>
+                        <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchCalendarEvents}>Filter</button>
                     </div>
                 </div>
-
-                <CompanyCalendar 
-                    events={calendarEvents} 
+                <CompanyCalendar
+                    events={calendarEvents}
                     date={new Date(calendarFilter.year, calendarFilter.month - 1, 1)}
-                    onSelectEvent={(event) => alert(`${event.title}\n${event.start.toLocaleString()} - ${event.end.toLocaleString()}`)}
+                    onSelectEvent={(event) => alert(
+                        event.title + '\n' + event.start.toLocaleString() + ' - ' + event.end.toLocaleString()
+                    )}
                     onNavigate={(date) => {
                         setCalendarFilter(f => ({ ...f, month: date.getMonth() + 1, year: date.getFullYear() }));
                     }}
@@ -874,11 +862,6 @@ export default function AdminWorkSchedule() {
         );
     }
 
-    // ============================================
-    // MODALS
-    // ============================================
-
-    // --- SCHEDULE MODAL ---
     function renderScheduleModal() {
         if (!showScheduleModal) return null;
         return (
@@ -886,7 +869,7 @@ export default function AdminWorkSchedule() {
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
                     <div className="modal-header">
                         <h2 className="modal-title">{scheduleForm.id ? 'Edit' : 'Tambah'} Jadwal Kerja</h2>
-                        <button className="modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
+                        <button className="modal-close" onClick={() => setShowScheduleModal(false)}><Icon name="X" size={16} /></button>
                     </div>
 
                     <div style={{ padding: '1.5rem' }}>
@@ -947,7 +930,7 @@ export default function AdminWorkSchedule() {
                         {/* Shifts detail */}
                         <div style={{ margin: '1.5rem 0' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '1rem' }}>
-                                📋 Detail {scheduleForm.type === 'normal' ? 'Jam Kerja' : 'Shift'}
+                                Detail {scheduleForm.type ==='normal' ? 'Jam Kerja' : 'Shift'}
                             </h3>
                             {scheduleForm.shifts.map((shift, idx) => (
                                 <div key={idx} style={{
@@ -998,13 +981,7 @@ export default function AdminWorkSchedule() {
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', cursor: 'pointer', color: 'var(--gray-700)', fontSize: '0.8rem' }}>
                                         <input type="checkbox" checked={shift.is_overnight || false}
                                             onChange={e => updateShift(idx, 'is_overnight', e.target.checked)} />
-                                        🌙 Shift melewati tengah malam (overnight)
-                                    </label>
-                                </div>
-                            ))}
-
-                            {/* Timeline Preview */}
-                            <div style={{ marginTop: '1rem' }}>
+                                        Shift melewati tengah malam (overnight) </label> </div> ))} {/* Timeline Preview */} <div style={{ marginTop:'1rem' }}>
                                 <label className="form-label" style={{ fontSize: '0.75rem' }}>Preview Timeline 24 Jam</label>
                                 <ShiftTimeline shifts={scheduleForm.shifts} />
                             </div>
@@ -1012,7 +989,7 @@ export default function AdminWorkSchedule() {
 
                         {/* Overtime Rule */}
                         <div style={{ margin: '1.5rem 0', padding: '1rem', background: 'rgba(245,158,11,0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--warning-500)', marginBottom: '1rem' }}>⏱️ Aturan Lembur</h3>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--warning-500)', marginBottom: '1rem' }}><Icon name="Clock" size={16} inline /> Aturan Lembur</h3>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label" style={{ fontSize: '0.75rem' }}>Tipe Lembur</label>
@@ -1075,7 +1052,7 @@ export default function AdminWorkSchedule() {
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
                     <div className="modal-header">
                         <h2 className="modal-title">Assign Shift Karyawan</h2>
-                        <button className="modal-close" onClick={() => setShowAssignModal(false)}>×</button>
+                        <button className="modal-close" onClick={() => setShowAssignModal(false)}><Icon name="X" size={16} /></button>
                     </div>
 
                     <div style={{ padding: '1.5rem' }}>
@@ -1083,11 +1060,11 @@ export default function AdminWorkSchedule() {
                         <div className="form-group">
                             <label className="form-label">Mode Penugasan</label>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                {[{ k: 'daily', l: '📅 Harian' }, { k: 'range', l: '📆 Rentang Tanggal' }, { k: 'weekly', l: '🗓️ Mingguan' }].map(m => (
+                                {[{ k: 'daily', l: 'Harian' }, { k: 'range', l: 'Rentang Tanggal' }, { k: 'weekly', l: 'Mingguan' }].map(m => (
                                     <button key={m.k} className={`btn ${assignForm.assign_mode === m.k ? 'btn-primary' : 'btn-outline'}`}
                                         style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem' }}
                                         onClick={() => setAssignForm(f => ({ ...f, assign_mode: m.k, dates: [], start_date: '', end_date: '' }))}>
-                                        {m.l}
+                                        <Icon name="Calendar" size={16} inline /> {m.l}
                                     </button>
                                 ))}
                             </div>
@@ -1109,14 +1086,7 @@ export default function AdminWorkSchedule() {
                                         {assignForm.dates.map(d => (
                                             <span key={d} className="badge badge-primary" style={{ cursor: 'pointer', padding: '0.3rem 0.6rem' }}
                                                 onClick={() => setAssignForm(f => ({ ...f, dates: f.dates.filter(x => x !== d) }))}>
-                                                {formatDate(d)} ✕
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                                {formatDate(d)} </span> ))} </div> )} </div> ) : ( <div style={{ display:'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                                 <div className="form-group">
                                     <label className="form-label">Tanggal Mulai</label>
                                     <input type="date" className="form-input" value={assignForm.start_date}
@@ -1202,10 +1172,9 @@ export default function AdminWorkSchedule() {
             <div className="modal-overlay">
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
                     <div className="modal-header">
-                        <h2 className="modal-title">📋 Pengajuan Lembur (SPL)</h2>
-                        <button className="modal-close" onClick={() => setShowOvertimeModal(false)}>×</button>
+                        <h2 className="modal-title">Pengajuan Lembur (SPL)</h2>
+                        <button className="modal-close" onClick={() => setShowOvertimeModal(false)}><Icon name="X" size={16} /></button>
                     </div>
-
                     <div style={{ padding: '1.5rem' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
@@ -1315,7 +1284,7 @@ export default function AdminWorkSchedule() {
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
                     <div className="modal-header">
                         <h2 className="modal-title">Detail SPL</h2>
-                        <button className="modal-close" onClick={() => setShowSplDetail(null)}>×</button>
+                        <button className="modal-close" onClick={() => setShowSplDetail(null)}><Icon name="X" size={16} /></button>
                     </div>
 
                     <div style={{ padding: '1.5rem' }}>
@@ -1369,7 +1338,7 @@ export default function AdminWorkSchedule() {
                         {/* Employees */}
                         <div style={{ marginBottom: '1.5rem' }}>
                             <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '0.75rem' }}>
-                                👥 Karyawan ({ot.employees?.length || 0})
+                                Karyawan ({ot.employees?.length || 0})
                             </h3>
                             <div className="table-container">
                                 <table className="table">
@@ -1406,22 +1375,22 @@ export default function AdminWorkSchedule() {
                                 <button className="btn btn-danger" onClick={() => {
                                     const notes = prompt('Catatan penolakan (opsional):');
                                     updateOtStatus(ot.id, 'rejected', notes);
-                                }}>❌ Tolak</button>
+                                }}>Tolak</button>
                                 <button className="btn btn-success" onClick={() => {
                                     const notes = prompt('Catatan approval (opsional):');
                                     updateOtStatus(ot.id, 'approved', notes);
-                                }}>✅ Setujui</button>
+                                }}>Setujui</button>
                             </div>
                         )}
                         {ot.status === 'approved' && user?.role === 'admin' && (
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
                                 <button className="btn btn-primary" onClick={() => updateOtStatus(ot.id, 'completed')}>
-                                    ✔️ Tandai Selesai
+                                    Tandai Selesai
                                 </button>
                             </div>
                         )}
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-                            <button className="btn btn-danger" style={{ fontSize: '0.8rem' }} onClick={() => { deleteOtRequest(ot.id); setShowSplDetail(null); }}>🗑️ Hapus SPL</button>
+                            <button className="btn btn-danger" style={{ fontSize: '0.8rem' }} onClick={() => { deleteOtRequest(ot.id); setShowSplDetail(null); }}>Hapus SPL</button>
                             <button className="btn btn-outline" onClick={() => setShowSplDetail(null)}>Tutup</button>
                         </div>
                     </div>
@@ -1430,10 +1399,8 @@ export default function AdminWorkSchedule() {
         );
     }
 
-    // --- EDIT ASSIGNMENT MODAL ---
     function renderEditAssignModal() {
         if (!showEditAssignModal) return null;
-
         const groupedShifts = {};
         allShifts.forEach(s => {
             const key = s.schedule_name + (s.department ? ` (${s.department})` : '');
@@ -1446,7 +1413,7 @@ export default function AdminWorkSchedule() {
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                     <div className="modal-header">
                         <h2 className="modal-title">Edit Penugasan Shift</h2>
-                        <button className="modal-close" onClick={() => setShowEditAssignModal(false)}>×</button>
+                        <button className="modal-close" onClick={() => setShowEditAssignModal(false)}><Icon name="X" size={16} /></button>
                     </div>
                     <div style={{ padding: '1.5rem' }}>
                         <div className="form-group">
@@ -1488,13 +1455,12 @@ export default function AdminWorkSchedule() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🕐 Jadwal Kerja & Lembur</h1>
+                <h1 className="page-title">Jadwal Kerja & Lembur</h1>
                 <p className="page-subtitle">Kelola jadwal kerja, penugasan shift, dan pengajuan lembur (SPL)</p>
             </div>
-
             {message.text && (
                 <div className={`alert alert-${message.type}`} style={{ marginBottom: '1.5rem' }}>
-                    <span className="alert-icon">{message.type === 'success' ? '✅' : '⚠️'}</span>
+                    <span className="alert-icon">{message.type === 'success' ? <Icon name="CheckCircle2" size={16} inline /> : <Icon name="AlertTriangle" size={16} inline />}</span>
                     {message.text}
                 </div>
             )}
@@ -1520,7 +1486,7 @@ export default function AdminWorkSchedule() {
                             fontFamily: 'inherit'
                         }}
                     >
-                        <span>{tab.icon}</span> {tab.label}
+                        <span><Icon name={tab.icon} size={16} inline /></span> {tab.label}
                     </button>
                 ))}
             </div>

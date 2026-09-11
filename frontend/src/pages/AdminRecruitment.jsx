@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -297,10 +298,10 @@ export default function AdminRecruitment() {
 
     // ==================== TABS ====================
     const tabs = [
-        { id: 'dashboard', icon: '📊', label: 'Dashboard' },
-        { id: 'positions', icon: '💼', label: 'Lowongan' },
-        { id: 'candidates', icon: '👥', label: 'Kandidat' },
-        { id: 'interviews', icon: '🗓️', label: 'Interview' },
+        { id: 'dashboard', icon: 'BarChart3', label: 'Dashboard' },
+        { id: 'positions', icon: 'Briefcase', label: 'Lowongan' },
+        { id: 'candidates', icon: 'Users', label: 'Kandidat' },
+        { id: 'interviews', icon: 'Calendar', label: 'Interview' },
     ];
 
     if (loading) {
@@ -315,7 +316,7 @@ export default function AdminRecruitment() {
         <div>
             <div className="card-header" style={{ marginBottom: '1.5rem' }}>
                 <div>
-                    <h1 className="card-title" style={{ fontSize: '1.5rem' }}>🧑‍💼 Recruitment</h1>
+                    <h1 className="card-title" style={{ fontSize: '1.5rem' }}><Icon name="User" size={16} inline />‍<Icon name="Briefcase" size={16} inline /> Recruitment</h1>
                     <p className="card-subtitle">Manajemen proses rekrutmen karyawan</p>
                 </div>
             </div>
@@ -327,7 +328,7 @@ export default function AdminRecruitment() {
                         className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-outline'}`}
                         onClick={() => setActiveTab(tab.id)}
                         style={{ padding: '0.6rem 1.2rem' }}>
-                        {tab.icon} {tab.label}
+                        <Icon name={tab.icon} size={16} inline /> {tab.label}
                     </button>
                 ))}
             </div>
@@ -337,28 +338,28 @@ export default function AdminRecruitment() {
                 <div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                         <div className="card status-card">
-                            <div className="status-card-icon primary">💼</div>
+                            <div className="status-card-icon primary"><Icon name="Briefcase" size={16} inline /></div>
                             <div className="status-card-content">
                                 <h3>Posisi Terbuka</h3>
                                 <p>{openPositions}</p>
                             </div>
                         </div>
                         <div className="card status-card">
-                            <div className="status-card-icon warning">👥</div>
+                            <div className="status-card-icon warning"><Icon name="Users" size={16} inline /></div>
                             <div className="status-card-content">
                                 <h3>Total Kandidat</h3>
                                 <p>{stats.candidates?.reduce((s, c) => s + parseInt(c.count), 0) || 0}</p>
                             </div>
                         </div>
                         <div className="card status-card">
-                            <div className="status-card-icon success">✅</div>
+                            <div className="status-card-icon success"><Icon name="CheckCircle2" size={16} inline /></div>
                             <div className="status-card-content">
                                 <h3>Diterima</h3>
                                 <p>{hiredCount}</p>
                             </div>
                         </div>
                         <div className="card status-card">
-                            <div className="status-card-icon primary">🗓️</div>
+                            <div className="status-card-icon primary"><Icon name="Calendar" size={16} inline /></div>
                             <div className="status-card-content">
                                 <h3>Interview Mendatang</h3>
                                 <p>{stats.upcoming_interviews?.reduce((s, i) => s + parseInt(i.count), 0) || 0}</p>
@@ -368,7 +369,7 @@ export default function AdminRecruitment() {
 
                     {/* Pipeline Overview */}
                     <div className="card" style={{ marginBottom: '1.5rem' }}>
-                        <h3 style={{ marginBottom: '1rem', color: 'white', fontWeight: 700 }}>📈 Pipeline Rekrutmen</h3>
+                        <h3 style={{ marginBottom: '1rem', color: 'white', fontWeight: 700 }}><Icon name="TrendingUp" size={16} inline /> Pipeline Rekrutmen</h3>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                             {STATUS_PIPELINE.map(s => {
                                 const count = getStatCount(stats.candidates, s);
@@ -391,7 +392,7 @@ export default function AdminRecruitment() {
                     {/* Recent Candidates */}
                     {stats.recent_candidates?.length > 0 && (
                         <div className="card">
-                            <h3 style={{ marginBottom: '1rem', color: 'white', fontWeight: 700 }}>🕐 Kandidat Terbaru</h3>
+                            <h3 style={{ marginBottom: '1rem', color: 'white', fontWeight: 700 }}><Icon name="Clock" size={16} inline /> Kandidat Terbaru</h3>
                             <div className="table-container">
                                 <table className="table">
                                     <thead>
@@ -430,7 +431,7 @@ export default function AdminRecruitment() {
                     <div className="card">
                         {positions.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray-400)' }}>
-                                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>💼</p>
+                                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Briefcase" size={16} inline /></p>
                                 <p>Belum ada lowongan</p>
                             </div>
                         ) : (
@@ -470,9 +471,9 @@ export default function AdminRecruitment() {
                                                 <td>
                                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                         <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                            onClick={() => openEditPosition(p)}>✏️</button>
+                                                            onClick={() => openEditPosition(p)}><Icon name="Pencil" size={16} inline /></button>
                                                         <button className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                            onClick={() => handleDeletePosition(p.id)}>🗑️</button>
+                                                            onClick={() => handleDeletePosition(p.id)}><Icon name="Trash2" size={16} inline /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -513,7 +514,7 @@ export default function AdminRecruitment() {
                     <div className="card">
                         {candidates.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray-400)' }}>
-                                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</p>
+                                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Users" size={16} inline /></p>
                                 <p>Belum ada kandidat</p>
                             </div>
                         ) : (
@@ -550,7 +551,7 @@ export default function AdminRecruitment() {
                                                             {c.resume_path.split(',').map((path, index) => (
                                                                 <a key={index} href={`${API}${path}`} target="_blank" rel="noopener noreferrer" 
                                                                     style={{ color: 'var(--primary-600)', fontSize: '0.8rem', textDecoration: 'none' }}>
-                                                                    📄 Lampiran {index + 1}
+                                                                    <Icon name="FileText" size={16} inline /> Lampiran {index + 1}
                                                                 </a>
                                                             ))}
                                                         </div>
@@ -589,7 +590,7 @@ export default function AdminRecruitment() {
                                                             </select>
                                                         )}
                                                         <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                                                            onClick={() => handleDeleteCandidate(c.id)}>🗑️</button>
+                                                            onClick={() => handleDeleteCandidate(c.id)}><Icon name="Trash2" size={16} inline /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -613,7 +614,7 @@ export default function AdminRecruitment() {
                     <div className="card">
                         {interviews.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray-400)' }}>
-                                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗓️</p>
+                                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Calendar" size={16} inline /></p>
                                 <p>Belum ada jadwal interview</p>
                             </div>
                         ) : (
@@ -641,7 +642,7 @@ export default function AdminRecruitment() {
                                                 <td>{i.interview_time ? i.interview_time.substring(0, 5) : '-'}</td>
                                                 <td>
                                                     <span className={`badge ${i.type === 'online' ? 'badge-primary' : 'badge-warning'}`}>
-                                                        {i.type === 'online' ? '🌐 Online' : '🏢 Onsite'}
+                                                        {i.type === 'online' ? 'Online' : 'Onsite'}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -658,21 +659,21 @@ export default function AdminRecruitment() {
                                                             i.status === 'cancelled' ? 'badge-danger' :
                                                                 i.status === 'no-show' ? 'badge-danger' : 'badge-warning'
                                                         }`}>
-                                                        {i.status === 'scheduled' ? '📅 Dijadwalkan' :
-                                                            i.status === 'completed' ? '✅ Selesai' :
-                                                                i.status === 'cancelled' ? '❌ Dibatalkan' : '⚠️ No Show'}
+                                                        {i.status === 'scheduled' ? 'Dijadwalkan' :
+                                                            i.status === 'completed' ? 'Selesai' :
+                                                                i.status === 'cancelled' ? 'Dibatalkan' : 'No Show'}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                         <button className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
                                                             onClick={() => handleSendInterviewEmail(i.id)} title="Kirim Email Undangan">
-                                                            ✉️ Kirim
+                                                            <Icon name="Mail" size={16} inline /> Kirim
                                                         </button>
                                                         <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                            onClick={() => openEditInterview(i)}>✏️</button>
+                                                            onClick={() => openEditInterview(i)}><Icon name="Pencil" size={16} inline /></button>
                                                         <button className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                            onClick={() => handleDeleteInterview(i.id)}>🗑️</button>
+                                                            onClick={() => handleDeleteInterview(i.id)}><Icon name="Trash2" size={16} inline /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -690,8 +691,8 @@ export default function AdminRecruitment() {
                 <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">{editPositionId ? '✏️ Edit Lowongan' : '➕ Tambah Lowongan'}</h2>
-                            <button className="modal-close" onClick={() => setShowPositionModal(false)}>✕</button>
+                            <h2 className="modal-title">{editPositionId ? 'Edit Lowongan' : 'Tambah Lowongan'}</h2>
+                            <button className="modal-close" onClick={() => setShowPositionModal(false)}><Icon name="X" size={16} inline /></button>
                         </div>
                         <form onSubmit={handlePositionSubmit}>
                             <div style={{ padding: '1.5rem' }}>
@@ -760,7 +761,7 @@ export default function AdminRecruitment() {
                                 </div>
                                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowPositionModal(false)}>Batal</button>
-                                    <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                    <button type="submit" className="btn btn-primary"><Icon name="Save" size={16} inline /> Simpan</button>
                                 </div>
                             </div>
                         </form>
@@ -773,8 +774,8 @@ export default function AdminRecruitment() {
                 <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">➕ Tambah Kandidat</h2>
-                            <button className="modal-close" onClick={() => setShowCandidateModal(false)}>✕</button>
+                            <h2 className="modal-title"><Icon name="Plus" size={16} inline /> Tambah Kandidat</h2>
+                            <button className="modal-close" onClick={() => setShowCandidateModal(false)}><Icon name="X" size={16} inline /></button>
                         </div>
                         <form onSubmit={handleCandidateSubmit}>
                             <div style={{ padding: '1.5rem' }}>
@@ -850,7 +851,7 @@ export default function AdminRecruitment() {
                                 </div>
                                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowCandidateModal(false)}>Batal</button>
-                                    <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                    <button type="submit" className="btn btn-primary"><Icon name="Save" size={16} inline /> Simpan</button>
                                 </div>
                             </div>
                         </form>
@@ -863,8 +864,8 @@ export default function AdminRecruitment() {
                 <div className="modal-overlay">
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">{editInterviewId ? '✏️ Edit Interview' : '➕ Jadwalkan Interview'}</h2>
-                            <button className="modal-close" onClick={() => setShowInterviewModal(false)}>✕</button>
+                            <h2 className="modal-title">{editInterviewId ? 'Edit Interview' : 'Jadwalkan Interview'}</h2>
+                            <button className="modal-close" onClick={() => setShowInterviewModal(false)}><Icon name="X" size={16} inline /></button>
                         </div>
                         <form onSubmit={handleInterviewSubmit}>
                             <div style={{ padding: '1.5rem' }}>
@@ -898,8 +899,8 @@ export default function AdminRecruitment() {
                                         <label className="form-label">Tipe</label>
                                         <select className="form-input form-select" value={interviewForm.type}
                                             onChange={e => setInterviewForm(f => ({ ...f, type: e.target.value }))}>
-                                            <option value="onsite">🏢 Onsite</option>
-                                            <option value="online">🌐 Online</option>
+                                            <option value="onsite">Onsite</option>
+                                            <option value="online">Online</option>
                                         </select>
                                     </div>
                                     {editInterviewId && (
@@ -935,7 +936,7 @@ export default function AdminRecruitment() {
                                 </div>
                                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                                     <button type="button" className="btn btn-outline" onClick={() => setShowInterviewModal(false)}>Batal</button>
-                                    <button type="submit" className="btn btn-primary">💾 Simpan</button>
+                                    <button type="submit" className="btn btn-primary"><Icon name="Save" size={16} inline /> Simpan</button>
                                 </div>
                             </div>
                         </form>

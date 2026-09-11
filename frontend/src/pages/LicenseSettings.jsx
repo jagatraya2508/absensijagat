@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { licenseAPI } from '../utils/api';
+import Icon from '../components/Icon';
 
 export default function LicenseSettings() {
     const [licenseInfo, setLicenseInfo] = useState(null);
@@ -60,27 +61,27 @@ export default function LicenseSettings() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🔑 Info & Pengaturan License</h1>
+                <h1 className="page-title"><Icon name="KeyRound" size={16} inline /> Info & Pengaturan License</h1>
                 <p className="page-subtitle">Kelola lisensi aplikasi dan batas pengguna</p>
             </div>
 
             {error && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                     {error}
                 </div>
             )}
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span>
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span>
                     {success}
                 </div>
             )}
 
             {licenseInfo?.wrong_machine && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                     License terpasang terikat ke mesin lain, jadi tidak berlaku di server ini. Aktifkan license yang dibuat untuk ID Mesin di bawah.
                 </div>
             )}
@@ -183,7 +184,7 @@ export default function LicenseSettings() {
                             </div>
                         ) : (
                             <div className="empty-state" style={{ padding: '2rem 1rem' }}>
-                                <div className="empty-state-icon" style={{ opacity: 0.5 }}>⚠️</div>
+                                <div className="empty-state-icon" style={{ opacity: 0.5 }}><Icon name="AlertTriangle" size={16} inline /></div>
                                 <h3 style={{ marginBottom: '0.5rem' }}>TRIAL MODE</h3>
                                 <p className="empty-state-text">Aplikasi berjalan pada mode trial dengan batasan 5 pengguna.</p>
                             </div>

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
 
 // Register face for a user (Admin only)
 router.post('/register/:userId', authenticateToken, isAdmin, async (req, res) => {
@@ -142,7 +142,7 @@ router.get('/users-status', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get all face descriptors for Kiosk matching (Admin)
-router.get('/all-descriptors', authenticateToken, isAdmin, async (req, res) => {
+router.get('/all-descriptors', authenticateToken, hasPermission('admin.kiosk'), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, employee_id, name, face_descriptor 

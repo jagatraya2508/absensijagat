@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { faceAPI } from '../utils/api';
 import useFaceApi from '../hooks/useFaceApi';
+import Icon from '../components/Icon';
 
 export default function AdminFaceRegistration() {
     const [users, setUsers] = useState([]);
@@ -55,8 +56,8 @@ export default function AdminFaceRegistration() {
     }
 
     function getSortIcon(key) {
-        if (sortConfig.key !== key) return '⇅';
-        return sortConfig.direction === 'asc' ? '▲' : '▼';
+        if (sortConfig.key !== key) return <Icon name="ArrowUpDown" size={12} />;
+        return sortConfig.direction === 'asc' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />;
     }
 
     // Filtered & sorted users
@@ -253,27 +254,27 @@ export default function AdminFaceRegistration() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🔐 Registrasi Wajah Karyawan</h1>
+                <h1 className="page-title"><Icon name="Lock" size={16} inline /> Registrasi Wajah Karyawan</h1>
                 <p className="page-subtitle">Daftarkan wajah karyawan untuk verifikasi absensi</p>
             </div>
 
             {modelsLoading && (
                 <div className="alert alert-info mb-3">
-                    <span className="alert-icon">⏳</span>
+                    <span className="alert-icon"><Icon name="Hourglass" size={16} inline /></span>
                     Memuat model face recognition... Mohon tunggu.
                 </div>
             )}
 
             {error && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                     {error}
                 </div>
             )}
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span>
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span>
                     {success}
                 </div>
             )}
@@ -282,8 +283,8 @@ export default function AdminFaceRegistration() {
             {showCamera && selectedUser && (
                 <div className="card mb-4" style={{ border: '2px solid var(--primary-500)' }}>
                     <div className="card-header">
-                        <h2 className="card-title">📸 Daftarkan Wajah: {selectedUser.name}</h2>
-                        <button className="btn btn-outline" onClick={handleCloseCamera}>✕</button>
+                        <h2 className="card-title"><Icon name="Camera" size={16} inline /> Daftarkan Wajah: {selectedUser.name}</h2>
+                        <button className="btn btn-outline" onClick={handleCloseCamera}><Icon name="X" size={16} inline /></button>
                     </div>
 
                     <div style={{ position: 'relative', width: '100%', maxWidth: 480, margin: '0 auto' }}>
@@ -302,7 +303,7 @@ export default function AdminFaceRegistration() {
                                 color: 'white',
                                 textAlign: 'center'
                             }}>
-                                <span style={{ fontSize: '3rem', marginBottom: '1rem' }}>📷</span>
+                                <span style={{ fontSize: '3rem', marginBottom: '1rem' }}><Icon name="Camera" size={16} inline /></span>
                                 <p style={{ marginBottom: '1rem' }}>Koneksi tidak aman (IP lokal). Gunakan tombol di bawah untuk membuka kamera perangkat.</p>
                                 <label className="btn btn-primary btn-lg">
                                     {processing ? 'Memproses...' : 'Buka Kamera Perangkat'}
@@ -360,7 +361,7 @@ export default function AdminFaceRegistration() {
                                         Memproses...
                                     </>
                                 ) : (
-                                    '📸 Ambil Foto & Daftarkan'
+                                    'Ambil Foto & Daftarkan'
                                 )}
                             </button>
                         </div>
@@ -375,12 +376,12 @@ export default function AdminFaceRegistration() {
             {/* Users List */}
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <h2 className="card-title">👥 Daftar Karyawan</h2>
+                    <h2 className="card-title"><Icon name="Users" size={16} inline /> Daftar Karyawan</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="🔍 Cari karyawan..."
+                            placeholder="Cari karyawan..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             style={{ maxWidth: 200 }}
@@ -392,8 +393,8 @@ export default function AdminFaceRegistration() {
                             style={{ maxWidth: 170 }}
                         >
                             <option value="all">Semua Status</option>
-                            <option value="registered">✅ Terdaftar</option>
-                            <option value="unregistered">❌ Belum Terdaftar</option>
+                            <option value="registered">Terdaftar</option>
+                            <option value="unregistered">Belum Terdaftar</option>
                         </select>
                         <span className="badge badge-primary">
                             {users.filter(u => u.has_face).length}/{users.length} Terdaftar
@@ -407,7 +408,7 @@ export default function AdminFaceRegistration() {
                     </div>
                 ) : filteredUsers.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">👥</div>
+                        <div className="empty-state-icon"><Icon name="Users" size={16} inline /></div>
                         <p className="empty-state-text">
                             {search || filterStatus !== 'all' ? 'Tidak ada karyawan yang cocok' : 'Belum ada karyawan terdaftar'}
                         </p>
@@ -436,9 +437,9 @@ export default function AdminFaceRegistration() {
                                         <td>{user.name}</td>
                                         <td>
                                             {user.has_face ? (
-                                                <span className="badge badge-success">✅ Terdaftar</span>
+                                                <span className="badge badge-success"><Icon name="CheckCircle2" size={16} inline /> Terdaftar</span>
                                             ) : (
-                                                <span className="badge badge-danger">❌ Belum</span>
+                                                <span className="badge badge-danger"><Icon name="XCircle" size={16} inline /> Belum</span>
                                             )}
                                         </td>
                                         <td>
@@ -449,7 +450,7 @@ export default function AdminFaceRegistration() {
                                                     onClick={() => handleOpenCamera(user)}
                                                     disabled={showCamera || modelsLoading}
                                                 >
-                                                    {modelsLoading ? '⌛' : '📸'} {user.has_face ? 'Perbarui' : 'Daftarkan'}
+                                                    {modelsLoading ? '⌛' : 'Camera'} {user.has_face ? 'Perbarui' : 'Daftarkan'}
                                                 </button>
                                                 {user.has_face && (
                                                     <button
@@ -457,7 +458,7 @@ export default function AdminFaceRegistration() {
                                                         style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
                                                         onClick={() => handleDeleteFace(user)}
                                                     >
-                                                        🗑️
+                                                        <Icon name="Trash2" size={16} inline />
                                                     </button>
                                                 )}
                                             </div>

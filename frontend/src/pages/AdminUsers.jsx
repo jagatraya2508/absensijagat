@@ -3,6 +3,7 @@ import { authAPI, licenseAPI, rolesAPI } from '../utils/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Icon from '../components/Icon';
 
 export default function AdminUsers() {
     const [users, setUsers] = useState([]);
@@ -160,7 +161,7 @@ export default function AdminUsers() {
     async function handleRoleChange(user, newRole) {
         if (newRole === user.role) return;
 
-        const roleLabels = { admin: 'Admin', manager: 'Pimpinan / Manager', employee: 'Karyawan' };
+        const roleLabels = { admin: 'Admin', manager: 'Pimpinan / Manager', employee: 'Karyawan', kiosk: 'Operator Kiosk' };
         const confirmed = confirm(
             `Ubah role ${user.name} dari "${roleLabels[user.role]}" menjadi "${roleLabels[newRole]}"?`
         );
@@ -195,14 +196,18 @@ export default function AdminUsers() {
     }
 
     function getSortIcon(key) {
-        if (sortConfig.key !== key) return '⇅';
-        return sortConfig.direction === 'asc' ? '▲' : '▼';
+        if (sortConfig.key !== key) return <Icon name="ArrowUpDown" size={12} />;
+        return sortConfig.direction === 'asc' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />;
     }
 
     function getRoleLabel(role) {
+        const fromList = roles.find((r) => r.name === role);
+        if (fromList?.label) return fromList.label;
         if (role === 'admin') return 'Admin';
         if (role === 'manager') return 'Pimpinan / Manager';
-        return 'Karyawan';
+        if (role === 'kiosk') return 'Operator Kiosk';
+        if (role === 'employee') return 'Karyawan';
+        return role || 'Karyawan';
     }
 
     // Filtered & sorted users
@@ -360,24 +365,8 @@ export default function AdminUsers() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">👥 Kelola User</h1>
-                <p className="page-subtitle">Atur akun karyawan dan admin</p>
-            </div>
-
-            {success && (
-                <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span>
-                    {success}
-                </div>
-            )}
-
-            {licenseInfo && (
-                <div className={`alert mb-3 ${users.length >= licenseInfo.max_users ? 'alert-danger' : users.length >= licenseInfo.max_users * 0.9 ? 'alert-warning' : 'alert-info'}`}>
-                    <span className="alert-icon">ℹ️</span>
-                    <div>
-                        <strong>Info Lisensi: </strong>
-                        Pengguna terdaftar: {users.length} / {licenseInfo.max_users} 
-                        {users.length >= licenseInfo.max_users ? ' (Batas Tercapai)' : ''}
+                <h1 className="page-title">Kelola User</h1> <p className="page-subtitle">Atur akun karyawan dan admin</p> </div> {success && ( <div className="alert alert-success mb-3"> <span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success} </div> )} {licenseInfo && ( <div className={`alert mb-3 ${users.length >= licenseInfo.max_users ?'alert-danger' : users.length >= licenseInfo.max_users * 0.9 ? 'alert-warning' : 'alert-info'}`}>
+                    <span className="alert-icon"><Icon name="Info" size={16} inline /></span> <div> <strong>Info Lisensi: </strong> Pengguna terdaftar: {users.length} / {licenseInfo.max_users} {users.length >= licenseInfo.max_users ?' (Batas Tercapai)' : ''}
                     </div>
                 </div>
             )}
@@ -389,46 +378,21 @@ export default function AdminUsers() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="🔍 Cari user..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            style={{ maxWidth: 220 }}
-                        />
-                        <button
-                            className="btn"
-                            onClick={handleExportPDF}
-                            title="Ekspor ke PDF"
-                            style={{
-                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                            placeholder="Cari user..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 220 }} /> <button className="btn" onClick={handleExportPDF} title="Ekspor ke PDF" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
                                 background: 'linear-gradient(135deg, #ef4444, #f87171)', color: '#fff',
                                 border: 'none', borderRadius: 'var(--radius-md)',
                                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                                 transition: 'all 0.2s', cursor: 'pointer'
                             }}
                         >
-                            📄 PDF
-                        </button>
-                        <button
-                            className="btn"
-                            onClick={handleExportExcel}
-                            title="Ekspor ke Excel"
-                            style={{
-                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                            PDF </button> <button className="btn" onClick={handleExportExcel} title="Ekspor ke Excel" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
                                 background: 'linear-gradient(135deg, #22c55e, #4ade80)', color: '#fff',
                                 border: 'none', borderRadius: 'var(--radius-md)',
                                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                                 transition: 'all 0.2s', cursor: 'pointer'
                             }}
                         >
-                            📊 Excel
-                        </button>
-                        <button
-                            className="btn"
-                            onClick={handleDownloadTemplate}
-                            disabled={downloadingTemplate}
-                            title="Unduh template Excel untuk import user"
-                            style={{
-                                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                            Excel </button> <button className="btn" onClick={handleDownloadTemplate} disabled={downloadingTemplate} title="Unduh template Excel untuk import user" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
                                 background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)', color: '#fff',
                                 border: 'none', borderRadius: 'var(--radius-md)',
                                 display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -436,7 +400,7 @@ export default function AdminUsers() {
                                 opacity: downloadingTemplate ? 0.7 : 1
                             }}
                         >
-                            {downloadingTemplate ? 'Mengunduh...' : '📥 Template'}
+                            {downloadingTemplate ? 'Mengunduh...' : <><Icon name="Download" size={16} inline /> Template</>}
                         </button>
                         <button
                             className="btn"
@@ -451,33 +415,12 @@ export default function AdminUsers() {
                                 transition: 'all 0.2s', cursor: 'pointer'
                             }}
                         >
-                            📤 Upload Excel
-                        </button>
-                        <button 
-                            className="btn btn-primary" 
-                            onClick={openAddModal}
-                            disabled={licenseInfo && users.length >= licenseInfo.max_users}
-                        >
-                            + Tambah User
-                        </button>
-                    </div>
-                </div>
-
-                {loading ? (
-                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            Upload Excel </button> <button className="btn btn-primary" onClick={openAddModal} disabled={licenseInfo && users.length >= licenseInfo.max_users} > + Tambah User </button> </div> </div> {loading ? ( <div style={{ textAlign:'center', padding: '2rem' }}>
                         <div className="loading-spinner" style={{ margin: '0 auto' }} />
                     </div>
                 ) : filteredUsers.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">👥</div>
-                        <p className="empty-state-text">Belum ada user terdaftar</p>
-                    </div>
-                ) : (
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                        <div className="empty-state-icon"><Icon name="Users" size={28} /></div> <p className="empty-state-text">Belum ada user terdaftar</p> </div> ) : ( <div className="table-container"> <table className="table"> <thead> <tr> <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Employee ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
                                     </th>
                                     <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
@@ -535,7 +478,6 @@ export default function AdminUsers() {
                                             >
                                                 {roles.map(r => (
                                                     <option key={r.id} value={r.name}>
-                                                        {r.name === 'admin' ? '🛡️ ' : r.name === 'manager' ? '👔 ' : '👤 '}
                                                         {r.label}
                                                     </option>
                                                 ))}
@@ -549,90 +491,22 @@ export default function AdminUsers() {
                                                     style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
                                                     onClick={() => openEditModal(user)}
                                                 >
-                                                    ✏️ Edit
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline"
-                                                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
+                                                    Edit </button> <button className="btn btn-outline" style={{ padding:'0.5rem 0.75rem', fontSize: '0.8rem' }}
                                                     onClick={() => handleResetPassword(user)}
                                                 >
-                                                    🔑 Reset Password
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline"
-                                                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', color: 'var(--danger-500)' }}
+                                                    Reset Password </button> <button className="btn btn-outline" style={{ padding:'0.5rem 0.75rem', fontSize: '0.8rem', color: 'var(--danger-500)' }}
                                                     onClick={() => handleDelete(user.id)}
                                                 >
-                                                    🗑️ Hapus
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="modal-title">
-                                {editingUser ? 'Edit User' : 'Tambah User Baru'}
+                                                    Hapus </button> </div> </td> </tr> ))} </tbody> </table> </div> )} </div> {/* Modal */} {showModal && ( <div className="modal-overlay"> <div className="modal" onClick={(e) => e.stopPropagation()}> <div className="modal-header"> <h3 className="modal-title"> {editingUser ?'Edit User' : 'Tambah User Baru'}
                             </h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>
 
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 {error && (
                                     <div className="alert alert-danger mb-3">
-                                        <span className="alert-icon">⚠️</span>
-                                        {error}
-                                    </div>
-                                )}
-
-                                <div className="form-group">
-                                    <label className="form-label">Employee ID *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Contoh: EMP001"
-                                        value={formData.employee_id}
-                                        onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Nama Lengkap *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Nama lengkap karyawan"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Email</label>
-                                    <input
-                                        type="email"
-                                        className="form-input"
-                                        placeholder="email@company.com"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        Password {editingUser ? '(kosongkan jika tidak ingin mengubah)' : '*'}
+                                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} </div> )} <div className="form-group"> <label className="form-label">Employee ID *</label> <input type="text" className="form-input" placeholder="Contoh: EMP001" value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })} required /> </div> <div className="form-group"> <label className="form-label">Nama Lengkap *</label> <input type="text" className="form-input" placeholder="Nama lengkap karyawan" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /> </div> <div className="form-group"> <label className="form-label">Email</label> <input type="email" className="form-input" placeholder="email@company.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /> </div> <div className="form-group"> <label className="form-label"> Password {editingUser ?'(kosongkan jika tidak ingin mengubah)' : '*'}
                                     </label>
                                     <input
                                         type="password"
@@ -678,35 +552,13 @@ export default function AdminUsers() {
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680 }}>
                         <div className="modal-header">
                             <h3 className="modal-title">Upload User dari Excel</h3>
-                            <button className="modal-close" onClick={() => setShowImportModal(false)}>×</button>
+                            <button className="modal-close" onClick={() => setShowImportModal(false)}><Icon name="X" size={16} /></button>
                         </div>
 
                         <div className="modal-body">
                             {error && (
                                 <div className="alert alert-danger mb-3">
-                                    <span className="alert-icon">⚠️</span>
-                                    {error}
-                                </div>
-                            )}
-
-                            <div className="alert alert-info mb-3">
-                                <span className="alert-icon">ℹ️</span>
-                                <div>
-                                    Unduh template resmi, isi data user, lalu unggah file .xlsx.
-                                    Kolom wajib: <strong>Employee ID</strong>, <strong>Nama</strong>, dan <strong>Password</strong> (minimal 6 karakter).
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">File Excel (.xlsx)</label>
-                                <input
-                                    type="file"
-                                    className="form-input"
-                                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                    onChange={(e) => {
-                                        setImportFile(e.target.files?.[0] || null);
-                                        setImportResult(null);
-                                        setError('');
+                                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} </div> )} <div className="alert alert-info mb-3"> <span className="alert-icon"><Icon name="Info" size={16} inline /></span> <div> Unduh template resmi, isi data user, lalu unggah file .xlsx. Kolom wajib: <strong>Employee ID</strong>, <strong>Nama</strong>, dan <strong>Password</strong> (minimal 6 karakter). </div> </div> <div className="form-group"> <label className="form-label">File Excel (.xlsx)</label> <input type="file" className="form-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); setError('');
                                     }}
                                 />
                                 {importFile && (
@@ -719,7 +571,7 @@ export default function AdminUsers() {
                             {importResult && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <div className={`alert mb-3 ${importResult.imported > 0 ? 'alert-success' : 'alert-warning'}`}>
-                                        <span className="alert-icon">{importResult.imported > 0 ? '✓' : '⚠️'}</span>
+                                        <span className="alert-icon">{importResult.imported > 0 ? <Icon name="Check" size={16} inline /> : <Icon name="AlertTriangle" size={16} inline />}</span>
                                         <div>
                                             Berhasil: <strong>{importResult.imported}</strong>
                                             {' · '}Gagal: <strong>{importResult.failed}</strong>
@@ -775,7 +627,7 @@ export default function AdminUsers() {
                                 onClick={handleDownloadTemplate}
                                 disabled={downloadingTemplate}
                             >
-                                {downloadingTemplate ? 'Mengunduh...' : '📥 Unduh Template'}
+                                {downloadingTemplate ? 'Mengunduh...' : <><Icon name="Download" size={16} inline /> Unduh Template</>}
                             </button>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 <button type="button" className="btn btn-outline" onClick={() => setShowImportModal(false)}>

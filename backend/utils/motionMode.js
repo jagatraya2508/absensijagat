@@ -58,7 +58,7 @@ function classifyMotion({ speedMs, trail, vehicleTypeName }) {
         return {
             mode: 'still',
             label: 'Diam / berhenti',
-            icon: '🛑',
+            icon: 'Ban',
             speed_kmh: Math.round(kmh * 10) / 10,
             guessed: false,
         };
@@ -67,7 +67,7 @@ function classifyMotion({ speedMs, trail, vehicleTypeName }) {
         return {
             mode: 'walk',
             label: 'Jalan kaki',
-            icon: '🚶',
+            icon: 'PersonStanding',
             speed_kmh: Math.round(kmh * 10) / 10,
             guessed: false,
         };
@@ -78,7 +78,7 @@ function classifyMotion({ speedMs, trail, vehicleTypeName }) {
         return {
             mode: 'motorcycle',
             label: 'Naik motor',
-            icon: '🏍️',
+            icon: 'Bike',
             speed_kmh: Math.round(kmh * 10) / 10,
             guessed: false,
             vehicle_type: vehicleTypeName,
@@ -88,7 +88,7 @@ function classifyMotion({ speedMs, trail, vehicleTypeName }) {
         return {
             mode: 'car',
             label: 'Naik mobil',
-            icon: '🚗',
+            icon: 'Car',
             speed_kmh: Math.round(kmh * 10) / 10,
             guessed: false,
             vehicle_type: vehicleTypeName,
@@ -99,7 +99,7 @@ function classifyMotion({ speedMs, trail, vehicleTypeName }) {
         return {
             mode: 'car',
             label: 'Naik mobil',
-            icon: '🚗',
+            icon: 'Car',
             speed_kmh: Math.round(kmh * 10) / 10,
             guessed: true,
         };
@@ -107,7 +107,7 @@ function classifyMotion({ speedMs, trail, vehicleTypeName }) {
     return {
         mode: 'motorcycle',
         label: 'Naik motor',
-        icon: '🏍️',
+            icon: 'Bike',
         speed_kmh: Math.round(kmh * 10) / 10,
         guessed: true,
     };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import Icon from './Icon';
 
 export default function LocationTracker({ onLocationUpdate, targetLocation }) {
     const [location, setLocation] = useState(null);
@@ -100,7 +101,7 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
     if (loading) {
         return (
             <div className="location-info">
-                <span className="location-info-icon">📍</span>
+                <span className="location-info-icon"><Icon name="LoaderCircle" size={20} /></span>
                 <div className="location-info-content">
                     <div className="location-info-label">Lokasi</div>
                     <div className="location-info-value">Mencari lokasi...</div>
@@ -109,17 +110,13 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
             </div>
         );
     }
-
     if (error) {
         return (
             <div className="alert alert-danger">
-                <span className="alert-icon">⚠️</span>
+                <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                 <div style={{ flex: 1 }}>
                     <p>{error}</p>
-                    <button
-                        className="btn btn-outline"
-                        onClick={getLocation}
-                        style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+                    <button className="btn btn-outline" onClick={getLocation} style={{ marginTop:'0.5rem', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
                     >
                         Coba Lagi
                     </button>
@@ -135,34 +132,26 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
     return (
         <div>
             <div className="location-info">
-                <span className="location-info-icon">📍</span>
+                <span className="location-info-icon"><Icon name="MapPin" size={20} /></span>
                 <div className="location-info-content">
                     <div className="location-info-label">Koordinat Anda</div>
-                    <div className="location-info-value">
-                        {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                    </div>
+                    <div className="location-info-value"> {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)} </div>
                 </div>
-                <button
-                    className="btn btn-outline"
-                    onClick={getLocation}
-                    style={{ padding: '0.5rem', fontSize: '1rem' }}
+                <button className="btn btn-outline" onClick={getLocation} style={{ padding:'0.5rem', fontSize: '1rem' }}
                     title="Refresh lokasi"
                 >
-                    🔄
+                    <Icon name="RefreshCw" size={16} />
                 </button>
             </div>
-
             {targetLocation && distance !== null && (
-                <div className="location-info" style={{ marginTop: '0.5rem' }}>
-                    <span className="location-info-icon">🏢</span>
+                <div className="location-info" style={{ marginTop:'0.5rem' }}>
+                    <span className="location-info-icon"><Icon name="Building2" size={20} /></span>
                     <div className="location-info-content">
                         <div className="location-info-label">{targetLocation.name}</div>
-                        <div className="location-info-value">
-                            Jarak: {distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(2)}km`}
-                        </div>
+                        <div className="location-info-value"> Jarak: {distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(2)}km`} </div>
                     </div>
                     <span className={`location-distance ${isWithinRadius ? 'valid' : 'invalid'}`}>
-                        {isWithinRadius ? '✓ Dalam Area' : '⚠ Diluar Area'}
+                        {isWithinRadius ? <><Icon name="Check" size={16} inline /> Dalam Area</> : <><Icon name="AlertTriangle" size={16} inline /> Diluar Area</>}
                     </span>
                 </div>
             )}

@@ -4,6 +4,7 @@ import Camera from '../components/Camera';
 import LocationTracker from '../components/LocationTracker';
 import { attendanceAPI, locationsAPI, faceAPI } from '../utils/api';
 import useFaceApi from '../hooks/useFaceApi';
+import Icon from '../components/Icon';
 
 export default function Attendance() {
     const [searchParams] = useSearchParams();
@@ -233,17 +234,17 @@ export default function Attendance() {
         return (
             <div className="attendance-container">
                 <div className="page-header">
-                    <h1 className="page-title">🔐 Registrasi Wajah Diperlukan</h1>
+                    <h1 className="page-title"><Icon name="Lock" size={16} inline /> Registrasi Wajah Diperlukan</h1>
                 </div>
                 <div className="card">
                     <div className="empty-state">
-                        <div className="empty-state-icon">📸</div>
+                        <div className="empty-state-icon"><Icon name="Camera" size={16} inline /></div>
                         <p className="empty-state-text">
                             Wajah Anda belum terdaftar di sistem. Anda perlu mendaftarkan wajah terlebih dahulu untuk dapat melakukan absensi.
                         </p>
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
                             <button className="btn btn-primary" onClick={() => setIsRegistering(true)}>
-                                📸 Daftarkan Wajah Sekarang
+                                <Icon name="Camera" size={16} inline /> Daftarkan Wajah Sekarang
                             </button>
                             <button className="btn btn-outline" onClick={() => navigate('/')}>
                                 Kembali ke Dashboard
@@ -311,31 +312,31 @@ export default function Attendance() {
         <div className="attendance-container">
             <div className="page-header">
                 <h1 className="page-title">
-                    {isRegistering ? '📝 Registrasi Wajah' : (isCheckIn ? '📥 Check-in' : '📤 Check-out')}
+                    {isRegistering ? 'Registrasi Wajah' : (isCheckIn ? 'Check-in' : 'Check-out')}
                 </h1>
                 <p className="page-subtitle">
                     {isRegistering ? 'Ambil foto selfie untuk pendaftaran sistem' : (isCheckIn ? 'Absen masuk kerja' : 'Absen pulang kerja')}
-                    {hasFaceRegistered && !isRegistering && <span style={{ marginLeft: '0.5rem', color: 'var(--success-500)' }}>🔐 Verifikasi Wajah Aktif</span>}
+                    {hasFaceRegistered && !isRegistering && <span style={{ marginLeft: '0.5rem', color: 'var(--success-500)' }}><Icon name="Lock" size={16} inline /> Verifikasi Wajah Aktif</span>}
                 </p>
             </div>
 
             {modelsLoading && (
                 <div className="alert alert-info mb-3">
-                    <span className="alert-icon">⏳</span>
+                    <span className="alert-icon"><Icon name="Hourglass" size={16} inline /></span>
                     Memuat model face recognition... Mohon tunggu sebentar.
                 </div>
             )}
 
             {error && (
                 <div className="alert alert-danger mb-3">
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                     {error}
                 </div>
             )}
 
             {success && (
                 <div className="alert alert-success mb-3">
-                    <span className="alert-icon">✓</span>
+                    <span className="alert-icon"><Icon name="Check" size={16} inline /></span>
                     {success}
                 </div>
             )}
@@ -378,7 +379,7 @@ export default function Attendance() {
                                         justifyContent: 'center',
                                         fontWeight: 600
                                     }}>
-                                        {faceVerifying ? '⏳' : (faceVerified ? '✓' : '2')}
+                                        {faceVerifying ? 'Hourglass' : (faceVerified ? 'Check' : '2')}
                                     </div>
                                     <span style={{ color: step >= 2 ? 'white' : 'var(--gray-500)' }}>Verifikasi</span>
                                 </div>
@@ -412,7 +413,7 @@ export default function Attendance() {
             {isRegistering && (
                 <div className="card mb-4">
                     <div className="card-header">
-                        <h2 className="card-title">📝 Pendaftaran Wajah</h2>
+                        <h2 className="card-title"><Icon name="FileText" size={16} inline /> Pendaftaran Wajah</h2>
                     </div>
                     {!photo ? (
                         <>
@@ -433,10 +434,10 @@ export default function Attendance() {
                             <img src={photo} alt="Result" style={{ width: '100%', borderRadius: 'var(--radius-lg)' }} />
                             <div className="mt-3">
                                 <button className="btn btn-primary btn-block mb-2" onClick={handleRegisterFace} disabled={loading}>
-                                    {loading ? 'Menyimpan...' : '💾 Simpan Wajah Ini'}
+                                    {loading ? 'Menyimpan...' : 'Simpan Wajah Ini'}
                                 </button>
                                 <button className="btn btn-outline btn-block" onClick={handlePhotoReset} disabled={loading}>
-                                    🔄 Ambil Ulang
+                                    <Icon name="RefreshCw" size={16} inline /> Ambil Ulang
                                 </button>
                             </div>
                         </div>
@@ -447,12 +448,12 @@ export default function Attendance() {
             {!isRegistering && step === 1 && (
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">📸 Ambil Foto Selfie</h2>
+                        <h2 className="card-title"><Icon name="Camera" size={16} inline /> Ambil Foto Selfie</h2>
                     </div>
                     <Camera onCapture={handlePhotoCapture} onReset={handlePhotoReset} />
                     <p className="text-muted text-center mt-2" style={{ fontSize: '0.85rem' }}>
                         {hasFaceRegistered
-                            ? '🔐 Foto akan diverifikasi dengan wajah terdaftar'
+                            ? 'Foto akan diverifikasi dengan wajah terdaftar'
                             : 'Posisikan wajah Anda di dalam kotak'}
                     </p>
                 </div>
@@ -471,9 +472,9 @@ export default function Attendance() {
                 <div className="grid grid-2">
                     <div className="card">
                         <div className="card-header">
-                            <h2 className="card-title">📸 Foto Selfie</h2>
+                            <h2 className="card-title"><Icon name="Camera" size={16} inline /> Foto Selfie</h2>
                             {faceVerified && (
-                                <span className="badge badge-success">✅ Terverifikasi {faceSimilarity}%</span>
+                                <span className="badge badge-success"><Icon name="CheckCircle2" size={16} inline /> Terverifikasi {faceSimilarity}%</span>
                             )}
                         </div>
                         {photo && (
@@ -483,14 +484,14 @@ export default function Attendance() {
                             className="btn btn-outline btn-block mt-2"
                             onClick={handlePhotoReset}
                         >
-                            🔄 Ambil Ulang
+                            <Icon name="RefreshCw" size={16} inline /> Ambil Ulang
                         </button>
                     </div>
 
                     <div>
                         <div className="card mb-3">
                             <div className="card-header">
-                                <h2 className="card-title">📍 Lokasi</h2>
+                                <h2 className="card-title"><Icon name="MapPin" size={16} inline /> Lokasi</h2>
                             </div>
                             <LocationTracker
                                 onLocationUpdate={handleLocationUpdate}
@@ -518,7 +519,7 @@ export default function Attendance() {
                                 className="btn btn-warning btn-block btn-lg"
                                 onClick={handlePhotoReset}
                             >
-                                🔄 Di Luar Area - Absen Ulang
+                                <Icon name="RefreshCw" size={16} inline /> Di Luar Area - Absen Ulang
                             </button>
                         ) : (
                             <button
@@ -533,7 +534,7 @@ export default function Attendance() {
                                     </>
                                 ) : (
                                     <>
-                                        {isCheckIn ? '📥 Konfirmasi Check-in' : '📤 Konfirmasi Check-out'}
+                                        {isCheckIn ? 'Konfirmasi Check-in' : 'Konfirmasi Check-out'}
                                     </>
                                 )}
                             </button>

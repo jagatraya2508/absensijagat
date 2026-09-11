@@ -1,3 +1,4 @@
+import Icon from './Icon';
 import { useState, useEffect } from 'react';
 import { scheduleAPI } from '../utils/api';
 
@@ -134,7 +135,7 @@ export default function OffDayManager({ onClose, isPage = false }) {
         return (
             <div className="card" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
                 <div className="card-header">
-                    <h2 className="card-title">📅 Atur Tanggal Libur</h2>
+                    <h2 className="card-title"><Icon name="Calendar" size={16} inline /> Atur Tanggal Libur</h2>
                 </div>
                 <div style={{ flex: 1, overflow: 'hidden', padding: '0 1.5rem 1.5rem' }}>
                     {content}

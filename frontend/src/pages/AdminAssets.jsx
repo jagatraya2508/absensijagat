@@ -1,3 +1,4 @@
+import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { QRCodeSVG } from 'qrcode.react';
@@ -303,13 +304,13 @@ export default function AdminAssets() {
                     onClick={() => setActiveTab('assets')}
                     style={{ background: 'none', border: 'none', fontWeight: 600, fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', borderBottom: activeTab === 'assets' ? '3px solid var(--primary-500)' : '3px solid transparent', color: activeTab === 'assets' ? 'var(--primary-600)' : 'var(--gray-500)' }}
                 >
-                    📦 Daftar Aset
+                    <Icon name="Package" size={16} inline /> Daftar Aset
                 </button>
                 <button 
                     onClick={() => setActiveTab('categories')}
                     style={{ background: 'none', border: 'none', fontWeight: 600, fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', borderBottom: activeTab === 'categories' ? '3px solid var(--primary-500)' : '3px solid transparent', color: activeTab === 'categories' ? 'var(--primary-600)' : 'var(--gray-500)' }}
                 >
-                    🏷️ Kategori
+                    <Icon name="Tag" size={16} inline /> Kategori
                 </button>
             </div>
 
@@ -332,7 +333,7 @@ export default function AdminAssets() {
                                         {a.photo_path ? (
                                             <img src={`${API_URL}${a.photo_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="aset" />
                                         ) : (
-                                            <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', opacity:0.5 }}>📦</div>
+                                            <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', opacity:0.5 }}><Icon name="Package" size={16} inline /></div>
                                         )}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -361,24 +362,24 @@ export default function AdminAssets() {
                                         <svg style={{ width: '16px', height: '16px', margin: 'auto' }} fill="currentColor" viewBox="0 0 16 16"><path d="M2 2h4v4H2V2Z"/><path d="M2 10h4v4H2v-4Z"/><path d="M10 2h4v4h-4V2Z"/><path d="M10 10h2v2h-2v-2Z"/><path d="M12 12h2v2h-2v-2Z"/><path d="M10 14h2v2h-2v-2Z"/></svg>
                                     </button>
                                     <button className="btn btn-outline" style={{ padding: '0.5rem 0' }} onClick={() => handleHistory(a.id)} title="Riwayat">
-                                        🕒
+                                        <Icon name="Clock" size={16} inline />
                                     </button>
                                     <button className="btn btn-outline" style={{ padding: '0.5rem 0' }} onClick={() => openEditAsset(a)} title="Edit">
-                                        ✏️
+                                        <Icon name="Pencil" size={16} inline />
                                     </button>
                                     {a.status === 'available' ? (
                                         <button className="btn btn-warning" style={{ padding: '0.5rem 0' }} onClick={() => openAssign(a)} title="Pinjamkan">
-                                            ↗️
+                                            <Icon name="ArrowUpRight" size={16} />
                                         </button>
                                     ) : a.status === 'assigned' ? (
                                         <button className="btn btn-success" style={{ padding: '0.5rem 0' }} onClick={() => openReturn(a)} title="Kembalikan">
-                                            ↙️
+                                            <Icon name="ArrowDownLeft" size={16} />
                                         </button>
                                     ) : (
                                          <div style={{ padding: '0.5rem 0', textAlign: 'center', opacity: 0.5 }}>-</div>
                                     )}
                                     <button className="btn btn-outline" style={{ padding: '0.5rem 0', color: '#ef4444', borderColor: '#fca5a5' }} onClick={() => handleDeleteAsset(a.id)} title="Hapus">
-                                        🗑️
+                                        <Icon name="Trash2" size={16} inline />
                                     </button>
                                 </div>
                             </div>
@@ -412,8 +413,8 @@ export default function AdminAssets() {
                                         <td style={{ padding: '1rem' }}>{c.description || '-'}</td>
                                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                <button className="btn btn-outline" style={{ padding: '0.35rem 0.6rem' }} onClick={() => openEditCategory(c)} title="Edit">✏️</button>
-                                                <button className="btn btn-outline" style={{ padding: '0.35rem 0.6rem' }} onClick={() => handleDeleteCategory(c.id)} title="Hapus">🗑️</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.35rem 0.6rem' }} onClick={() => openEditCategory(c)} title="Edit"><Icon name="Pencil" size={16} inline /></button>
+                                                <button className="btn btn-outline" style={{ padding: '0.35rem 0.6rem' }} onClick={() => handleDeleteCategory(c.id)} title="Hapus"><Icon name="Trash2" size={16} inline /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -609,7 +610,7 @@ export default function AdminAssets() {
                                 </div>
                                 <p style={{ marginTop: '1rem', fontSize: '1.1rem', fontFamily: 'monospace', fontWeight: 700, color: '#000', letterSpacing: '1px' }}>{selectedQR}</p>
                             </div>
-                            <button className="btn btn-primary" onClick={printQR} style={{ marginTop: '1.5rem', width: '100%' }}>🖨️ Cetak Label</button>
+                            <button className="btn btn-primary" onClick={printQR} style={{ marginTop: '1.5rem', width: '100%' }}><Icon name="Printer" size={16} inline /> Cetak Label</button>
                             <style>{`
                                 @media print {
                                     body * { visibility: hidden; }
@@ -646,7 +647,7 @@ export default function AdminAssets() {
                                             <div style={{ fontSize: '0.85rem', color: 'var(--gray-600)', display: 'grid', gap: '0.25rem' }}>
                                                 <div><strong>Tgl Pinjam:</strong> {new Date(h.assigned_date).toLocaleDateString('id-ID')}</div>
                                                 {h.returned_date && <div><strong>Tgl Kembali:</strong> {new Date(h.returned_date).toLocaleDateString('id-ID')}</div>}
-                                                {h.notes && <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--gray-50)', borderRadius: '4px' }}>📝 {h.notes}</div>}
+                                                {h.notes && <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--gray-50)', borderRadius: '4px' }}><Icon name="FileText" size={16} inline /> {h.notes}</div>}
                                             </div>
                                         </div>
                                     ))}

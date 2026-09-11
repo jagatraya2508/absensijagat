@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import CompanyCalendar from '../components/CompanyCalendar';
+import Icon from '../components/Icon';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -34,11 +35,7 @@ export default function EmployeeSchedule() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🗓️ Jadwal Kerja & Kalender</h1>
-                <p className="page-subtitle">Lihat jadwal shift, hari libur, dan cuti Anda bulan ini</p>
-            </div>
-
-            <div className="card" style={{ marginBottom: '1rem' }}>
+                <h1 className="page-title">Jadwal Kerja & Kalender</h1> <p className="page-subtitle">Lihat jadwal shift, hari libur, dan cuti Anda bulan ini</p> </div> <div className="card" style={{ marginBottom:'1rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                         <label className="form-label">Bulan</label>
@@ -62,18 +59,4 @@ export default function EmployeeSchedule() {
                             <option value="">Seluruh Perusahaan</option>
                         </select>
                     </div>
-                    <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchCalendarEvents}>🔍 Filter</button>
-                </div>
-            </div>
-
-            <CompanyCalendar 
-                events={calendarEvents} 
-                date={new Date(calendarFilter.year, calendarFilter.month - 1, 1)}
-                onSelectEvent={(event) => alert(`${event.title}\n${event.start.toLocaleString()} - ${event.end.toLocaleString()}`)}
-                onNavigate={(date) => {
-                    setCalendarFilter(f => ({ ...f, month: date.getMonth() + 1, year: date.getFullYear() }));
-                }}
-            />
-        </div>
-    );
-}
+                    <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchCalendarEvents}>Filter</button> </div> </div> <CompanyCalendar events={calendarEvents} date={new Date(calendarFilter.year, calendarFilter.month - 1, 1)} onSelectEvent={(event) => alert(`${event.title}\n${event.start.toLocaleString()} - ${event.end.toLocaleString()}`)} onNavigate={(date) => { setCalendarFilter(f => ({ ...f, month: date.getMonth() + 1, year: date.getFullYear() })); }} /> </div> ); }

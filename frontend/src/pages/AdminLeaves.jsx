@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { leavesAPI } from '../utils/api';
 import ApprovalTimeline from '../components/ApprovalTimeline';
+import Icon from '../components/Icon';
 
 export default function AdminLeaves() {
     const [requests, setRequests] = useState([]);
@@ -11,17 +12,17 @@ export default function AdminLeaves() {
     const [selectedRequest, setSelectedRequest] = useState(null);
 
     const leaveTypes = {
-        late: { label: 'Izin Terlambat', icon: '⏰', color: 'warning' },
-        sick: { label: 'Izin Sakit', icon: '🏥', color: 'danger' },
-        permission: { label: 'Izin Tidak Masuk', icon: '📝', color: 'secondary' },
-        leave: { label: 'Cuti', icon: '🏖️', color: 'primary' },
-        change_off: { label: 'Tukar Libur', icon: '🔄', color: 'info' }
+        late: { label: 'Izin Terlambat', icon: 'Clock', color: 'warning' },
+        sick: { label: 'Izin Sakit', icon: 'HeartPulse', color: 'danger' },
+        permission: { label: 'Izin Tidak Masuk', icon: 'FileText', color: 'secondary' },
+        leave: { label: 'Cuti', icon: 'Palmtree', color: 'primary' },
+        change_off: { label: 'Tukar Libur', icon: 'RefreshCw', color: 'info' }
     };
 
     const statusLabels = {
-        pending: { label: 'Menunggu', color: 'warning', icon: '⏳' },
-        approved: { label: 'Disetujui', color: 'success', icon: '✅' },
-        rejected: { label: 'Ditolak', color: 'danger', icon: '❌' }
+        pending: { label: 'Menunggu', color: 'warning', icon: 'Hourglass' },
+        approved: { label: 'Disetujui', color: 'success', icon: 'CheckCircle2' },
+        rejected: { label: 'Ditolak', color: 'danger', icon: 'XCircle' }
     };
 
     useEffect(() => {
@@ -77,7 +78,7 @@ export default function AdminLeaves() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📋 Kelola Izin & Cuti</h1>
+                <h1 className="page-title"><Icon name="ClipboardList" size={16} inline /> Kelola Izin & Cuti</h1>
                 <p className="page-subtitle">Setujui atau tolak pengajuan karyawan</p>
             </div>
 
@@ -91,9 +92,9 @@ export default function AdminLeaves() {
                             onClick={() => setFilter(status)}
                             style={{ padding: '0.5rem 1rem' }}
                         >
-                            {status === '' ? '📋 Semua' :
-                                status === 'pending' ? '⏳ Menunggu' :
-                                    status === 'approved' ? '✅ Disetujui' : '❌ Ditolak'}
+                            {status === '' ? 'Semua' :
+                                status === 'pending' ? 'Menunggu' :
+                                    status === 'approved' ? 'Disetujui' : 'Ditolak'}
                         </button>
                     ))}
                 </div>
@@ -103,9 +104,9 @@ export default function AdminLeaves() {
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">
-                        {filter === 'pending' ? '⏳ Pengajuan Menunggu Persetujuan' :
-                            filter === 'approved' ? '✅ Pengajuan Disetujui' :
-                                filter === 'rejected' ? '❌ Pengajuan Ditolak' : '📋 Semua Pengajuan'}
+                        {filter === 'pending' ? 'Pengajuan Menunggu Persetujuan' :
+                            filter === 'approved' ? 'Pengajuan Disetujui' :
+                                filter === 'rejected' ? 'Pengajuan Ditolak' : 'Semua Pengajuan'}
                     </h2>
                     <span className="badge badge-primary">{requests.length}</span>
                 </div>
@@ -116,7 +117,7 @@ export default function AdminLeaves() {
                     </div>
                 ) : requests.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📝</div>
+                        <div className="empty-state-icon"><Icon name="FileText" size={16} inline /></div>
                         <p className="empty-state-text">Tidak ada pengajuan</p>
                     </div>
                 ) : (
@@ -135,7 +136,7 @@ export default function AdminLeaves() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                            <span style={{ fontSize: '1.25rem' }}>{leaveTypes[req.type].icon}</span>
+                                            <span style={{ fontSize: '1.25rem' }}><Icon name={leaveTypes[req.type].icon} size={18} inline /></span>
                                             <strong style={{ color: 'white' }}>{req.employee_name}</strong>
                                             <span style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>({req.employee_id})</span>
                                         </div>
@@ -148,7 +149,7 @@ export default function AdminLeaves() {
                                         </p>
                                     </div>
                                     <span className={`badge badge-${statusLabels[req.status].color}`}>
-                                        {statusLabels[req.status].icon} {statusLabels[req.status].label}
+                                        <Icon name={statusLabels[req.status].icon} size={14} inline /> {statusLabels[req.status].label}
                                         {req.status === 'pending' && req.total_steps > 1 ? ` (${req.current_step || 1}/${req.total_steps})` : ''}
                                     </span>
                                 </div>
@@ -175,7 +176,7 @@ export default function AdminLeaves() {
                                             className="btn btn-outline"
                                             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                                         >
-                                            📎 Lihat Lampiran
+                                            <Icon name="Paperclip" size={16} inline /> Lihat Lampiran
                                         </a>
                                     </div>
                                 )}
@@ -218,7 +219,7 @@ export default function AdminLeaves() {
                                                         disabled={processing === req.id}
                                                         style={{ padding: '0.5rem 1rem' }}
                                                     >
-                                                        {processing === req.id ? '⏳' : '✅'} Setujui Tingkat Ini
+                                                        {processing === req.id ? 'Hourglass' : 'CheckCircle2'} Setujui Tingkat Ini
                                                     </button>
                                                     {req.total_steps > 1 && (req.current_step || 1) < req.total_steps && (
                                                         <button
@@ -227,7 +228,7 @@ export default function AdminLeaves() {
                                                             disabled={processing === req.id}
                                                             style={{ padding: '0.5rem 1rem' }}
                                                         >
-                                                            ✅ Setujui Final
+                                                            <Icon name="CheckCircle2" size={16} inline /> Setujui Final
                                                         </button>
                                                     )}
                                                     <button
@@ -236,7 +237,7 @@ export default function AdminLeaves() {
                                                         disabled={processing === req.id}
                                                         style={{ padding: '0.5rem 1rem' }}
                                                     >
-                                                        {processing === req.id ? '⏳' : '❌'} Tolak
+                                                        {processing === req.id ? 'Hourglass' : 'XCircle'} Tolak
                                                     </button>
                                                     <button
                                                         className="btn btn-outline"
@@ -253,7 +254,7 @@ export default function AdminLeaves() {
                                                 onClick={() => setSelectedRequest(req.id)}
                                                 style={{ padding: '0.5rem 1rem' }}
                                             >
-                                                ⚡ Proses Pengajuan
+                                                <Icon name="Zap" size={16} inline /> Proses Pengajuan
                                             </button>
                                         )}
                                     </div>
