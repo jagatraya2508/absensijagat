@@ -29,6 +29,8 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+      # ID mesin host (Linux). Diabaikan jika file tidak ada di Windows Docker.
+      # - /etc/machine-id:/host/etc/machine-id:ro
     env_file:
       - .env
     environment:

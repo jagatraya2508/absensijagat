@@ -91,6 +91,24 @@ export default function AdminRoles() {
         });
     }
 
+    function setCheckboxIndeterminate(el, partial) {
+        if (el) el.indeterminate = partial;
+    }
+
+    function toggleCategoryPermissions(keys) {
+        setFormData((prev) => {
+            const allOn = keys.length > 0 && keys.every((k) => prev.permissions.includes(k));
+            if (allOn) {
+                return { ...prev, permissions: prev.permissions.filter((k) => !keys.includes(k)) };
+            }
+            return { ...prev, permissions: [...new Set([...prev.permissions, ...keys])] };
+        });
+    }
+
+    function toggleAllPermissions() {
+        toggleCategoryPermissions(permissions.map((p) => p.key));
+    }
+
     async function handleSubmit(e) {
         e.preventDefault();
         setSaving(true);
@@ -447,9 +465,34 @@ export default function AdminRoles() {
                                 </div>
                             ) : (
                                 <>
-                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                                        Hak Akses Menu
-                                    </h3>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '1rem',
+                                        flexWrap: 'wrap',
+                                        marginBottom: '1rem',
+                                        borderBottom: '1px solid var(--border-color)',
+                                        paddingBottom: '0.5rem'
+                                    }}>
+                                        <h3 style={{ fontSize: '1.1rem', margin: 0 }}>
+                                            Hak Akses Menu
+                                        </h3>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={permissions.length > 0 && permissions.every((p) => formData.permissions.includes(p.key))}
+                                                ref={(el) => {
+                                                    const keys = permissions.map((p) => p.key);
+                                                    const selected = keys.filter((k) => formData.permissions.includes(k)).length;
+                                                    setCheckboxIndeterminate(el, selected > 0 && selected < keys.length);
+                                                }}
+                                                onChange={toggleAllPermissions}
+                                                style={{ width: '1.15rem', height: '1.15rem', accentColor: 'var(--primary-500)' }}
+                                            />
+                                            Pilih semua menu
+                                        </label>
+                                    </div>
                                     
                                     <div style={{ 
                                         display: 'grid', 
@@ -459,15 +502,32 @@ export default function AdminRoles() {
                                         overflowY: 'auto',
                                         padding: '0.5rem'
                                     }}>
-                                        {Object.entries(groupedPermissions).map(([category, perms]) => (
+                                        {Object.entries(groupedPermissions).map(([category, perms]) => {
+                                            const keys = perms.map((p) => p.key);
+                                            const selectedCount = keys.filter((k) => formData.permissions.includes(k)).length;
+                                            const allOn = keys.length > 0 && selectedCount === keys.length;
+                                            const partial = selectedCount > 0 && selectedCount < keys.length;
+                                            return (
                                             <div key={category} style={{ 
                                                 background: 'var(--surface-200)', 
                                                 padding: '1rem', 
                                                 borderRadius: 'var(--radius-md)' 
                                             }}>
-                                                <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.95rem', color: 'var(--primary-500)' }}>
-                                                    {category}
-                                                </h4>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.8rem' }}>
+                                                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--primary-500)' }}>
+                                                        {category}
+                                                    </h4>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--gray-600)', whiteSpace: 'nowrap' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={allOn}
+                                                            ref={(el) => setCheckboxIndeterminate(el, partial)}
+                                                            onChange={() => toggleCategoryPermissions(keys)}
+                                                            style={{ width: '1rem', height: '1rem', accentColor: 'var(--primary-500)' }}
+                                                        />
+                                                        Semua
+                                                    </label>
+                                                </div>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                                     {perms.map(perm => (
                                                         <label key={perm.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
@@ -482,7 +542,8 @@ export default function AdminRoles() {
                                                     ))}
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </>
                             )}

@@ -93,6 +93,7 @@ export default function LicenseSettings() {
                 <div className="card-body">
                     <p style={{ marginBottom: '0.75rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>
                         Kirim ID ini ke developer saat minta license. Key hanya berlaku di mesin ini dan tidak bisa disalin ke server lain.
+                        Di Docker, ID disimpan di server (bukan ID container) supaya tetap sama setelah recreate.
                     </p>
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <code style={{
