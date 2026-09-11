@@ -528,16 +528,6 @@ export const backupAPI = {
         body: formData,
         skipRetry: true,
     }),
-    pullFromRemote: (data) => request('/backup/pull-from-remote', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        skipRetry: true,
-    }),
-    pushToRemote: (data) => request('/backup/push-to-remote', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        skipRetry: true,
-    }),
 };
 
 // Schedule API
