@@ -311,6 +311,22 @@ CREATE TABLE IF NOT EXISTS payroll_items (
 CREATE INDEX IF NOT EXISTS idx_payroll_item_run ON payroll_items(payroll_run_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_item_user ON payroll_items(user_id);
 
+-- Insentif tuang produksi (input harian oleh manager)
+CREATE TABLE IF NOT EXISTS production_tuang (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tuang_date DATE NOT NULL,
+    amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    notes TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, tuang_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_production_tuang_date ON production_tuang(tuang_date);
+CREATE INDEX IF NOT EXISTS idx_production_tuang_user ON production_tuang(user_id);
+
 -- Tabel BPJS Settings (Pengaturan Tarif BPJS)
 CREATE TABLE IF NOT EXISTS bpjs_settings (
     id SERIAL PRIMARY KEY,

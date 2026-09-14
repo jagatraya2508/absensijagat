@@ -16,25 +16,27 @@ const AVAILABLE_PERMISSIONS = [
     { key: 'admin.divisions', label: 'Master Divisi', category: 'Master' },
     { key: 'admin.vehicle_types', label: 'Master Kendaraan', category: 'Master' },
     { key: 'admin.employees', label: 'Data Karyawan', category: 'Master' },
+    { key: 'admin.organization', label: 'Struktur Organisasi', category: 'Master' },
     { key: 'admin.face_registration', label: 'Registrasi Wajah', category: 'Master' },
     { key: 'admin.work_schedule', label: 'Jadwal Kerja', category: 'Master' },
     { key: 'admin.customers', label: 'Master Customer', category: 'Master' },
-    { key: 'admin.organization', label: 'Struktur Organisasi', category: 'Master' },
 
-    { key: 'admin.off_days', label: 'Atur Libur', category: 'Admin' },
-    { key: 'admin.announcements', label: 'Kelola Pengumuman', category: 'Admin' },
-    { key: 'admin.driver_activities', label: 'Aktivitas Driver', category: 'Admin' },
-    { key: 'admin.driver_tracking', label: 'Tracking Kunjungan', category: 'Admin' },
-    { key: 'admin.leaves', label: 'Kelola Izin', category: 'Admin' },
-    { key: 'admin.manual_attendance', label: 'Persetujuan Absen', category: 'Admin' },
-    { key: 'admin.daily_work_report', label: 'Review Laporan Harian', category: 'Admin' },
+    { key: 'admin.leaves', label: 'Kelola Izin', category: 'Pimpinan' },
+    { key: 'admin.manual_attendance', label: 'Persetujuan Absen', category: 'Pimpinan' },
+    { key: 'admin.off_days', label: 'Atur Libur', category: 'Pimpinan' },
+    { key: 'admin.announcements', label: 'Kelola Pengumuman', category: 'Pimpinan' },
+    { key: 'admin.driver_activities', label: 'Aktivitas Driver', category: 'Pimpinan' },
+    { key: 'admin.driver_tracking', label: 'Tracking Kunjungan', category: 'Pimpinan' },
+    { key: 'admin.daily_work_report', label: 'Review Laporan Harian', category: 'Pimpinan' },
+    { key: 'admin.reports', label: 'Laporan Absensi', category: 'Pimpinan' },
 
     { key: 'admin.loans', label: 'Pinjaman', category: 'HR & Keuangan' },
     { key: 'admin.payroll', label: 'Payroll', category: 'HR & Keuangan' },
     { key: 'admin.assessments', label: 'Penilaian', category: 'HR & Keuangan' },
     { key: 'admin.recruitment', label: 'Recruitment', category: 'HR & Keuangan' },
+
     { key: 'admin.assets', label: 'Manajemen Aset', category: 'Operasional' },
-    { key: 'admin.reports', label: 'Laporan', category: 'Sistem' },
+
     { key: 'admin.users', label: 'Kelola User', category: 'Sistem' },
     { key: 'admin.roles', label: 'Kelola Role', category: 'Sistem' },
     { key: 'admin.settings', label: 'Pengaturan', category: 'Sistem' },
@@ -42,7 +44,8 @@ const AVAILABLE_PERMISSIONS = [
     { key: 'admin.kiosk', label: 'Mode Kiosk', category: 'Sistem' },
 
     { key: 'manager.leave_approvals', label: 'Persetujuan Izin (Atasan)', category: 'Managerial' },
-    { key: 'manager.approvals', label: 'Persetujuan Lembur (Manager)', category: 'Managerial' }
+    { key: 'manager.approvals', label: 'Persetujuan Lembur (Manager)', category: 'Managerial' },
+    { key: 'manager.tuang', label: 'Insentif Tuang Produksi', category: 'Managerial' }
 ];
 
 const PERMISSION_KEY_SET = new Set(AVAILABLE_PERMISSIONS.map((p) => p.key));

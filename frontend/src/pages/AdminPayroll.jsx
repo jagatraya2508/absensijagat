@@ -247,6 +247,7 @@ export default function AdminPayroll() {
                                             <th style={{ textAlign: 'right' }}>Tunjangan</th>
                                             <th style={{ textAlign: 'center' }}>Jam Lembur</th>
                                             <th style={{ textAlign: 'right' }}>Nilai Lembur</th>
+                                            <th style={{ textAlign: 'right' }}>Tuang</th>
                                             <th style={{ textAlign: 'right' }}>Gross</th>
                                             <th style={{ textAlign: 'right' }}>BPJS</th>
                                             <th style={{ textAlign: 'right' }}>PPh 21</th>
@@ -271,6 +272,7 @@ export default function AdminPayroll() {
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(tunjangan)}</td>
                                                     <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{parseFloat(item.overtime_hours)} jam</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.overtime_amount)}</td>
+                                                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.tuang_amount || 0)}</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.gross_income)}</td>
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(bpjsTotal)}</td>
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(item.pph21_amount)}</td>
@@ -290,6 +292,7 @@ export default function AdminPayroll() {
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance), 0))}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>{selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_hours), 0)} jam</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_amount), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.tuang_amount || 0), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.gross_income), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.bpjs_kes_employee) + parseFloat(i.bpjs_jht_employee) + parseFloat(i.bpjs_jp_employee), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.pph21_amount), 0))}</td>
@@ -350,6 +353,7 @@ export default function AdminPayroll() {
                                     ['Tunjangan Transport', selectedSlip.transport_allowance],
                                     ['Tunjangan Makan', selectedSlip.meal_allowance],
                                     ['Lembur (' + selectedSlip.overtime_hours + ' jam)', selectedSlip.overtime_amount],
+                                    ...(parseFloat(selectedSlip.tuang_amount) > 0 ? [['Insentif Tuang (' + (selectedSlip.tuang_days || 0) + ' hari)', selectedSlip.tuang_amount]] : []),
                                 ].map(([label, val]) => (
                                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                         <span>{label}</span>

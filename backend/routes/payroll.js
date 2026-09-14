@@ -224,6 +224,8 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
             let driverExtraRitJauh = 0, driverRitaseJauhAmount = 0;
             let driverRitaseAmount = 0; // Total
             let driverTotalAllowance = 0;
+            let tuangAmount = 0;
+            let tuangDays = 0;
 
             if (emp.is_driver) {
                 const driverResult = await client.query(`
@@ -253,6 +255,17 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                 driverRitaseAmount = driverRitaseDekatAmount + driverRitaseJauhAmount;
                 driverTotalAllowance = driverSubuhAmount + driverRitAmount + driverOvernightAmount + driverRitaseAmount;
             }
+
+            const tuangResult = await client.query(`
+                SELECT COALESCE(SUM(amount), 0) as total_amount,
+                       COUNT(*) FILTER (WHERE amount > 0) as total_days
+                FROM production_tuang
+                WHERE user_id = $1
+                  AND EXTRACT(MONTH FROM tuang_date) = $2
+                  AND EXTRACT(YEAR FROM tuang_date) = $3
+            `, [emp.id, month, year]);
+            tuangAmount = parseFloat(tuangResult.rows[0].total_amount) || 0;
+            tuangDays = parseInt(tuangResult.rows[0].total_days, 10) || 0;
 
             // Calculate BPJS (using rates from bpjs_settings + per-employee overrides)
             const bpjsBase = basicSalary; // effective monthly amount
@@ -289,7 +302,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
             const bpjsJkm = emp.bpjs_jkm_enrolled ? bpjsBase * getRate(emp.bpjs_jkm_rate, 'BPJS_JKM', 'company_rate', 0.003) : 0;
 
             // Gross income (including driver allowances)
-            const grossIncome = basicSalary + transportAllowance + mealAllowance + overtimeAmount + driverTotalAllowance;
+            const grossIncome = basicSalary + transportAllowance + mealAllowance + overtimeAmount + driverTotalAllowance + tuangAmount;
 
             // Calculate PPh 21 (monthly) - only if enabled for this employee
             let monthlyPPh = 0;
@@ -327,8 +340,9 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                     salary_type, working_days,
                     driver_subuh_days, driver_subuh_amount, driver_rit_total, driver_rit_amount,
                     driver_overnight_days, driver_overnight_amount, driver_total_allowance,
-                    driver_extra_rit_dekat, driver_extra_rit_jauh, driver_ritase_dekat_amount, driver_ritase_jauh_amount
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
+                    driver_extra_rit_dekat, driver_extra_rit_jauh, driver_ritase_dekat_amount, driver_ritase_jauh_amount,
+                    tuang_amount, tuang_days
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
             `, [
                 payrollRunId, emp.id, basicSalary, transportAllowance, mealAllowance,
                 overtimeHours, overtimeAmount,
@@ -338,7 +352,8 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                 salaryType, workingDays,
                 driverSubuhDays, driverSubuhAmount, driverRitTotal, driverRitAmount,
                 driverOvernightDays, driverOvernightAmount, driverTotalAllowance,
-                driverExtraRitDekat, driverExtraRitJauh, driverRitaseDekatAmount, driverRitaseJauhAmount
+                driverExtraRitDekat, driverExtraRitJauh, driverRitaseDekatAmount, driverRitaseJauhAmount,
+                tuangAmount, tuangDays
             ]);
         }
 
@@ -639,7 +654,7 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
         ws.getCell('A2').alignment = { horizontal: 'center' };
 
         // Header
-        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'Jam Lembur', 'Nilai Lembur', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
+        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'Jam Lembur', 'Nilai Lembur', 'Tuang', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
         ws.getRow(4).values = headers;
         ws.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         ws.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
@@ -659,6 +674,7 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
                 parseFloat(item.meal_allowance),
                 parseFloat(item.overtime_hours),
                 parseFloat(item.overtime_amount),
+                parseFloat(item.tuang_amount || 0),
                 parseFloat(item.gross_income),
                 bpjsEmp,
                 parseFloat(item.pph21_amount),
@@ -668,12 +684,12 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
         });
 
         // Total row
-        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', totalNet]);
+        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', '', totalNet]);
         totalRow.font = { bold: true };
-        totalRow.getCell(14).numFmt = '#,##0';
+        totalRow.getCell(15).numFmt = '#,##0';
 
         // Format currency columns
-        for (let col = 5; col <= 14; col++) {
+        for (let col = 5; col <= 15; col++) {
             if (col === 8) {
                 // Jam Lembur
                 ws.getColumn(col).numFmt = '0';
@@ -775,6 +791,9 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
                 addRow(`Uang Ritase Dekat (${slip.driver_extra_rit_dekat} trip)`, slip.driver_ritase_dekat_amount);
             if (parseFloat(slip.driver_ritase_jauh_amount) > 0)
                 addRow(`Uang Ritase Jauh (${slip.driver_extra_rit_jauh} trip)`, slip.driver_ritase_jauh_amount);
+        }
+        if (parseFloat(slip.tuang_amount) > 0) {
+            addRow(`Insentif Tuang (${slip.tuang_days || 0} hari)`, slip.tuang_amount);
         }
         doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
         doc.moveDown(0.3);
@@ -895,6 +914,9 @@ router.get('/:id/slip/:userId/excel', authenticateToken, async (req, res) => {
             ['Tunjangan Makan', parseFloat(slip.meal_allowance)],
             [`Lembur (${slip.overtime_hours} jam)`, parseFloat(slip.overtime_amount)],
         ];
+        if (parseFloat(slip.tuang_amount) > 0) {
+            incomeItems.push([`Insentif Tuang (${slip.tuang_days || 0} hari)`, parseFloat(slip.tuang_amount)]);
+        }
         incomeItems.forEach(([label, val]) => {
             ws.getCell(`A${row}`).value = label;
             ws.getCell(`C${row}`).value = val;

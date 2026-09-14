@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { rolesAPI } from '../utils/api';
 import Icon from '../components/Icon';
 
@@ -25,6 +25,7 @@ export default function AdminRoles() {
     const [importResult, setImportResult] = useState(null);
     const [importError, setImportError] = useState('');
     const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+    const [permSearch, setPermSearch] = useState('');
 
     useEffect(() => {
         fetchData();
@@ -47,14 +48,18 @@ export default function AdminRoles() {
         }
     }
 
-    // Group permissions by category
-    const groupedPermissions = permissions.reduce((acc, perm) => {
-        if (!acc[perm.category]) {
-            acc[perm.category] = [];
-        }
-        acc[perm.category].push(perm);
-        return acc;
-    }, {});
+    const groupedPermissions = useMemo(() => {
+        const q = permSearch.trim().toLowerCase();
+        return permissions.reduce((acc, perm) => {
+            if (q) {
+                const hay = `${perm.label} ${perm.category} ${perm.key}`.toLowerCase();
+                if (!hay.includes(q)) return acc;
+            }
+            if (!acc[perm.category]) acc[perm.category] = [];
+            acc[perm.category].push(perm);
+            return acc;
+        }, {});
+    }, [permissions, permSearch]);
 
     function handleOpenModal(role = null) {
         if (role) {
@@ -73,8 +78,10 @@ export default function AdminRoles() {
             });
         }
         setIsModalOpen(true);
+        setPermSearch('');
         setError('');
         setSuccess('');
+        rolesAPI.getPermissions().then(setPermissions).catch(() => {});
     }
 
     function handleCloseModal() {
@@ -420,13 +427,13 @@ export default function AdminRoles() {
             {/* Modal Tambah/Edit */}
             {isModalOpen && (
                 <div className="modal-overlay" onClick={handleCloseModal}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '960px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editingRole ? 'Edit Role' : 'Tambah Role Baru'}</h2>
                             <button className="modal-close" onClick={handleCloseModal}>&times;</button>
                         </div>
                         
-                        <form onSubmit={handleSubmit} className="modal-body">
+                        <form onSubmit={handleSubmit} className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Nama Role (ID Unik)</label>
@@ -477,8 +484,20 @@ export default function AdminRoles() {
                                     }}>
                                         <h3 style={{ fontSize: '1.1rem', margin: 0 }}>
                                             Hak Akses Menu
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--gray-500)', marginLeft: '0.5rem' }}>
+                                                {formData.permissions.length}/{permissions.length} dipilih
+                                            </span>
                                         </h3>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                            <input
+                                                type="search"
+                                                className="form-input"
+                                                placeholder="Cari menu..."
+                                                value={permSearch}
+                                                onChange={(e) => setPermSearch(e.target.value)}
+                                                style={{ minWidth: '180px', maxWidth: '240px', padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
+                                            />
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
                                             <input
                                                 type="checkbox"
                                                 checked={permissions.length > 0 && permissions.every((p) => formData.permissions.includes(p.key))}
@@ -492,17 +511,23 @@ export default function AdminRoles() {
                                             />
                                             Pilih semua menu
                                         </label>
+                                        </div>
                                     </div>
                                     
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0 0 0.75rem' }}>
+                                        Daftar mengikuti menu aplikasi saat ini (Master, Pimpinan, HR, Operasional, Sistem, Managerial).
+                                    </p>
                                     <div style={{ 
                                         display: 'grid', 
                                         gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
-                                        gap: '1.5rem',
-                                        maxHeight: '400px',
+                                        gap: '1rem',
+                                        maxHeight: 'min(58vh, 560px)',
                                         overflowY: 'auto',
-                                        padding: '0.5rem'
+                                        padding: '0.25rem 0.35rem 0.5rem 0'
                                     }}>
-                                        {Object.entries(groupedPermissions).map(([category, perms]) => {
+                                        {Object.keys(groupedPermissions).length === 0 ? (
+                                            <p style={{ gridColumn: '1 / -1', color: 'var(--gray-500)', fontSize: '0.9rem' }}>Tidak ada menu yang cocok dengan pencarian.</p>
+                                        ) : Object.entries(groupedPermissions).map(([category, perms]) => {
                                             const keys = perms.map((p) => p.key);
                                             const selectedCount = keys.filter((k) => formData.permissions.includes(k)).length;
                                             const allOn = keys.length > 0 && selectedCount === keys.length;

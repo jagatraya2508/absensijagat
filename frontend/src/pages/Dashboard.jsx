@@ -359,7 +359,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ===== MENU MANAGER ===== */}
-                {(hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports')) && (
+                {(hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || hasPermission('manager.tuang') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.daily_work_report')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -408,6 +408,12 @@ export default function Dashboard() {
                                 <Link to="/admin/driver-activities" className="menu-item">
                                     <MenuIcon name="Truck" className="bg-orange-100 text-orange-600" />
                                     <span className="menu-label">Aktivitas Driver</span>
+                                </Link>
+                            )}
+                            {hasPermission('manager.tuang') && (
+                                <Link to="/admin/tuang" className="menu-item">
+                                    <MenuIcon name="Banknote" className="bg-orange-100 text-orange-600" />
+                                    <span className="menu-label">Insentif Tuang</span>
                                 </Link>
                             )}
                             {hasPermission('admin.driver_tracking') && (

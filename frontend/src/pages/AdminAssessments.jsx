@@ -352,13 +352,21 @@ export default function AdminAssessments() {
             {/* Modal */}
             {showModal && (
                 <div className="modal-overlay">
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{
+                        maxWidth: '920px',
+                        width: '95%',
+                        maxHeight: '92vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                    }}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editId ? 'Edit Penilaian' : 'Buat Penilaian Baru'}</h2>
                             <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} inline /></button>
                         </div>
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                            <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(140px, 1fr) minmax(110px, 0.8fr)', gap: '1rem' }}>
                                 <div className="form-group">
                                     <label className="form-label">Karyawan *</label>
                                     <select className="form-input form-select" value={form.user_id}
@@ -372,27 +380,25 @@ export default function AdminAssessments() {
                                         ))}
                                     </select>
                                 </div>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <div className="form-group" style={{ flex: 1 }}>
-                                        <label className="form-label">Bulan *</label>
-                                        <select className="form-input form-select" value={form.period_month}
-                                            onChange={e => setForm(f => ({ ...f, period_month: parseInt(e.target.value) }))}
-                                            disabled={!!editId}>
-                                            {MONTHS.map((m, i) => (
-                                                <option key={i} value={i + 1}>{m}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ flex: 1 }}>
-                                        <label className="form-label">Tahun *</label>
-                                        <select className="form-input form-select" value={form.period_year}
-                                            onChange={e => setForm(f => ({ ...f, period_year: parseInt(e.target.value) }))}
-                                            disabled={!!editId}>
-                                            {[2024, 2025, 2026, 2027].map(y => (
-                                                <option key={y} value={y}>{y}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                <div className="form-group">
+                                    <label className="form-label">Bulan *</label>
+                                    <select className="form-input form-select" value={form.period_month}
+                                        onChange={e => setForm(f => ({ ...f, period_month: parseInt(e.target.value) }))}
+                                        disabled={!!editId}>
+                                        {MONTHS.map((m, i) => (
+                                            <option key={i} value={i + 1}>{m}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Tahun *</label>
+                                    <select className="form-input form-select" value={form.period_year}
+                                        onChange={e => setForm(f => ({ ...f, period_year: parseInt(e.target.value) }))}
+                                        disabled={!!editId}>
+                                        {[2024, 2025, 2026, 2027].map(y => (
+                                            <option key={y} value={y}>{y}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -436,7 +442,7 @@ export default function AdminAssessments() {
                             </div>
 
                             {/* Scores */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Skor Kehadiran (40%)</label>
                                     <input type="number" className="form-input" min="0" max="100" step="0.1"
@@ -464,7 +470,7 @@ export default function AdminAssessments() {
                                     previewGrade === 'B' ? 'rgba(59, 130, 246, 0.1)' :
                                         previewGrade === 'C' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                                 textAlign: 'center',
-                                padding: '1rem'
+                                padding: '1.25rem'
                             }}>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.25rem' }}>Skor Akhir</div>
                                 <div style={{ fontSize: '2rem', fontWeight: 800 }}>{previewFinalScore.toFixed(1)}</div>
@@ -473,14 +479,15 @@ export default function AdminAssessments() {
                                 </span>
                             </div>
 
-                            <div className="form-group">
+                            <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label className="form-label">Catatan</label>
-                                <textarea className="form-input" rows="2" value={form.notes}
+                                <textarea className="form-input" rows="3" value={form.notes}
                                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                                     placeholder="Catatan tambahan..." />
                             </div>
+                            </div>
 
-                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                            <div className="modal-footer">
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
                                 <button type="submit" className="btn btn-primary">
                                     {editId ? 'Perbarui' : 'Simpan'}

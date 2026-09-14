@@ -674,6 +674,23 @@ export const payrollAPI = {
     delete: (id) => request(`/payroll/${id}`, { method: 'DELETE' }),
 };
 
+export const tuangAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/tuang?${query}`);
+    },
+    getSummary: (month, year) => request(`/tuang/summary?month=${month}&year=${year}`),
+    getEmployees: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return request(`/tuang/employees${query ? `?${query}` : ''}`);
+    },
+    getDepartments: () => request('/tuang/departments'),
+    bulkSave: (data) => request('/tuang/bulk', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+};
+
 // Departments API
 export const departmentsAPI = {
     getAll: () => request('/departments'),
@@ -1047,6 +1064,7 @@ export default {
     overtimeAPI,
     loansAPI,
     payrollAPI,
+    tuangAPI,
     departmentsAPI,
     employmentStatusesAPI,
     divisionsAPI,

@@ -55,6 +55,7 @@ app.use('/api/employees', require('./routes/employees'));
 app.use('/api/overtime', require('./routes/overtime'));
 app.use('/api/loans', require('./routes/loans'));
 app.use('/api/payroll', require('./routes/payroll'));
+app.use('/api/tuang', require('./routes/tuang'));
 app.use('/api/assessments', require('./routes/assessments'));
 app.use('/api/recruitment', require('./routes/recruitment'));
 app.use('/api/work-schedules', require('./routes/workSchedules'));

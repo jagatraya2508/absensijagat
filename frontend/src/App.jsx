@@ -26,6 +26,7 @@ import AdminRoles from './pages/AdminRoles';
 
 import AdminLoans from './pages/AdminLoans';
 import AdminPayroll from './pages/AdminPayroll';
+import AdminTuang from './pages/AdminTuang';
 import AdminAssessments from './pages/AdminAssessments';
 import AdminRecruitment from './pages/AdminRecruitment';
 import AdminWorkSchedule from './pages/AdminWorkSchedule';
@@ -449,6 +450,17 @@ function AppRoutes() {
                     <ProtectedRoute permission="admin.loans">
                         <AppLayout>
                             <AdminLoans />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/tuang"
+                element={
+                    <ProtectedRoute permission="manager.tuang">
+                        <AppLayout>
+                            <AdminTuang />
                         </AppLayout>
                     </ProtectedRoute>
                 }
