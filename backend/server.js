@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { pool } = require('./db');
+const { pool, ensurePrerequisiteUniques, ensureWorkScheduleSchema } = require('./db');
 const { ensureOrgApprovalSchema } = require('./utils/leaveApproval');
 const { ensureSystemRoles } = require('./utils/systemRoles');
 
@@ -79,6 +79,7 @@ app.get('/api/health', (req, res) => {
 // Initialize database tables
 async function initDatabase() {
     try {
+        await ensurePrerequisiteUniques();
         const schemaPath = path.join(__dirname, 'db/schema.sql');
         const schema = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schema);
@@ -87,6 +88,12 @@ async function initDatabase() {
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Error initializing database:', error);
+    }
+    try {
+        await ensureWorkScheduleSchema();
+        console.log('Work schedule schema ready');
+    } catch (error) {
+        console.error('Error patching work schedule schema:', error);
     }
 }
 

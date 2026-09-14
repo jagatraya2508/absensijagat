@@ -2,8 +2,9 @@ import Icon from '../components/Icon';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import CompanyCalendar from '../components/CompanyCalendar';
+import { departmentsAPI, positionsAPI } from '../utils/api';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API_URL || '/api';
 
 const SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -211,7 +212,7 @@ export default function AdminWorkSchedule() {
 
     // Schedule form
     const [scheduleForm, setScheduleForm] = useState({
-        id: null, name: '', type: 'normal', shift_count: 1, department: '', position: '', is_default: false,
+        id: null, name: '', type: 'normal', shift_count: 1, department_id: '', position_id: '', is_default: false,
         shifts: [defaultNormalShift()],
         overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
     });
@@ -238,25 +239,24 @@ export default function AdminWorkSchedule() {
         try {
             const res = await fetch(`${API}/work-schedules`, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
-            if (res.ok) setSchedules(data);
+            if (res.ok) setSchedules(Array.isArray(data) ? data : []);
+            else console.error(data.error || 'Gagal memuat jadwal kerja');
         } catch (e) { console.error(e); }
     }, [token]);
 
     const fetchPositions = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/positions`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (res.ok) setPositions(data.map(p => p.name));
+            const data = await positionsAPI.getAll();
+            setPositions(Array.isArray(data) ? data : []);
         } catch (e) { console.error(e); }
-    }, [token]);
+    }, []);
 
     const fetchDepartments = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/departments`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (res.ok) setDepartments(data.map(d => d.name));
+            const data = await departmentsAPI.getAll();
+            setDepartments(Array.isArray(data) ? data : []);
         } catch (e) { console.error(e); }
-    }, [token]);
+    }, []);
 
     const fetchEmployees = useCallback(async (dept) => {
         try {
@@ -339,7 +339,7 @@ export default function AdminWorkSchedule() {
     // ============================================
     function openNewSchedule() {
         setScheduleForm({
-            id: null, name: '', type: 'normal', shift_count: 1, department: '', position: '', is_default: false,
+            id: null, name: '', type: 'normal', shift_count: 1, department_id: '', position_id: '', is_default: false,
             shifts: [defaultNormalShift()],
             overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
         });
@@ -347,13 +347,15 @@ export default function AdminWorkSchedule() {
     }
 
     function openEditSchedule(sched) {
+        const deptId = sched.department_id || departments.find(d => d.name === sched.department)?.id || '';
+        const posId = sched.position_id || positions.find(p => p.name === sched.position)?.id || '';
         setScheduleForm({
             id: sched.id,
             name: sched.name,
             type: sched.type,
             shift_count: sched.shift_count,
-            department: sched.department || '',
-            position: sched.position || '',
+            department_id: deptId ? String(deptId) : '',
+            position_id: posId ? String(posId) : '',
             is_default: sched.is_default,
             shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(normalizeShiftForForm) : [defaultNormalShift()],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? sched.overtime_rule : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
@@ -367,8 +369,10 @@ export default function AdminWorkSchedule() {
             name: `${sched.name} (Copy)`,
             type: sched.type,
             shift_count: sched.shift_count,
-            department: '', // Clear department so admin has to select a new one
-            position: sched.position || '',
+            department_id: '',
+            position_id: sched.position_id
+                ? String(sched.position_id)
+                : (positions.find(p => p.name === sched.position)?.id ? String(positions.find(p => p.name === sched.position).id) : ''),
             is_default: false, // Don't copy default status
             shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(s => ({ ...normalizeShiftForForm(s), id: undefined })) : [defaultNormalShift()],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? { ...sched.overtime_rule, id: undefined } : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
@@ -489,7 +493,14 @@ export default function AdminWorkSchedule() {
             const method = scheduleForm.id ? 'PUT' : 'POST';
             const url = scheduleForm.id ? `${API}/work-schedules/${scheduleForm.id}` : `${API}/work-schedules`;
             const payload = {
-                ...scheduleForm,
+                name: scheduleForm.name,
+                type: scheduleForm.type,
+                shift_count: scheduleForm.shift_count,
+                department_id: scheduleForm.department_id || null,
+                position_id: scheduleForm.position_id || null,
+                is_default: scheduleForm.is_default,
+                is_active: true,
+                overtime_rule: scheduleForm.overtime_rule,
                 shifts: (scheduleForm.shifts || []).map(shift => {
                     const breaks = (shift.breaks || [])
                         .filter(b => b.start_time && b.end_time)
@@ -835,7 +846,7 @@ export default function AdminWorkSchedule() {
                             <select className="form-input form-select" value={assignFilter.department}
                                 onChange={e => setAssignFilter(f => ({ ...f, department: e.target.value }))}>
                                 <option value="">Semua</option>
-                                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                                {departments.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
                             </select>
                         </div>
                         <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchAssignments}>Filter</button>
@@ -1048,18 +1059,18 @@ export default function AdminWorkSchedule() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Departemen</label>
-                                <select className="form-input form-select" value={scheduleForm.department}
-                                    onChange={e => setScheduleForm(f => ({ ...f, department: e.target.value }))}>
+                                <select className="form-input form-select" value={scheduleForm.department_id}
+                                    onChange={e => setScheduleForm(f => ({ ...f, department_id: e.target.value }))}>
                                     <option value="">Semua Departemen</option>
-                                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Jabatan (Opsional)</label>
-                                <select className="form-input form-select" value={scheduleForm.position}
-                                    onChange={e => setScheduleForm(f => ({ ...f, position: e.target.value }))}>
+                                <select className="form-input form-select" value={scheduleForm.position_id}
+                                    onChange={e => setScheduleForm(f => ({ ...f, position_id: e.target.value }))}>
                                     <option value="">Semua Jabatan</option>
-                                    {positions.map(d => <option key={d} value={d}>{d}</option>)}
+                                    {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -1399,7 +1410,7 @@ export default function AdminWorkSchedule() {
                                         fetchEmployees(e.target.value);
                                     }}>
                                     <option value="">Semua</option>
-                                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                                    {departments.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
                                 </select>
                             </div>
                         </div>

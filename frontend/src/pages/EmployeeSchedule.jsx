@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import CompanyCalendar from '../components/CompanyCalendar';
 import Icon from '../components/Icon';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API_URL || '/api';
 
 export default function EmployeeSchedule() {
     const { user } = useAuth();

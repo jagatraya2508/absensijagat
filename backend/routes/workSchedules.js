@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin, isManagerOrAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission, isManagerOrAdmin } = require('../middleware/auth');
+
+const canManage = [authenticateToken, hasPermission('admin.work_schedule')];
 
 const SHIFT_JSON = `
     json_build_object(
@@ -84,6 +86,8 @@ async function insertShiftWithBreaks(client, scheduleTypeId, shift) {
 function scheduleFullSelect(whereClause = 'WHERE wst.id = $1') {
     return `
         SELECT wst.*,
+               COALESCE(d.name, wst.department) AS department,
+               COALESCE(p.name, wst."position") AS position,
                COALESCE(json_agg(${SHIFT_JSON} ORDER BY ws.shift_order) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
                json_build_object(
                    'id', otr.id,
@@ -94,11 +98,57 @@ function scheduleFullSelect(whereClause = 'WHERE wst.id = $1') {
                    'rate_multiplier', otr.rate_multiplier
                ) as overtime_rule
         FROM work_schedule_types wst
+        LEFT JOIN departments d ON d.id = wst.department_id
+        LEFT JOIN positions p ON p.id = wst.position_id
         LEFT JOIN work_shifts ws ON ws.schedule_type_id = wst.id
         LEFT JOIN overtime_rules otr ON otr.schedule_type_id = wst.id
         ${whereClause}
-        GROUP BY wst.id, otr.id
+        GROUP BY wst.id, otr.id, d.id, p.id
     `;
+}
+
+function httpError(status, message) {
+    const err = new Error(message);
+    err.status = status;
+    return err;
+}
+
+async function resolveMasterLink(client, table, { id, name }, label) {
+    const parsedId = Number.parseInt(id, 10);
+    if (Number.isInteger(parsedId) && parsedId > 0) {
+        const result = await client.query(`SELECT id, name FROM ${table} WHERE id = $1`, [parsedId]);
+        if (!result.rows[0]) throw httpError(400, `${label} tidak ditemukan di master data`);
+        return result.rows[0];
+    }
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return { id: null, name: null };
+    const result = await client.query(`SELECT id, name FROM ${table} WHERE name = $1`, [trimmed]);
+    if (!result.rows[0]) throw httpError(400, `${label} harus dipilih dari master data`);
+    return result.rows[0];
+}
+
+async function resolveScheduleMasters(client, body) {
+    const department = await resolveMasterLink(client, 'departments', {
+        id: body.department_id,
+        name: body.department,
+    }, 'Departemen');
+    const position = await resolveMasterLink(client, 'positions', {
+        id: body.position_id,
+        name: body.position,
+    }, 'Jabatan');
+    return { department, position };
+}
+
+async function handleScheduleWriteError(res, client, error, label) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+    if (error.status) {
+        return res.status(error.status).json({ error: error.message });
+    }
+    console.error(label, error);
+    if (error.code === '42P01' || error.code === '42703') {
+        return res.status(500).json({ error: 'Struktur database jadwal kerja belum lengkap. Muat ulang halaman, lalu coba lagi.' });
+    }
+    return res.status(500).json({ error: 'Terjadi kesalahan server' });
 }
 
 // ============================================
@@ -106,10 +156,12 @@ function scheduleFullSelect(whereClause = 'WHERE wst.id = $1') {
 // ============================================
 
 // Get all schedule types with shifts & overtime rules
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', ...canManage, async (req, res) => {
     try {
         const { department } = req.query;
-        let query = scheduleFullSelect(department ? 'WHERE wst.department = $1' : '');
+        let query = scheduleFullSelect(department
+            ? 'WHERE (COALESCE(d.name, wst.department) = $1)'
+            : '');
         const values = [];
         if (department) {
             values.push(department);
@@ -125,10 +177,10 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Create schedule type with shifts & overtime rule
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', ...canManage, async (req, res) => {
     const client = await pool.connect();
     try {
-        const { name, type, shift_count, department, position, is_default, shifts, overtime_rule } = req.body;
+        const { name, type, shift_count, is_default, shifts, overtime_rule } = req.body;
 
         if (!name || !type) {
             return res.status(400).json({ error: 'Nama dan tipe jadwal harus diisi' });
@@ -136,19 +188,23 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 
         await client.query('BEGIN');
 
-        // If setting as default, unset other defaults for same department
+        const { department, position } = await resolveScheduleMasters(client, req.body);
+
+        // If setting as default, unset other defaults for same department/jabatan
         if (is_default) {
             await client.query(
-                `UPDATE work_schedule_types SET is_default = FALSE WHERE department = $1`,
-                [department || null]
+                `UPDATE work_schedule_types SET is_default = FALSE
+                 WHERE COALESCE(department_id, 0) = COALESCE($1, 0)
+                   AND COALESCE(position_id, 0) = COALESCE($2, 0)`,
+                [department.id, position.id]
             );
         }
 
         // Create schedule type
         const schedResult = await client.query(`
-            INSERT INTO work_schedule_types (name, type, shift_count, department, position, is_default)
-            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-        `, [name, type, shift_count || 1, department || null, position || null, is_default || false]);
+            INSERT INTO work_schedule_types (name, type, shift_count, department, "position", department_id, position_id, is_default)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+        `, [name, type, shift_count || 1, department.name, position.name, department.id, position.id, is_default || false]);
         const scheduleType = schedResult.rows[0];
 
         // Create shifts + breaks
@@ -179,38 +235,42 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 
         res.status(201).json(fullResult.rows[0]);
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Create work schedule error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        return handleScheduleWriteError(res, client, error, 'Create work schedule error:');
     } finally {
         client.release();
     }
 });
 
 // Update schedule type with shifts & overtime rule
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', ...canManage, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
-        const { name, type, shift_count, department, position, is_default, is_active, shifts, overtime_rule } = req.body;
+        const { name, type, shift_count, is_default, is_active, shifts, overtime_rule } = req.body;
 
         await client.query('BEGIN');
 
-        // If setting as default, unset other defaults for same department
+        const { department, position } = await resolveScheduleMasters(client, req.body);
+
+        // If setting as default, unset other defaults for same department/jabatan
         if (is_default) {
             await client.query(
-                `UPDATE work_schedule_types SET is_default = FALSE WHERE department = $1 AND id != $2`,
-                [department || null, id]
+                `UPDATE work_schedule_types SET is_default = FALSE
+                 WHERE COALESCE(department_id, 0) = COALESCE($1, 0)
+                   AND COALESCE(position_id, 0) = COALESCE($2, 0)
+                   AND id != $3`,
+                [department.id, position.id, id]
             );
         }
 
         // Update schedule type
         await client.query(`
-            UPDATE work_schedule_types 
-            SET name = $1, type = $2, shift_count = $3, department = $4, position = $5,
-                is_default = $6, is_active = $7, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $8
-        `, [name, type, shift_count || 1, department || null, position || null, is_default || false, is_active !== false, id]);
+            UPDATE work_schedule_types
+            SET name = $1, type = $2, shift_count = $3, department = $4, "position" = $5,
+                department_id = $6, position_id = $7,
+                is_default = $8, is_active = $9, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $10
+        `, [name, type, shift_count || 1, department.name, position.name, department.id, position.id, is_default || false, is_active !== false, id]);
 
         // Replace shifts: delete old, insert new (breaks cascade)
         await client.query('DELETE FROM work_shifts WHERE schedule_type_id = $1', [id]);
@@ -244,16 +304,14 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 
         res.json(fullResult.rows[0]);
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Update work schedule error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        return handleScheduleWriteError(res, client, error, 'Update work schedule error:');
     } finally {
         client.release();
     }
 });
 
 // Delete schedule type
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', ...canManage, async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query('DELETE FROM work_schedule_types WHERE id = $1', [id]);
@@ -265,7 +323,7 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get single schedule type
-router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id', ...canManage, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(scheduleFullSelect(), [id]);
@@ -289,7 +347,9 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 router.get('/shifts/all', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT ws.*, wst.name as schedule_name, wst.department, wst.position,
+            SELECT ws.*, wst.name as schedule_name,
+                   COALESCE(d.name, wst.department) as department,
+                   COALESCE(p.name, wst."position") as position,
                    COALESCE((
                        SELECT json_agg(
                            json_build_object(
@@ -305,8 +365,10 @@ router.get('/shifts/all', authenticateToken, async (req, res) => {
                    ), '[]'::json) as breaks
             FROM work_shifts ws
             JOIN work_schedule_types wst ON wst.id = ws.schedule_type_id
+            LEFT JOIN departments d ON d.id = wst.department_id
+            LEFT JOIN positions p ON p.id = wst.position_id
             WHERE wst.is_active = TRUE
-            ORDER BY wst.department, wst.name, ws.shift_order
+            ORDER BY COALESCE(d.name, wst.department), wst.name, ws.shift_order
         `);
         res.json(result.rows);
     } catch (error) {
@@ -316,7 +378,7 @@ router.get('/shifts/all', authenticateToken, async (req, res) => {
 });
 
 // Get assignments with filters
-router.get('/assignments/list', authenticateToken, isAdmin, async (req, res) => {
+router.get('/assignments/list', ...canManage, async (req, res) => {
     try {
         const { start_date, end_date, department, user_id } = req.query;
         let query = `
@@ -361,7 +423,7 @@ router.get('/assignments/list', authenticateToken, isAdmin, async (req, res) => 
 });
 
 // Bulk assign shifts (bisa harian, mingguan, bulanan)
-router.post('/assignments/bulk', authenticateToken, isAdmin, async (req, res) => {
+router.post('/assignments/bulk', ...canManage, async (req, res) => {
     const client = await pool.connect();
     try {
         const { user_ids, shift_id, dates } = req.body;
@@ -398,7 +460,7 @@ router.post('/assignments/bulk', authenticateToken, isAdmin, async (req, res) =>
 });
 
 // Update single assignment
-router.put('/assignments/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/assignments/:id', ...canManage, async (req, res) => {
     try {
         const { id } = req.params;
         const { shift_id, assignment_date, user_id } = req.body;
@@ -430,7 +492,7 @@ router.put('/assignments/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete assignment
-router.delete('/assignments/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/assignments/:id', ...canManage, async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query('DELETE FROM employee_shift_assignments WHERE id = $1', [id]);
@@ -612,7 +674,7 @@ router.put('/overtime-requests/:id/status', authenticateToken, isManagerOrAdmin,
 });
 
 // Update actual hours for employee in SPL
-router.put('/overtime-requests/:reqId/employees/:empId', authenticateToken, isAdmin, async (req, res) => {
+router.put('/overtime-requests/:reqId/employees/:empId', ...canManage, async (req, res) => {
     try {
         const { reqId, empId } = req.params;
         const { actual_hours, notes } = req.body;
@@ -634,7 +696,7 @@ router.put('/overtime-requests/:reqId/employees/:empId', authenticateToken, isAd
 });
 
 // Edit overtime request (Admin only)
-router.put('/overtime-requests/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/overtime-requests/:id', ...canManage, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -707,7 +769,7 @@ router.put('/overtime-requests/:id', authenticateToken, isAdmin, async (req, res
 });
 
 // Delete overtime request
-router.delete('/overtime-requests/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/overtime-requests/:id', ...canManage, async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query('DELETE FROM overtime_requests WHERE id = $1', [id]);
@@ -721,12 +783,8 @@ router.delete('/overtime-requests/:id', authenticateToken, isAdmin, async (req, 
 // Get departments list (helper)
 router.get('/helpers/departments', authenticateToken, async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT DISTINCT department FROM employee_details 
-            WHERE department IS NOT NULL AND department != ''
-            ORDER BY department
-        `);
-        res.json(result.rows.map(r => r.department));
+        const result = await pool.query(`SELECT id, name FROM departments ORDER BY name`);
+        res.json(result.rows);
     } catch (error) {
         console.error('Get departments error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });

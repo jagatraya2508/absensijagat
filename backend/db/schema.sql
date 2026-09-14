@@ -474,6 +474,9 @@ CREATE TABLE IF NOT EXISTS work_schedule_types (
     type VARCHAR(10) NOT NULL DEFAULT 'normal' CHECK (type IN ('normal', 'shift')),
     shift_count INTEGER DEFAULT 1 CHECK (shift_count BETWEEN 1 AND 4),
     department VARCHAR(100),
+    "position" VARCHAR(100),
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    position_id INTEGER REFERENCES positions(id) ON DELETE SET NULL,
     is_default BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -903,6 +906,9 @@ ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS collection_status VARCHAR(2
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkin_photo_path VARCHAR(255);
 ALTER TABLE driver_tracking ADD COLUMN IF NOT EXISTS checkout_photo_path VARCHAR(255);
 ALTER TABLE license_info ADD COLUMN IF NOT EXISTS machine_id VARCHAR(32);
+ALTER TABLE work_schedule_types ADD COLUMN IF NOT EXISTS "position" VARCHAR(100);
+ALTER TABLE work_schedule_types ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL;
+ALTER TABLE work_schedule_types ADD COLUMN IF NOT EXISTS position_id INTEGER REFERENCES positions(id) ON DELETE SET NULL;
 
 -- Posisi live kendaraan / karyawan lapangan
 CREATE TABLE IF NOT EXISTS live_tracking_latest (
