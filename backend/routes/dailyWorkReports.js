@@ -478,6 +478,9 @@ router.put('/admin/:id/review', hasPermission('admin.daily_work_report'), async 
             return res.status(404).json({ error: 'Laporan tidak ditemukan' });
         }
 
+        const allowedStatuses = ['reviewed', 'draft'];
+        const nextStatus = allowedStatuses.includes(status) ? status : 'reviewed';
+
         const result = await pool.query(`
             UPDATE daily_work_reports 
             SET status = $1,
@@ -486,7 +489,7 @@ router.put('/admin/:id/review', hasPermission('admin.daily_work_report'), async 
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = $4
             RETURNING *
-        `, [status || 'reviewed', reviewerId, review_notes || '', id]);
+        `, [nextStatus, reviewerId, review_notes || '', id]);
 
         res.json(result.rows[0]);
     } catch (error) {

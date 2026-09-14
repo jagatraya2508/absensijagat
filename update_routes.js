@@ -9,6 +9,8 @@ const replacements = [
     { path: '/admin/locations', perm: 'admin.locations' },
     { path: '/admin/departments', perm: 'admin.departments' },
     { path: '/admin/positions', perm: 'admin.positions' },
+    { path: '/admin/employment-statuses', perm: 'admin.employment_statuses' },
+    { path: '/admin/divisions', perm: 'admin.divisions' },
     { path: '/admin/vehicle-types', perm: 'admin.vehicle_types' },
     { path: '/admin/employees', perm: 'admin.employees' },
     { path: '/admin/face-registration', perm: 'admin.face_registration' },

@@ -99,7 +99,10 @@ export default function AdminDailyWorkReport() {
 
     function openReview(report) {
         setSelectedReport(report);
-        setReviewForm({ review_notes: report.review_notes || '', status: 'reviewed' });
+        setReviewForm({
+            review_notes: report.review_notes || '',
+            status: report.status === 'reviewed' ? 'draft' : 'reviewed'
+        });
         setShowReviewModal(true);
         setError('');
     }
@@ -111,7 +114,9 @@ export default function AdminDailyWorkReport() {
             setSaving(true);
             setError('');
             await dailyWorkReportAPI.adminReview(selectedReport.id, reviewForm);
-            setSuccess('Laporan berhasil direview');
+            setSuccess(reviewForm.status === 'draft'
+                ? 'Laporan dikembalikan ke Draft. Karyawan bisa mengedit dan submit ulang.'
+                : 'Laporan berhasil disetujui');
             setShowReviewModal(false);
             fetchReports();
             fetchStats();
@@ -315,6 +320,15 @@ export default function AdminDailyWorkReport() {
                                                         <Icon name="CheckCircle2" size={16} inline /> Review
                                                     </button>
                                                 )}
+                                                {report.status === 'reviewed' && (
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        onClick={() => openReview(report)}
+                                                        style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                                                    >
+                                                        <Icon name="RefreshCw" size={16} inline /> Unapprove
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -472,6 +486,14 @@ export default function AdminDailyWorkReport() {
                                     <Icon name="CheckCircle2" size={16} inline /> Review Laporan
                                 </button>
                             )}
+                            {selectedReport.status === 'reviewed' && (
+                                <button className="btn btn-secondary" onClick={() => {
+                                    setShowDetailModal(false);
+                                    openReview(selectedReport);
+                                }}>
+                                    <Icon name="RefreshCw" size={16} inline /> Unapprove
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -483,7 +505,7 @@ export default function AdminDailyWorkReport() {
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
                         <div className="modal-header">
                             <div>
-                                <h3><Icon name="CheckCircle2" size={16} inline /> Review Laporan</h3>
+                                <h3><Icon name="CheckCircle2" size={16} inline /> {selectedReport.status === 'reviewed' ? 'Ubah Status Laporan' : 'Review Laporan'}</h3>
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                                     {selectedReport.user_name} — {formatDate(selectedReport.report_date)}
                                 </p>
@@ -523,10 +545,12 @@ export default function AdminDailyWorkReport() {
                                         value={reviewForm.status}
                                         onChange={e => setReviewForm({ ...reviewForm, status: e.target.value })}
                                     >
-                                        <option value="reviewed">Approved / Reviewed</option>
-                                        <option value="submitted">Kembalikan ke Submitted</option>
-                                        <option value="draft">Kembalikan ke Draft</option>
+                                        <option value="reviewed">Setujui (Approved)</option>
+                                        <option value="draft">Kembalikan ke Draft (Unapprove)</option>
                                     </select>
+                                    <small style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                                        Draft membuat karyawan bisa mengedit lagi, lalu submit ulang.
+                                    </small>
                                 </div>
 
                                 <div className="form-group">
@@ -545,7 +569,7 @@ export default function AdminDailyWorkReport() {
                                     Batal
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : 'Submit Review'}
+                                    {saving ? 'Menyimpan...' : (reviewForm.status === 'draft' ? 'Kembalikan ke Draft' : 'Setujui Laporan')}
                                 </button>
                             </div>
                         </form>

@@ -1,6 +1,6 @@
 import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI } from '../utils/api';
+import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI, employmentStatusesAPI, divisionsAPI } from '../utils/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -14,6 +14,23 @@ const TABS = [
     { id: 'locations', label: 'Lokasi Absen' },
     { id: 'documents', label: 'Dokumen' },
 ];
+
+const LEGACY_STATUS_LABELS = {
+    permanen: 'Permanen',
+    kontrak: 'Kontrak',
+    honor_harian: 'Honor Harian',
+    percobaan: 'Percobaan',
+    magang: 'Magang',
+    paruh_waktu: 'Paruh Waktu',
+    outsourcing: 'Outsourcing',
+    freelance: 'Freelance',
+    konsultan: 'Konsultan',
+};
+
+function employmentStatusLabel(value) {
+    if (!value) return '-';
+    return LEGACY_STATUS_LABELS[value] || value;
+}
 
 const DOC_TYPES = [
     { value: 'KTP', label: 'KTP (Kartu Tanda Penduduk)' },
@@ -32,6 +49,8 @@ export default function AdminEmployees() {
     const [employees, setEmployees] = useState([]);
     const [masterDepartments, setMasterDepartments] = useState([]);
     const [masterPositions, setMasterPositions] = useState([]);
+    const [masterEmploymentStatuses, setMasterEmploymentStatuses] = useState([]);
+    const [masterDivisions, setMasterDivisions] = useState([]);
     const [masterLocations, setMasterLocations] = useState([]);
     const [masterVehicleTypes, setMasterVehicleTypes] = useState([]);
     const [orgMembers, setOrgMembers] = useState([]);
@@ -58,7 +77,7 @@ export default function AdminEmployees() {
     const [formData, setFormData] = useState({
         nik: '', no_kk: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
-        department: '', position: '', join_date: '', supervisor_id: '',
+        department: '', division: '', position: '', employment_status: '', join_date: '', supervisor_id: '',
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
@@ -82,10 +101,14 @@ export default function AdminEmployees() {
         try {
             const depts = await departmentsAPI.getAll();
             const pos = await positionsAPI.getAll();
+            const statuses = await employmentStatusesAPI.getAll();
+            const divs = await divisionsAPI.getAll();
             const loc = await locationsAPI.getAll();
             const vts = await vehicleTypesAPI.getAll();
             setMasterDepartments(depts);
             setMasterPositions(pos);
+            setMasterEmploymentStatuses(statuses);
+            setMasterDivisions(divs);
             setMasterLocations(loc.filter(l => l.is_active));
             setMasterVehicleTypes(vts);
             try {
@@ -130,6 +153,8 @@ export default function AdminEmployees() {
                 gender: d.gender || '', marital_status: d.marital_status || 'Belum Menikah',
                 religion: d.religion || '', education: d.education || '',
                 department: d.department || '', position: d.position || '',
+                division: d.division || '',
+                employment_status: d.employment_status || '',
                 supervisor_id: d.supervisor_id || '',
                 join_date: d.join_date ? d.join_date.split('T')[0] : '',
                 bank_name: d.bank_name || '', bank_account: d.bank_account || '',
@@ -237,6 +262,15 @@ export default function AdminEmployees() {
         });
     }
 
+    function toggleAllLocations() {
+        setFormData(prev => {
+            const allIds = masterLocations.map(l => l.id);
+            const ids = prev.location_ids || [];
+            const allSelected = allIds.length > 0 && allIds.every(id => ids.includes(id));
+            return { ...prev, location_ids: allSelected ? [] : allIds };
+        });
+    }
+
     function formatCurrency(val) {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
     }
@@ -258,7 +292,10 @@ export default function AdminEmployees() {
         let result = employees.filter(e =>
             e.name.toLowerCase().includes(search.toLowerCase()) ||
             e.employee_id.toLowerCase().includes(search.toLowerCase()) ||
-            (e.department || '').toLowerCase().includes(search.toLowerCase())
+            (e.department || '').toLowerCase().includes(search.toLowerCase()) ||
+            (e.division || '').toLowerCase().includes(search.toLowerCase()) ||
+            (e.position || '').toLowerCase().includes(search.toLowerCase()) ||
+            employmentStatusLabel(e.employment_status).toLowerCase().includes(search.toLowerCase())
         );
 
         // Sort
@@ -292,7 +329,9 @@ export default function AdminEmployees() {
             'ID Karyawan': emp.employee_id,
             'Nama': emp.name,
             'Departemen': emp.department || '-',
+            'Divisi': emp.division || '-',
             'Jabatan': emp.position || '-',
+            'Status Karyawan': employmentStatusLabel(emp.employment_status),
             'Gaji Pokok': emp.basic_salary || 0,
             'Tipe Gaji': emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
         }));
@@ -304,7 +343,9 @@ export default function AdminEmployees() {
             { wch: 14 }, // ID
             { wch: 28 }, // Nama
             { wch: 18 }, // Departemen
+            { wch: 18 }, // Divisi
             { wch: 18 }, // Jabatan
+            { wch: 18 }, // Status Karyawan
             { wch: 18 }, // Gaji Pokok
             { wch: 12 }, // Tipe Gaji
         ];
@@ -376,24 +417,27 @@ export default function AdminEmployees() {
             emp.employee_id,
             emp.name,
             emp.department || '-',
+            emp.division || '-',
             emp.position || '-',
+            employmentStatusLabel(emp.employment_status),
             formatCurrency(emp.basic_salary),
             emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
         ]);
 
         doc.autoTable({
             startY: 28,
-            head: [['No', 'ID Karyawan', 'Nama', 'Departemen', 'Jabatan', 'Gaji Pokok', 'Tipe Gaji']],
+            head: [['No', 'ID Karyawan', 'Nama', 'Departemen', 'Divisi', 'Jabatan', 'Status', 'Gaji Pokok', 'Tipe Gaji']],
             body: tableData,
             styles: { fontSize: 8, cellPadding: 3 },
             headStyles: { fillColor: [30, 41, 82], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
             alternateRowStyles: { fillColor: [240, 243, 255] },
             columnStyles: {
                 0: { halign: 'center', cellWidth: 12 },
-                1: { cellWidth: 28 },
-                2: { cellWidth: 50 },
-                5: { halign: 'right' },
-                6: { halign: 'center', cellWidth: 22 }
+                1: { cellWidth: 24 },
+                2: { cellWidth: 38 },
+                6: { halign: 'center', cellWidth: 24 },
+                7: { halign: 'right' },
+                8: { halign: 'center', cellWidth: 20 }
             },
             didDrawPage: (data) => {
                 // Footer
@@ -434,13 +478,15 @@ export default function AdminEmployees() {
             </head>
             <body>
                 <div class="print-header">
-                    <h1>Data Karyawan</h1> <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • Total: ${filteredEmployees.length} karyawan</p> </div> <table> <thead> <tr> <th class="text-center">No</th> <th>ID Karyawan</th> <th>Nama</th> <th>Departemen</th> <th>Jabatan</th> <th class="text-right">Gaji Pokok</th> <th class="text-center">Tipe Gaji</th> </tr> </thead> <tbody> ${filteredEmployees.map((emp, i) =>`
+                    <h1>Data Karyawan</h1> <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • Total: ${filteredEmployees.length} karyawan</p> </div> <table> <thead> <tr> <th class="text-center">No</th> <th>ID Karyawan</th> <th>Nama</th> <th>Departemen</th> <th>Divisi</th> <th>Jabatan</th> <th>Status Karyawan</th> <th class="text-right">Gaji Pokok</th> <th class="text-center">Tipe Gaji</th> </tr> </thead> <tbody> ${filteredEmployees.map((emp, i) =>`
                             <tr>
                                 <td class="text-center">${i + 1}</td>
                                 <td>${emp.employee_id}</td>
                                 <td>${emp.name}</td>
                                 <td>${emp.department || '-'}</td>
+                                <td>${emp.division || '-'}</td>
                                 <td>${emp.position || '-'}</td>
+                                <td>${employmentStatusLabel(emp.employment_status)}</td>
                                 <td class="text-right">${formatCurrency(emp.basic_salary)}</td>
                                 <td class="text-center">
                                     <span class="badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}">
@@ -588,8 +634,14 @@ export default function AdminEmployees() {
                                     <th onClick={() => handleSort('department')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Departemen <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'department' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('department')}</span>
                                     </th>
+                                    <th onClick={() => handleSort('division')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Divisi <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'division' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('division')}</span>
+                                    </th>
                                     <th onClick={() => handleSort('position')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Jabatan <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'position' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('position')}</span>
+                                    </th>
+                                    <th onClick={() => handleSort('employment_status')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                        Status <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employment_status' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employment_status')}</span>
                                     </th>
                                     <th onClick={() => handleSort('basic_salary')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Gaji Pokok <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'basic_salary' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('basic_salary')}</span>
@@ -606,7 +658,9 @@ export default function AdminEmployees() {
                                         <td style={{ fontWeight: 500 }}>{emp.employee_id}</td>
                                         <td>{emp.name}</td>
                                         <td>{emp.department || '-'}</td>
+                                        <td>{emp.division || '-'}</td>
                                         <td>{emp.position || '-'}</td>
+                                        <td>{employmentStatusLabel(emp.employment_status)}</td>
                                         <td>{formatCurrency(emp.basic_salary)}</td>
                                         <td>
                                             <span className={`badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
@@ -867,6 +921,18 @@ export default function AdminEmployees() {
                                             </select>
                                         </div>
                                         <div className="form-group">
+                                            <label className="form-label">Divisi</label>
+                                            <select className="form-input form-select" value={formData.division} onChange={e => updateField('division', e.target.value)}>
+                                                <option value="">Pilih Divisi...</option>
+                                                {masterDivisions.map(d => (
+                                                    <option key={d.id} value={d.name}>{d.name}</option>
+                                                ))}
+                                                {formData.division && !masterDivisions.find(d => d.name === formData.division) && (
+                                                    <option value={formData.division}>{formData.division}</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
                                             <label className="form-label">Jabatan</label>
                                             <select className="form-input form-select" value={formData.position} onChange={e => updateField('position', e.target.value)}>
                                                 <option value="">Pilih Jabatan...</option>
@@ -875,6 +941,18 @@ export default function AdminEmployees() {
                                                 ))}
                                                 {formData.position && !masterPositions.find(p => p.name === formData.position) && (
                                                     <option value={formData.position}>{formData.position}</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Status Karyawan</label>
+                                            <select className="form-input form-select" value={formData.employment_status} onChange={e => updateField('employment_status', e.target.value)}>
+                                                <option value="">Pilih Status...</option>
+                                                {masterEmploymentStatuses.map(s => (
+                                                    <option key={s.id} value={s.name}>{s.name}</option>
+                                                ))}
+                                                {formData.employment_status && !masterEmploymentStatuses.find(s => s.name === formData.employment_status) && (
+                                                    <option value={formData.employment_status}>{employmentStatusLabel(formData.employment_status)}</option>
                                                 )}
                                             </select>
                                         </div>
@@ -1252,7 +1330,46 @@ export default function AdminEmployees() {
                                             {masterLocations.length === 0 ? (
                                                 <p style={{ textAlign: 'center', color: 'var(--gray-400)', margin: '1rem 0' }}>Belum ada master lokasi yang aktif.</p>
                                             ) : (
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                <>
+                                                    {(() => {
+                                                        const selectedIds = formData.location_ids || [];
+                                                        const allSelected = masterLocations.length > 0 && masterLocations.every(loc => selectedIds.includes(loc.id));
+                                                        const someSelected = !allSelected && masterLocations.some(loc => selectedIds.includes(loc.id));
+                                                        return (
+                                                            <div
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                                                    padding: '0.6rem 0.75rem', marginBottom: '0.75rem',
+                                                                    background: allSelected ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
+                                                                    borderRadius: 'var(--radius-sm)',
+                                                                    border: allSelected ? '1px solid var(--primary-500)' : '1px solid var(--gray-700)',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                                onClick={toggleAllLocations}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={allSelected}
+                                                                    ref={el => { if (el) el.indeterminate = someSelected; }}
+                                                                    onChange={() => {}}
+                                                                    style={{ cursor: 'pointer' }}
+                                                                />
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600, color: allSelected ? 'var(--primary-400)' : 'var(--text-primary)' }}>
+                                                                        Pilih Semua
+                                                                    </div>
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>
+                                                                        {allSelected
+                                                                            ? `${masterLocations.length} lokasi dipilih`
+                                                                            : someSelected
+                                                                                ? `${selectedIds.filter(id => masterLocations.some(l => l.id === id)).length} dari ${masterLocations.length} dipilih`
+                                                                                : 'Centang untuk memilih semua lokasi'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                                     {masterLocations.map(loc => {
                                                         const isChecked = formData.location_ids && formData.location_ids.includes(loc.id);
                                                         return (
@@ -1270,7 +1387,8 @@ export default function AdminEmployees() {
                                                             </div>
                                                         );
                                                     })}
-                                                </div>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                     </div>

@@ -43,6 +43,36 @@ CREATE TABLE IF NOT EXISTS positions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabel Employment Statuses (Master Status Karyawan)
+CREATE TABLE IF NOT EXISTS employment_statuses (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(150) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO employment_statuses (name, description) VALUES
+    ('Permanen', 'Karyawan tetap (PKWTT)'),
+    ('Kontrak', 'Karyawan kontrak (PKWT)'),
+    ('Honor Harian', 'Tenaga honor / harian'),
+    ('Percobaan', 'Masa percobaan'),
+    ('Magang', 'Peserta magang / PKL'),
+    ('Paruh Waktu', 'Karyawan paruh waktu'),
+    ('Outsourcing', 'Tenaga alih daya'),
+    ('Freelance', 'Mitra / pekerja lepas'),
+    ('Konsultan', 'Konsultan')
+ON CONFLICT (name) DO NOTHING;
+
+-- Tabel Divisions (Master Divisi)
+CREATE TABLE IF NOT EXISTS divisions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(150) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tabel Vehicle Types (Master Jenis Kendaraan)
 CREATE TABLE IF NOT EXISTS vehicle_types (
     id SERIAL PRIMARY KEY,
@@ -153,7 +183,9 @@ CREATE TABLE IF NOT EXISTS employee_details (
     religion VARCHAR(20),
     education VARCHAR(30),
     department VARCHAR(100),
+    division VARCHAR(150),
     position VARCHAR(100),
+    employment_status VARCHAR(150),
     join_date DATE,
     bank_name VARCHAR(50),
     bank_account VARCHAR(30),
@@ -815,6 +847,18 @@ ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAU
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_tracking BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS supervisor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS employment_status VARCHAR(150);
+ALTER TABLE employee_details ALTER COLUMN employment_status TYPE VARCHAR(150);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS division VARCHAR(150);
+UPDATE employee_details SET employment_status = 'Permanen' WHERE lower(employment_status) IN ('permanen', 'tetap', 'pkwtt', 'permanent');
+UPDATE employee_details SET employment_status = 'Kontrak' WHERE lower(employment_status) IN ('kontrak', 'pkwt', 'contract');
+UPDATE employee_details SET employment_status = 'Honor Harian' WHERE lower(replace(employment_status, '_', ' ')) IN ('honor harian', 'honor', 'borongan');
+UPDATE employee_details SET employment_status = 'Percobaan' WHERE lower(employment_status) IN ('percobaan', 'probation', 'probationary');
+UPDATE employee_details SET employment_status = 'Magang' WHERE lower(employment_status) IN ('magang', 'intern', 'internship', 'pkl');
+UPDATE employee_details SET employment_status = 'Paruh Waktu' WHERE lower(replace(employment_status, '_', ' ')) IN ('paruh waktu', 'part time', 'parttime');
+UPDATE employee_details SET employment_status = 'Outsourcing' WHERE lower(replace(employment_status, '_', ' ')) IN ('outsourcing', 'alih daya', 'alihdaya');
+UPDATE employee_details SET employment_status = 'Freelance' WHERE lower(employment_status) IN ('freelance', 'mitra', 'independent');
+UPDATE employee_details SET employment_status = 'Konsultan' WHERE lower(employment_status) IN ('konsultan', 'consultant');
 ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS current_step INTEGER DEFAULT 1;
 ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS total_steps INTEGER DEFAULT 1;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_code VARCHAR(50);

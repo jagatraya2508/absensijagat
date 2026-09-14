@@ -47,6 +47,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/license', licenseRoutes);
 app.use('/api/departments', require('./routes/departments'));
 app.use('/api/positions', require('./routes/positions'));
+app.use('/api/employment-statuses', require('./routes/employmentStatuses'));
+app.use('/api/divisions', require('./routes/divisions'));
 app.use('/api/schedule', require('./routes/schedule'));
 app.use('/api/off-days', require('./routes/offDays'));
 app.use('/api/employees', require('./routes/employees'));

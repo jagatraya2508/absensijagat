@@ -27,5 +27,9 @@ pool.on('error', (err) => {
 
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE')
   .catch((err) => console.warn('DB patch is_sales:', err.message));
+pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS employment_status VARCHAR(150)')
+  .catch((err) => console.warn('DB patch employment_status:', err.message));
+pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS division VARCHAR(150)')
+  .catch((err) => console.warn('DB patch division:', err.message));
 
 module.exports = { pool };

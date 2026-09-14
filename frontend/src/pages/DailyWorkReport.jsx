@@ -631,10 +631,10 @@ export default function DailyWorkReport() {
                                 </div>
 
                                 {/* Review notes if reviewed */}
-                                {currentReport.status === 'reviewed' && currentReport.review_notes && (
-                                    <div style={{ marginTop: 12, padding: 12, borderRadius: 'var(--radius-md)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                        <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#10b981', marginBottom: 4 }}>
-                                            <Icon name="MessageSquare" size={16} inline /> Catatan Review dari {currentReport.reviewer_name || 'Admin'}:
+                                {currentReport.review_notes && (
+                                    <div style={{ marginTop: 12, padding: 12, borderRadius: 'var(--radius-md)', background: currentReport.status === 'reviewed' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)', border: currentReport.status === 'reviewed' ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(245,158,11,0.25)' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.8rem', color: currentReport.status === 'reviewed' ? '#10b981' : '#d97706', marginBottom: 4 }}>
+                                            <Icon name="MessageSquare" size={16} inline /> {currentReport.status === 'reviewed' ? `Catatan Review dari ${currentReport.reviewer_name || 'Admin'}` : 'Laporan dikembalikan ke Draft'}:
                                         </div>
                                         <div style={{ fontSize: '0.85rem' }}>{currentReport.review_notes}</div>
                                     </div>

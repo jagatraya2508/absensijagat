@@ -12,6 +12,8 @@ const AVAILABLE_PERMISSIONS = [
     { key: 'admin.locations', label: 'Kelola Lokasi', category: 'Master' },
     { key: 'admin.departments', label: 'Master Departemen', category: 'Master' },
     { key: 'admin.positions', label: 'Master Jabatan', category: 'Master' },
+    { key: 'admin.employment_statuses', label: 'Master Status Karyawan', category: 'Master' },
+    { key: 'admin.divisions', label: 'Master Divisi', category: 'Master' },
     { key: 'admin.vehicle_types', label: 'Master Kendaraan', category: 'Master' },
     { key: 'admin.employees', label: 'Data Karyawan', category: 'Master' },
     { key: 'admin.face_registration', label: 'Registrasi Wajah', category: 'Master' },

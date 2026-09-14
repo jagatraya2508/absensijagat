@@ -32,6 +32,8 @@ import AdminWorkSchedule from './pages/AdminWorkSchedule';
 import EmployeeSchedule from './pages/EmployeeSchedule';
 import AdminDepartments from './pages/AdminDepartments';
 import AdminPositions from './pages/AdminPositions';
+import AdminEmploymentStatuses from './pages/AdminEmploymentStatuses';
+import AdminDivisions from './pages/AdminDivisions';
 import AdminVehicleTypes from './pages/AdminVehicleTypes';
 import ManagerApprovals from './pages/ManagerApprovals';
 import Overtime from './pages/Overtime';
@@ -513,6 +515,28 @@ function AppRoutes() {
                     <ProtectedRoute permission="admin.positions">
                         <AppLayout>
                             <AdminPositions />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/employment-statuses"
+                element={
+                    <ProtectedRoute permission="admin.employment_statuses">
+                        <AppLayout>
+                            <AdminEmploymentStatuses />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/divisions"
+                element={
+                    <ProtectedRoute permission="admin.divisions">
+                        <AppLayout>
+                            <AdminDivisions />
                         </AppLayout>
                     </ProtectedRoute>
                 }

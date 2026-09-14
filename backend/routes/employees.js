@@ -89,8 +89,15 @@ const EXCEL_HEADER_MAP = {
     pendidikan: 'education',
     departemen: 'department',
     department: 'department',
+    divisi: 'division',
+    division: 'division',
     jabatan: 'position',
     position: 'position',
+    'status karyawan': 'employment_status',
+    'status kepegawaian': 'employment_status',
+    'status kerja': 'employment_status',
+    'employee status': 'employment_status',
+    employment_status: 'employment_status',
     'tanggal masuk': 'join_date',
     'tgl masuk': 'join_date',
     'gaji pokok': 'basic_salary',
@@ -166,6 +173,50 @@ function parseMarital(value) {
     return undefined;
 }
 
+const EMPLOYMENT_STATUSES = [
+    { value: 'permanen', label: 'Permanen' },
+    { value: 'kontrak', label: 'Kontrak' },
+    { value: 'honor_harian', label: 'Honor Harian' },
+    { value: 'percobaan', label: 'Percobaan' },
+    { value: 'magang', label: 'Magang' },
+    { value: 'paruh_waktu', label: 'Paruh Waktu' },
+    { value: 'outsourcing', label: 'Outsourcing' },
+    { value: 'freelance', label: 'Freelance' },
+    { value: 'konsultan', label: 'Konsultan' }
+];
+
+function parseEmploymentStatus(value) {
+    if (!value) return null;
+    const v = String(value).trim().toLowerCase().replace(/[_-]+/g, ' ');
+    if (['permanen', 'tetap', 'pkwtt', 'permanent', 'full time', 'fulltime'].includes(v)) return 'permanen';
+    if (['kontrak', 'pkwt', 'contract', 'kontrak kerja'].includes(v)) return 'kontrak';
+    if (['honor harian', 'honor', 'harian', 'daily', 'borongan'].includes(v)) return 'honor_harian';
+    if (['percobaan', 'probation', 'probationary', 'masa percobaan'].includes(v)) return 'percobaan';
+    if (['magang', 'intern', 'internship', 'pkl'].includes(v)) return 'magang';
+    if (['paruh waktu', 'part time', 'parttime'].includes(v)) return 'paruh_waktu';
+    if (['outsourcing', 'alih daya', 'alihdaya'].includes(v)) return 'outsourcing';
+    if (['freelance', 'mitra', 'independent'].includes(v)) return 'freelance';
+    if (['konsultan', 'consultant'].includes(v)) return 'konsultan';
+    return undefined;
+}
+
+function employmentStatusLabel(value) {
+    return EMPLOYMENT_STATUSES.find(s => s.value === value)?.label || value || '';
+}
+
+function resolveEmploymentStatusName(raw, statusNames = []) {
+    if (!raw) return null;
+    const trimmed = String(raw).trim();
+    const exact = statusNames.find((name) => name.toLowerCase() === trimmed.toLowerCase());
+    if (exact) return exact;
+    const parsed = parseEmploymentStatus(trimmed);
+    if (parsed) {
+        const label = employmentStatusLabel(parsed);
+        return statusNames.find((name) => name.toLowerCase() === String(label).toLowerCase()) || label;
+    }
+    return undefined;
+}
+
 function parseSalaryType(value) {
     if (!value) return null;
     const v = String(value).trim().toLowerCase();
@@ -204,7 +255,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
-                   ed.nik, ed.phone, ed.department, ed.position, ed.join_date,
+                   ed.nik, ed.phone, ed.department, ed.division, ed.position, ed.employment_status, ed.join_date,
                    ed.basic_salary, ed.salary_type, ed.gender, ed.bpjs_kesehatan_no, ed.npwp,
                    ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking, ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
                    ed.bpjs_kes_enrolled, ed.bpjs_jht_enrolled, ed.bpjs_jp_enrolled, ed.bpjs_jkk_enrolled, ed.bpjs_jkm_enrolled, ed.pph21_enabled,
@@ -229,9 +280,11 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 
 router.get('/template', authenticateToken, isAdmin, async (req, res) => {
     try {
-        const [depts, positions] = await Promise.all([
+        const [depts, positions, empStatuses, divisions] = await Promise.all([
             pool.query('SELECT name FROM departments ORDER BY name ASC'),
-            pool.query('SELECT name FROM positions ORDER BY name ASC')
+            pool.query('SELECT name FROM positions ORDER BY name ASC'),
+            pool.query('SELECT name FROM employment_statuses ORDER BY name ASC'),
+            pool.query('SELECT name FROM divisions ORDER BY name ASC')
         ]);
 
         const workbook = new ExcelJS.Workbook();
@@ -258,7 +311,9 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
             { header: 'Agama', key: 'religion', width: 14 },
             { header: 'Pendidikan', key: 'education', width: 14 },
             { header: 'Departemen', key: 'department', width: 18 },
+            { header: 'Divisi', key: 'division', width: 18 },
             { header: 'Jabatan', key: 'position', width: 18 },
+            { header: 'Status Karyawan', key: 'employment_status', width: 18 },
             { header: 'Tanggal Masuk', key: 'join_date', width: 16 },
             { header: 'Gaji Pokok', key: 'basic_salary', width: 14 },
             { header: 'Tipe Gaji', key: 'salary_type', width: 14 },
@@ -270,15 +325,15 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
             { header: 'Nama Rekening', key: 'bank_holder', width: 22 }
         ];
         sheet.columns = columns;
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 25].forEach((col) => {
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27].forEach((col) => {
             sheet.getColumn(col).numFmt = '@';
         });
         applyHeaderStyle(sheet.getRow(1));
         sheet.getRow(1).height = 28;
 
         const sampleRows = [
-            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', '3174010101900001', '', '081234567890', 'Jl. Merdeka No. 1', 'Jakarta', '1990-01-15', 'Laki-laki', 'Menikah', 'Islam', 'S1', depts.rows[0]?.name || 'Operasional', positions.rows[0]?.name || 'Staff', '2024-01-02', '5000000', 'Bulanan', '', '', '', 'BCA', '1234567890', 'Budi Santoso'],
-            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', '3174010202920002', '', '081298765432', 'Jl. Sudirman No. 2', 'Bandung', '1992-02-20', 'Perempuan', 'Belum Menikah', 'Islam', 'SMA', depts.rows[0]?.name || 'Operasional', positions.rows[1]?.name || positions.rows[0]?.name || 'Staff', '2024-03-01', '4500000', 'Bulanan', '', '', '', 'Mandiri', '0987654321', 'Siti Aminah']
+            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', '3174010101900001', '', '081234567890', 'Jl. Merdeka No. 1', 'Jakarta', '1990-01-15', 'Laki-laki', 'Menikah', 'Islam', 'S1', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[0]?.name || 'Staff', empStatuses.rows[0]?.name || 'Permanen', '2024-01-02', '5000000', 'Bulanan', '', '', '', 'BCA', '1234567890', 'Budi Santoso'],
+            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', '3174010202920002', '', '081298765432', 'Jl. Sudirman No. 2', 'Bandung', '1992-02-20', 'Perempuan', 'Belum Menikah', 'Islam', 'SMA', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[1]?.name || positions.rows[0]?.name || 'Staff', empStatuses.rows[1]?.name || empStatuses.rows[0]?.name || 'Kontrak', '2024-03-01', '4500000', 'Bulanan', '', '', '', 'Mandiri', '0987654321', 'Siti Aminah']
         ];
         sampleRows.forEach((values, idx) => {
             const row = sheet.addRow(values);
@@ -305,10 +360,12 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
             { header: 'Jabatan', width: 24 },
             { header: 'Jenis Kelamin', width: 16 },
             { header: 'Status Pernikahan', width: 18 },
-            { header: 'Tipe Gaji', width: 14 }
+            { header: 'Tipe Gaji', width: 14 },
+            { header: 'Status Karyawan', width: 18 },
+            { header: 'Divisi', width: 18 }
         ];
         applyHeaderStyle(refSheet.getRow(1));
-        const maxRef = Math.max(depts.rows.length, positions.rows.length, 3);
+        const maxRef = Math.max(depts.rows.length, positions.rows.length, empStatuses.rows.length, divisions.rows.length, 3);
         for (let i = 0; i < maxRef; i++) {
             const row = refSheet.getRow(i + 2);
             if (depts.rows[i]) row.getCell(1).value = depts.rows[i].name;
@@ -322,6 +379,12 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
         refSheet.getCell('E2').value = 'Harian';
         refSheet.getCell('E3').value = 'Mingguan';
         refSheet.getCell('E4').value = 'Bulanan';
+        empStatuses.rows.forEach((status, idx) => {
+            refSheet.getCell(`F${idx + 2}`).value = status.name;
+        });
+        divisions.rows.forEach((division, idx) => {
+            refSheet.getCell(`G${idx + 2}`).value = division.name;
+        });
 
         const deptCount = Math.max(depts.rows.length, 1);
         const posCount = Math.max(positions.rows.length, 1);
@@ -332,9 +395,15 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
             });
         }
         if (positions.rows.length > 0) {
-            sheet.dataValidations.add(`P2:P1000`, {
+            sheet.dataValidations.add(`Q2:Q1000`, {
                 type: 'list', allowBlank: true,
                 formulae: [`Referensi!$B$2:$B$${posCount + 1}`]
+            });
+        }
+        if (divisions.rows.length > 0) {
+            sheet.dataValidations.add(`P2:P1000`, {
+                type: 'list', allowBlank: true,
+                formulae: [`Referensi!$G$2:$G$${Math.max(divisions.rows.length, 1) + 1}`]
             });
         }
         sheet.dataValidations.add('K2:K1000', {
@@ -343,8 +412,11 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
         sheet.dataValidations.add('L2:L1000', {
             type: 'list', allowBlank: true, formulae: ['Referensi!$D$2:$D$4']
         });
-        sheet.dataValidations.add('S2:S1000', {
+        sheet.dataValidations.add('U2:U1000', {
             type: 'list', allowBlank: true, formulae: ['Referensi!$E$2:$E$4']
+        });
+        sheet.dataValidations.add('R2:R1000', {
+            type: 'list', allowBlank: true, formulae: [`Referensi!$F$2:$F$${Math.max(empStatuses.rows.length, 1) + 1}`]
         });
 
         const guide = workbook.addWorksheet('Petunjuk');
@@ -358,7 +430,8 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
             ['Karyawan baru', 'Jika Employee ID belum ada, akun login akan dibuat (role employee). Password minimal 6 karakter.'],
             ['Karyawan existing', 'Jika Employee ID sudah ada, data karyawan akan diperbarui. Password dikosongkan = tidak diubah.'],
             ['Tanggal', 'Gunakan format YYYY-MM-DD (contoh 2024-01-15) atau pilih tanggal di Excel.'],
-            ['Departemen & Jabatan', 'Pilih dari dropdown Referensi, atau ketik nama yang sama dengan master data.'],
+            ['Departemen, Divisi & Jabatan', 'Pilih dari dropdown Referensi, atau ketik nama yang sama dengan master data.'],
+            ['Status Karyawan', 'Pilih dari dropdown Referensi sesuai master Status Karyawan, atau ketik nama yang sama.'],
             ['Baris contoh', 'Hapus atau ganti baris contoh sebelum diunggah.'],
             ['Batas lisensi', 'Pembuatan akun baru tidak boleh melebihi sisa kuota lisensi.'],
             ['Format file', 'Simpan sebagai .xlsx (Excel 2007 atau lebih baru).']
@@ -418,6 +491,8 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
         const usersResult = await pool.query('SELECT id, employee_id, email, role FROM users');
         const usersByEmpId = new Map(usersResult.rows.map((u) => [String(u.employee_id).toLowerCase(), u]));
         const emails = new Set(usersResult.rows.filter((u) => u.email).map((u) => u.email.toLowerCase()));
+        const statusRows = await pool.query('SELECT name FROM employment_statuses ORDER BY name ASC');
+        const statusNames = statusRows.rows.map((row) => row.name);
 
         const licenseInfo = await getActiveLicenseInfo();
         const maxUsers = licenseInfo.active ? licenseInfo.max_users : 5;
@@ -502,6 +577,13 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
                 continue;
             }
 
+            const statusRaw = read(row, 'employment_status');
+            const employmentStatus = resolveEmploymentStatusName(statusRaw, statusNames);
+            if (statusRaw && employmentStatus === undefined) {
+                pushError(`Status karyawan "${statusRaw}" tidak valid. Pilih dari master Status Karyawan`);
+                continue;
+            }
+
             const details = {
                 nik: read(row, 'nik') || null,
                 no_kk: read(row, 'no_kk') || null,
@@ -514,7 +596,9 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
                 religion: read(row, 'religion') || null,
                 education: read(row, 'education') || null,
                 department: read(row, 'department') || null,
+                division: read(row, 'division') || null,
                 position: read(row, 'position') || null,
+                employment_status: employmentStatus,
                 join_date: readDate(row, 'join_date'),
                 basic_salary: readNum(row, 'basic_salary'),
                 salary_type: salaryType,
@@ -554,12 +638,12 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
                         INSERT INTO employee_details (
                             user_id, nik, phone, address, birth_date, birth_place,
                             gender, marital_status, religion, education,
-                            department, position, join_date,
+                            department, division, position, employment_status, join_date,
                             bank_name, bank_account, bank_holder,
                             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
                             basic_salary, salary_type, no_kk, updated_at
                         ) VALUES (
-                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,CURRENT_TIMESTAMP
+                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,CURRENT_TIMESTAMP
                         )
                         ON CONFLICT (user_id) DO UPDATE SET
                             nik = COALESCE(EXCLUDED.nik, employee_details.nik),
@@ -572,7 +656,9 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
                             religion = COALESCE(EXCLUDED.religion, employee_details.religion),
                             education = COALESCE(EXCLUDED.education, employee_details.education),
                             department = COALESCE(EXCLUDED.department, employee_details.department),
+                            division = COALESCE(EXCLUDED.division, employee_details.division),
                             position = COALESCE(EXCLUDED.position, employee_details.position),
+                            employment_status = COALESCE(EXCLUDED.employment_status, employee_details.employment_status),
                             join_date = COALESCE(EXCLUDED.join_date, employee_details.join_date),
                             bank_name = COALESCE(EXCLUDED.bank_name, employee_details.bank_name),
                             bank_account = COALESCE(EXCLUDED.bank_account, employee_details.bank_account),
@@ -587,7 +673,7 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
                     `, [
                         existing.id, details.nik, details.phone, details.address, details.birth_date, details.birth_place,
                         details.gender, details.marital_status, details.religion, details.education,
-                        details.department, details.position, details.join_date,
+                        details.department, details.division, details.position, details.employment_status, details.join_date,
                         details.bank_name, details.bank_account, details.bank_holder,
                         details.npwp, details.bpjs_kesehatan_no, details.bpjs_ketenagakerjaan_no,
                         details.basic_salary, details.salary_type, details.no_kk
@@ -626,17 +712,17 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
                         INSERT INTO employee_details (
                             user_id, nik, phone, address, birth_date, birth_place,
                             gender, marital_status, religion, education,
-                            department, position, join_date,
+                            department, division, position, employment_status, join_date,
                             bank_name, bank_account, bank_holder,
                             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
                             basic_salary, salary_type, no_kk, updated_at
                         ) VALUES (
-                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,CURRENT_TIMESTAMP
+                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,CURRENT_TIMESTAMP
                         )
                     `, [
                         newUser.id, details.nik, details.phone, details.address, details.birth_date, details.birth_place,
                         details.gender, details.marital_status || 'Belum Menikah', details.religion, details.education,
-                        details.department, details.position, details.join_date,
+                        details.department, details.division, details.position, details.employment_status, details.join_date,
                         details.bank_name, details.bank_account, details.bank_holder,
                         details.npwp, details.bpjs_kesehatan_no, details.bpjs_ketenagakerjaan_no,
                         details.basic_salary, details.salary_type || 'monthly', details.no_kk
@@ -716,7 +802,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         const {
             nik, phone, address, birth_date, birth_place,
             gender, marital_status, religion, education,
-            department, position, join_date,
+            department, division, position, join_date, employment_status,
             bank_name, bank_account, bank_holder,
             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
             basic_salary, salary_type, transport_allowance, meal_allowance, overtime_rate,
@@ -731,6 +817,21 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 
 
         const trackingEnabled = !!(use_tracking || is_driver || is_collector || is_sales);
+
+        let nextEmploymentStatus;
+        if (employment_status !== undefined) {
+            if (employment_status) {
+                const statusRows = await pool.query('SELECT name FROM employment_statuses ORDER BY name ASC');
+                const statusNames = statusRows.rows.map((row) => row.name);
+                const resolved = resolveEmploymentStatusName(employment_status, statusNames);
+                if (resolved === undefined) {
+                    return res.status(400).json({ error: 'Status karyawan tidak valid. Tambahkan dulu di Master Status Karyawan.' });
+                }
+                nextEmploymentStatus = resolved;
+            } else {
+                nextEmploymentStatus = null;
+            }
+        }
 
         // Check user exists
         const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
@@ -861,6 +962,29 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             await pool.query(
                 `UPDATE employee_details SET supervisor_id = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
                 [nextSupervisor, id]
+            );
+        }
+
+        if (nextEmploymentStatus !== undefined) {
+            await pool.query(
+                `UPDATE employee_details SET employment_status = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [nextEmploymentStatus, id]
+            );
+        }
+
+        if (division !== undefined) {
+            let nextDivision = null;
+            if (division) {
+                const trimmed = String(division).trim();
+                const match = await pool.query(
+                    'SELECT name FROM divisions WHERE lower(name) = lower($1) LIMIT 1',
+                    [trimmed]
+                );
+                nextDivision = match.rows[0]?.name || trimmed;
+            }
+            await pool.query(
+                `UPDATE employee_details SET division = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [nextDivision, id]
             );
         }
 

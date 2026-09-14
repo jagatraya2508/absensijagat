@@ -372,7 +372,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ===== MENU ADMIN - MASTER DATA ===== */}
-                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.organization') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
+                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.employment_statuses') || hasPermission('admin.divisions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.organization') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -397,6 +397,18 @@ export default function Dashboard() {
                                 <Link to="/admin/positions" className="menu-item">
                                     <MenuIcon name="Award" className="bg-amber-100 text-amber-600" />
                                     <span className="menu-label">Jabatan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.employment_statuses') && (
+                                <Link to="/admin/employment-statuses" className="menu-item">
+                                    <MenuIcon name="Briefcase" className="bg-indigo-100 text-indigo-600" />
+                                    <span className="menu-label">Status Karyawan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.divisions') && (
+                                <Link to="/admin/divisions" className="menu-item">
+                                    <MenuIcon name="Folder" className="bg-teal-100 text-teal-600" />
+                                    <span className="menu-label">Divisi</span>
                                 </Link>
                             )}
                             {hasPermission('admin.vehicle_types') && (

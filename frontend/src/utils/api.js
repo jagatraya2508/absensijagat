@@ -688,6 +688,32 @@ export const departmentsAPI = {
     delete: (id) => request(`/departments/${id}`, { method: 'DELETE' }),
 };
 
+export const employmentStatusesAPI = {
+    getAll: () => request('/employment-statuses'),
+    create: (data) => request('/employment-statuses', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/employment-statuses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/employment-statuses/${id}`, { method: 'DELETE' }),
+};
+
+export const divisionsAPI = {
+    getAll: () => request('/divisions'),
+    create: (data) => request('/divisions', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/divisions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/divisions/${id}`, { method: 'DELETE' }),
+};
+
 // Positions API
 export const positionsAPI = {
     getAll: () => request('/positions'),
@@ -1022,6 +1048,8 @@ export default {
     loansAPI,
     payrollAPI,
     departmentsAPI,
+    employmentStatusesAPI,
+    divisionsAPI,
     positionsAPI,
     driverActivitiesAPI,
     driverTrackingAPI,
