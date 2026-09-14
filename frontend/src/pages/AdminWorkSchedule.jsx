@@ -15,7 +15,83 @@ const TAB_ITEMS = [
 
 function formatTime(t) {
     if (!t) return '-';
-    return t.substring(0, 5);
+    return String(t).substring(0, 5);
+}
+
+function toTimeInput(t) {
+    if (!t) return '';
+    return String(t).substring(0, 5);
+}
+
+function getShiftBreaks(shift) {
+    let listed = shift?.breaks;
+    if (typeof listed === 'string') {
+        try { listed = JSON.parse(listed); } catch { listed = []; }
+    }
+    if (Array.isArray(listed) && listed.length > 0) {
+        return listed.filter(b => b && b.start_time && b.end_time);
+    }
+    if (shift?.break_start && shift?.break_end) {
+        return [{ name: 'Istirahat', start_time: shift.break_start, end_time: shift.break_end }];
+    }
+    return [];
+}
+
+const BREAK_PRESETS = [
+    { name: 'ISOMA', start_time: '12:00', end_time: '13:00' },
+    { name: 'Coffee Break 1', start_time: '10:00', end_time: '10:15' },
+    { name: 'Coffee Break 2', start_time: '15:00', end_time: '15:15' },
+];
+
+function nextBreakPreset(existing = []) {
+    const used = new Set(existing.map(b => (b.name || '').toLowerCase()));
+    const preset = BREAK_PRESETS.find(p => !used.has(p.name.toLowerCase()));
+    if (preset) return { ...preset };
+    return { name: `Istirahat ${existing.length + 1}`, start_time: '12:00', end_time: '12:15' };
+}
+
+function defaultNormalShift(color = SHIFT_COLORS[0]) {
+    return {
+        name: 'Normal', shift_order: 1,
+        start_time: '08:00', end_time: '17:00',
+        is_overnight: false, color,
+        breaks: [{ name: 'ISOMA', break_order: 1, start_time: '12:00', end_time: '13:00' }],
+        break_start: '12:00', break_end: '13:00',
+    };
+}
+
+function normalizeShiftForForm(s) {
+    const breaks = getShiftBreaks(s).slice(0, 3).map((b, i) => ({
+        name: b.name || `Istirahat ${i + 1}`,
+        break_order: i + 1,
+        start_time: toTimeInput(b.start_time),
+        end_time: toTimeInput(b.end_time),
+    }));
+    return {
+        ...s,
+        start_time: toTimeInput(s.start_time),
+        end_time: toTimeInput(s.end_time),
+        breaks,
+        break_start: breaks[0]?.start_time || '',
+        break_end: breaks[0]?.end_time || '',
+    };
+}
+
+function timeToPercent(time) {
+    const [h, m] = toTimeInput(time).split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return 0;
+    return ((h * 60 + m) / 1440) * 100;
+}
+
+function breakSegments(brk) {
+    if (!brk?.start_time || !brk?.end_time) return [];
+    const start = timeToPercent(brk.start_time);
+    const end = timeToPercent(brk.end_time);
+    if (end > start) return [{ left: start, width: end - start }];
+    return [
+        { left: start, width: 100 - start },
+        { left: 0, width: end },
+    ];
 }
 
 function formatDate(d) {
@@ -28,11 +104,6 @@ function formatDate(d) {
 // ============================================
 function ShiftTimeline({ shifts }) {
     if (!shifts || shifts.length === 0) return null;
-
-    function timeToPercent(time) {
-        const [h, m] = time.split(':').map(Number);
-        return ((h * 60 + m) / 1440) * 100;
-    }
 
     return (
         <div className="shift-timeline-container">
@@ -48,6 +119,18 @@ function ShiftTimeline({ shifts }) {
                     const start = timeToPercent(shift.start_time);
                     let end = timeToPercent(shift.end_time);
                     const isOvernight = shift.is_overnight || end <= start;
+                    const breaks = getShiftBreaks(shift);
+
+                    const breakOverlays = breaks.flatMap((brk, bIdx) =>
+                        breakSegments(brk).map((seg, sIdx) => (
+                            <div
+                                key={`${i}-brk-${bIdx}-${sIdx}`}
+                                className="shift-timeline-break"
+                                style={{ left: `${seg.left}%`, width: `${seg.width}%` }}
+                                title={`${brk.name || 'Istirahat'}: ${formatTime(brk.start_time)} - ${formatTime(brk.end_time)}`}
+                            />
+                        ))
+                    );
 
                     if (isOvernight) {
                         return (
@@ -73,22 +156,25 @@ function ShiftTimeline({ shifts }) {
                                     }}
                                     title={`${shift.name} (lanjutan)`}
                                 />
+                                {breakOverlays}
                             </div>
                         );
                     }
 
                     return (
-                        <div
-                            key={i}
-                            className="shift-timeline-block"
-                            style={{
-                                left: `${start}%`,
-                                width: `${end - start}%`,
-                                background: shift.color || SHIFT_COLORS[i],
-                            }}
-                            title={`${shift.name}: ${formatTime(shift.start_time)} - ${formatTime(shift.end_time)}`}
-                        >
-                            <span>{shift.name}</span>
+                        <div key={i}>
+                            <div
+                                className="shift-timeline-block"
+                                style={{
+                                    left: `${start}%`,
+                                    width: `${end - start}%`,
+                                    background: shift.color || SHIFT_COLORS[i],
+                                }}
+                                title={`${shift.name}: ${formatTime(shift.start_time)} - ${formatTime(shift.end_time)}`}
+                            >
+                                <span>{shift.name}</span>
+                            </div>
+                            {breakOverlays}
                         </div>
                     );
                 })}
@@ -126,7 +212,7 @@ export default function AdminWorkSchedule() {
     // Schedule form
     const [scheduleForm, setScheduleForm] = useState({
         id: null, name: '', type: 'normal', shift_count: 1, department: '', position: '', is_default: false,
-        shifts: [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
+        shifts: [defaultNormalShift()],
         overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
     });
 
@@ -254,7 +340,7 @@ export default function AdminWorkSchedule() {
     function openNewSchedule() {
         setScheduleForm({
             id: null, name: '', type: 'normal', shift_count: 1, department: '', position: '', is_default: false,
-            shifts: [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
+            shifts: [defaultNormalShift()],
             overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
         });
         setShowScheduleModal(true);
@@ -269,7 +355,7 @@ export default function AdminWorkSchedule() {
             department: sched.department || '',
             position: sched.position || '',
             is_default: sched.is_default,
-            shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts : [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
+            shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(normalizeShiftForForm) : [defaultNormalShift()],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? sched.overtime_rule : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
         });
         setShowScheduleModal(true);
@@ -284,7 +370,7 @@ export default function AdminWorkSchedule() {
             department: '', // Clear department so admin has to select a new one
             position: sched.position || '',
             is_default: false, // Don't copy default status
-            shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(s => ({ ...s, id: undefined })) : [{ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: '#3b82f6' }],
+            shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(s => ({ ...normalizeShiftForForm(s), id: undefined })) : [defaultNormalShift()],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? { ...sched.overtime_rule, id: undefined } : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
         });
         setShowScheduleModal(true);
@@ -302,13 +388,14 @@ export default function AdminWorkSchedule() {
         ];
 
         if (type === 'normal') {
-            newShifts.push({ name: 'Normal', shift_order: 1, start_time: '08:00', end_time: '17:00', break_start: '12:00', break_end: '13:00', is_overnight: false, color: SHIFT_COLORS[0] });
+            newShifts.push(defaultNormalShift(SHIFT_COLORS[0]));
         } else {
             for (let i = 0; i < count; i++) {
                 newShifts.push({
                     name: shiftNames[i], shift_order: i + 1,
                     start_time: defaultTimes[i].start, end_time: defaultTimes[i].end,
                     break_start: '', break_end: '',
+                    breaks: [],
                     is_overnight: i === count - 1 && count >= 3,
                     color: SHIFT_COLORS[i]
                 });
@@ -333,6 +420,7 @@ export default function AdminWorkSchedule() {
                 name: shiftNames[i] || `Shift ${i + 1}`, shift_order: i + 1,
                 start_time: defaultTimes[i]?.start || '06:00', end_time: defaultTimes[i]?.end || '14:00',
                 break_start: '', break_end: '',
+                breaks: [],
                 is_overnight: false, color: SHIFT_COLORS[i]
             });
         }
@@ -347,15 +435,83 @@ export default function AdminWorkSchedule() {
         });
     }
 
+    function addBreak(shiftIdx) {
+        setScheduleForm(f => {
+            const s = [...f.shifts];
+            const current = [...(s[shiftIdx].breaks || [])];
+            if (current.length >= 3) return f;
+            const preset = nextBreakPreset(current);
+            current.push({ ...preset, break_order: current.length + 1 });
+            s[shiftIdx] = {
+                ...s[shiftIdx],
+                breaks: current,
+                break_start: current[0]?.start_time || '',
+                break_end: current[0]?.end_time || '',
+            };
+            return { ...f, shifts: s };
+        });
+    }
+
+    function updateBreak(shiftIdx, breakIdx, field, value) {
+        setScheduleForm(f => {
+            const s = [...f.shifts];
+            const breaks = [...(s[shiftIdx].breaks || [])];
+            breaks[breakIdx] = { ...breaks[breakIdx], [field]: value };
+            s[shiftIdx] = {
+                ...s[shiftIdx],
+                breaks,
+                break_start: breaks[0]?.start_time || '',
+                break_end: breaks[0]?.end_time || '',
+            };
+            return { ...f, shifts: s };
+        });
+    }
+
+    function removeBreak(shiftIdx, breakIdx) {
+        setScheduleForm(f => {
+            const s = [...f.shifts];
+            const breaks = (s[shiftIdx].breaks || [])
+                .filter((_, i) => i !== breakIdx)
+                .map((b, i) => ({ ...b, break_order: i + 1 }));
+            s[shiftIdx] = {
+                ...s[shiftIdx],
+                breaks,
+                break_start: breaks[0]?.start_time || '',
+                break_end: breaks[0]?.end_time || '',
+            };
+            return { ...f, shifts: s };
+        });
+    }
+
     async function saveSchedule() {
         setLoading(true);
         try {
             const method = scheduleForm.id ? 'PUT' : 'POST';
             const url = scheduleForm.id ? `${API}/work-schedules/${scheduleForm.id}` : `${API}/work-schedules`;
+            const payload = {
+                ...scheduleForm,
+                shifts: (scheduleForm.shifts || []).map(shift => {
+                    const breaks = (shift.breaks || [])
+                        .filter(b => b.start_time && b.end_time)
+                        .slice(0, 3)
+                        .map((b, i) => ({
+                            name: (b.name || `Istirahat ${i + 1}`).trim(),
+                            break_order: i + 1,
+                            start_time: b.start_time,
+                            end_time: b.end_time,
+                        }));
+                    return {
+                        ...shift,
+                        breaks,
+                        break_start: breaks[0]?.start_time || null,
+                        break_end: breaks[0]?.end_time || null,
+                    };
+                }),
+            };
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify(scheduleForm)
+                body: JSON.stringify(payload)
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -610,6 +766,16 @@ export default function AdminWorkSchedule() {
                                             <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: s.color || SHIFT_COLORS[i], flexShrink: 0 }} />
                                             <div style={{ flex: 1 }}>
                                                 <span style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.9rem' }}>{s.name}</span>
+                                                {getShiftBreaks(s).length > 0 && (
+                                                    <div style={{ fontSize: '0.72rem', color: 'var(--gray-600)', marginTop: '0.15rem' }}>
+                                                        {getShiftBreaks(s).map((b, bi) => (
+                                                            <span key={bi}>
+                                                                {bi > 0 ? ' • ' : ''}
+                                                                {b.name || 'Istirahat'} {formatTime(b.start_time)}-{formatTime(b.end_time)}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             <span style={{ fontSize: '0.85rem', color: 'var(--gray-700)', fontFamily: 'monospace' }}>
                                                 {formatTime(s.start_time)} - {formatTime(s.end_time)}
@@ -866,7 +1032,7 @@ export default function AdminWorkSchedule() {
         if (!showScheduleModal) return null;
         return (
             <div className="modal-overlay">
-                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '760px', maxHeight: '90vh', overflow: 'auto' }}>
                     <div className="modal-header">
                         <h2 className="modal-title">{scheduleForm.id ? 'Edit' : 'Tambah'} Jadwal Kerja</h2>
                         <button className="modal-close" onClick={() => setShowScheduleModal(false)}><Icon name="X" size={16} /></button>
@@ -955,16 +1121,6 @@ export default function AdminWorkSchedule() {
                                                 onChange={e => updateShift(idx, 'end_time', e.target.value)} style={{ fontSize: '0.85rem' }} />
                                         </div>
                                         <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <label className="form-label" style={{ fontSize: '0.75rem' }}>Istirahat Mulai</label>
-                                            <input type="time" className="form-input" value={shift.break_start || ''}
-                                                onChange={e => updateShift(idx, 'break_start', e.target.value)} style={{ fontSize: '0.85rem' }} />
-                                        </div>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <label className="form-label" style={{ fontSize: '0.75rem' }}>Istirahat Selesai</label>
-                                            <input type="time" className="form-input" value={shift.break_end || ''}
-                                                onChange={e => updateShift(idx, 'break_end', e.target.value)} style={{ fontSize: '0.85rem' }} />
-                                        </div>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
                                             <label className="form-label" style={{ fontSize: '0.75rem' }}>Warna</label>
                                             <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                                                 {SHIFT_COLORS.map(c => (
@@ -978,10 +1134,63 @@ export default function AdminWorkSchedule() {
                                             </div>
                                         </div>
                                     </div>
+                                    <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                                            <label className="form-label" style={{ fontSize: '0.75rem', margin: 0 }}>
+                                                Istirahat ({(shift.breaks || []).length}/3)
+                                            </label>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline"
+                                                disabled={(shift.breaks || []).length >= 3}
+                                                onClick={() => addBreak(idx)}
+                                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                                            >
+                                                <Icon name="Plus" size={12} inline /> Tambah Istirahat
+                                            </button>
+                                        </div>
+                                        {(shift.breaks || []).length === 0 && (
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', margin: 0 }}>
+                                                Tidak ada istirahat. Tambah sampai 3 kali (mis. Coffee Break 1, Coffee Break 2, ISOMA).
+                                            </p>
+                                        )}
+                                        {(shift.breaks || []).map((brk, bIdx) => (
+                                            <div key={bIdx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'end' }}>
+                                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                                    <label className="form-label" style={{ fontSize: '0.7rem' }}>Nama</label>
+                                                    <input className="form-input" value={brk.name || ''}
+                                                        placeholder={`Istirahat ${bIdx + 1}`}
+                                                        onChange={e => updateBreak(idx, bIdx, 'name', e.target.value)}
+                                                        style={{ fontSize: '0.85rem' }} />
+                                                </div>
+                                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                                    <label className="form-label" style={{ fontSize: '0.7rem' }}>Mulai</label>
+                                                    <input type="time" className="form-input" value={brk.start_time || ''}
+                                                        onChange={e => updateBreak(idx, bIdx, 'start_time', e.target.value)}
+                                                        style={{ fontSize: '0.85rem' }} />
+                                                </div>
+                                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                                    <label className="form-label" style={{ fontSize: '0.7rem' }}>Selesai</label>
+                                                    <input type="time" className="form-input" value={brk.end_time || ''}
+                                                        onChange={e => updateBreak(idx, bIdx, 'end_time', e.target.value)}
+                                                        style={{ fontSize: '0.85rem' }} />
+                                                </div>
+                                                <button type="button" className="btn btn-outline" title="Hapus istirahat"
+                                                    onClick={() => removeBreak(idx, bIdx)}
+                                                    style={{ padding: '0.4rem 0.5rem' }}>
+                                                    <Icon name="Trash2" size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', cursor: 'pointer', color: 'var(--gray-700)', fontSize: '0.8rem' }}>
                                         <input type="checkbox" checked={shift.is_overnight || false}
                                             onChange={e => updateShift(idx, 'is_overnight', e.target.checked)} />
-                                        Shift melewati tengah malam (overnight) </label> </div> ))} {/* Timeline Preview */} <div style={{ marginTop:'1rem' }}>
+                                        Shift melewati tengah malam (overnight)
+                                    </label>
+                                </div>
+                            ))}
+                            <div style={{ marginTop: '1rem' }}>
                                 <label className="form-label" style={{ fontSize: '0.75rem' }}>Preview Timeline 24 Jam</label>
                                 <ShiftTimeline shifts={scheduleForm.shifts} />
                             </div>

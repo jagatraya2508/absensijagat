@@ -479,6 +479,20 @@ CREATE TABLE IF NOT EXISTS work_shifts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Istirahat per shift (maks. 3: coffee break, ISOMA, dll)
+CREATE TABLE IF NOT EXISTS work_shift_breaks (
+    id SERIAL PRIMARY KEY,
+    shift_id INTEGER NOT NULL REFERENCES work_shifts(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL DEFAULT 'Istirahat',
+    break_order SMALLINT NOT NULL DEFAULT 1 CHECK (break_order BETWEEN 1 AND 3),
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (shift_id, break_order)
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_shift_breaks_shift ON work_shift_breaks(shift_id);
+
 -- Aturan Lembur per Jadwal
 CREATE TABLE IF NOT EXISTS overtime_rules (
     id SERIAL PRIMARY KEY,

@@ -3,6 +3,104 @@ const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, isAdmin, isManagerOrAdmin } = require('../middleware/auth');
 
+const SHIFT_JSON = `
+    json_build_object(
+        'id', ws.id,
+        'name', ws.name,
+        'shift_order', ws.shift_order,
+        'start_time', ws.start_time,
+        'end_time', ws.end_time,
+        'break_start', ws.break_start,
+        'break_end', ws.break_end,
+        'is_overnight', ws.is_overnight,
+        'color', ws.color,
+        'breaks', COALESCE((
+            SELECT json_agg(
+                json_build_object(
+                    'id', wsb.id,
+                    'name', wsb.name,
+                    'break_order', wsb.break_order,
+                    'start_time', wsb.start_time,
+                    'end_time', wsb.end_time
+                ) ORDER BY wsb.break_order
+            )
+            FROM work_shift_breaks wsb
+            WHERE wsb.shift_id = ws.id
+        ), '[]'::json)
+    )
+`;
+
+function normalizeBreaks(shift) {
+    let breaks = Array.isArray(shift.breaks) ? shift.breaks : [];
+    breaks = breaks
+        .filter(b => b && b.start_time && b.end_time)
+        .slice(0, 3)
+        .map((b, i) => ({
+            name: String(b.name || `Istirahat ${i + 1}`).trim().slice(0, 100) || `Istirahat ${i + 1}`,
+            break_order: i + 1,
+            start_time: String(b.start_time).substring(0, 8),
+            end_time: String(b.end_time).substring(0, 8),
+        }));
+
+    if (breaks.length === 0 && shift.break_start && shift.break_end) {
+        breaks = [{
+            name: 'Istirahat',
+            break_order: 1,
+            start_time: String(shift.break_start).substring(0, 8),
+            end_time: String(shift.break_end).substring(0, 8),
+        }];
+    }
+    return breaks;
+}
+
+async function insertShiftWithBreaks(client, scheduleTypeId, shift) {
+    const breaks = normalizeBreaks(shift);
+    const first = breaks[0] || {};
+    const result = await client.query(`
+        INSERT INTO work_shifts (schedule_type_id, name, shift_order, start_time, end_time, break_start, break_end, is_overnight, color)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id
+    `, [
+        scheduleTypeId,
+        shift.name,
+        shift.shift_order,
+        shift.start_time,
+        shift.end_time,
+        first.start_time || null,
+        first.end_time || null,
+        shift.is_overnight || false,
+        shift.color || '#3b82f6'
+    ]);
+
+    const shiftId = result.rows[0].id;
+    for (const b of breaks) {
+        await client.query(`
+            INSERT INTO work_shift_breaks (shift_id, name, break_order, start_time, end_time)
+            VALUES ($1, $2, $3, $4, $5)
+        `, [shiftId, b.name, b.break_order, b.start_time, b.end_time]);
+    }
+}
+
+function scheduleFullSelect(whereClause = 'WHERE wst.id = $1') {
+    return `
+        SELECT wst.*,
+               COALESCE(json_agg(${SHIFT_JSON} ORDER BY ws.shift_order) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
+               json_build_object(
+                   'id', otr.id,
+                   'overtime_type', otr.overtime_type,
+                   'grace_period_minutes', otr.grace_period_minutes,
+                   'min_overtime_minutes', otr.min_overtime_minutes,
+                   'max_overtime_hours', otr.max_overtime_hours,
+                   'rate_multiplier', otr.rate_multiplier
+               ) as overtime_rule
+        FROM work_schedule_types wst
+        LEFT JOIN work_shifts ws ON ws.schedule_type_id = wst.id
+        LEFT JOIN overtime_rules otr ON otr.schedule_type_id = wst.id
+        ${whereClause}
+        GROUP BY wst.id, otr.id
+    `;
+}
+
 // ============================================
 // WORK SCHEDULE TYPES (Master Jadwal Kerja)
 // ============================================
@@ -11,39 +109,12 @@ const { authenticateToken, isAdmin, isManagerOrAdmin } = require('../middleware/
 router.get('/', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { department } = req.query;
-        let query = `
-            SELECT wst.*, 
-                   COALESCE(json_agg(
-                       json_build_object(
-                           'id', ws.id,
-                           'name', ws.name,
-                           'shift_order', ws.shift_order,
-                           'start_time', ws.start_time,
-                           'end_time', ws.end_time,
-                           'break_start', ws.break_start,
-                           'break_end', ws.break_end,
-                           'is_overnight', ws.is_overnight,
-                           'color', ws.color
-                       ) ORDER BY ws.shift_order
-                   ) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
-                   json_build_object(
-                       'id', otr.id,
-                       'overtime_type', otr.overtime_type,
-                       'grace_period_minutes', otr.grace_period_minutes,
-                       'min_overtime_minutes', otr.min_overtime_minutes,
-                       'max_overtime_hours', otr.max_overtime_hours,
-                       'rate_multiplier', otr.rate_multiplier
-                   ) as overtime_rule
-            FROM work_schedule_types wst
-            LEFT JOIN work_shifts ws ON ws.schedule_type_id = wst.id
-            LEFT JOIN overtime_rules otr ON otr.schedule_type_id = wst.id
-        `;
+        let query = scheduleFullSelect(department ? 'WHERE wst.department = $1' : '');
         const values = [];
         if (department) {
-            query += ` WHERE wst.department = $1`;
             values.push(department);
         }
-        query += ` GROUP BY wst.id, otr.id ORDER BY wst.created_at DESC`;
+        query += ` ORDER BY wst.created_at DESC`;
 
         const result = await pool.query(query, values);
         res.json(result.rows);
@@ -80,23 +151,10 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
         `, [name, type, shift_count || 1, department || null, position || null, is_default || false]);
         const scheduleType = schedResult.rows[0];
 
-        // Create shifts
+        // Create shifts + breaks
         if (shifts && shifts.length > 0) {
             for (const shift of shifts) {
-                await client.query(`
-                    INSERT INTO work_shifts (schedule_type_id, name, shift_order, start_time, end_time, break_start, break_end, is_overnight, color)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                `, [
-                    scheduleType.id,
-                    shift.name,
-                    shift.shift_order,
-                    shift.start_time,
-                    shift.end_time,
-                    shift.break_start || null,
-                    shift.break_end || null,
-                    shift.is_overnight || false,
-                    shift.color || '#3b82f6'
-                ]);
+                await insertShiftWithBreaks(client, scheduleType.id, shift);
             }
         }
 
@@ -117,28 +175,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 
         await client.query('COMMIT');
 
-        // Fetch full record
-        const fullResult = await pool.query(`
-            SELECT wst.*, 
-                   COALESCE(json_agg(
-                       json_build_object('id', ws.id, 'name', ws.name, 'shift_order', ws.shift_order,
-                           'start_time', ws.start_time, 'end_time', ws.end_time,
-                           'break_start', ws.break_start, 'break_end', ws.break_end,
-                           'is_overnight', ws.is_overnight, 'color', ws.color
-                       ) ORDER BY ws.shift_order
-                   ) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
-                   json_build_object('id', otr.id, 'overtime_type', otr.overtime_type,
-                       'grace_period_minutes', otr.grace_period_minutes,
-                       'min_overtime_minutes', otr.min_overtime_minutes,
-                       'max_overtime_hours', otr.max_overtime_hours,
-                       'rate_multiplier', otr.rate_multiplier
-                   ) as overtime_rule
-            FROM work_schedule_types wst
-            LEFT JOIN work_shifts ws ON ws.schedule_type_id = wst.id
-            LEFT JOIN overtime_rules otr ON otr.schedule_type_id = wst.id
-            WHERE wst.id = $1
-            GROUP BY wst.id, otr.id
-        `, [scheduleType.id]);
+        const fullResult = await pool.query(scheduleFullSelect(), [scheduleType.id]);
 
         res.status(201).json(fullResult.rows[0]);
     } catch (error) {
@@ -175,24 +212,11 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
             WHERE id = $8
         `, [name, type, shift_count || 1, department || null, position || null, is_default || false, is_active !== false, id]);
 
-        // Replace shifts: delete old, insert new
+        // Replace shifts: delete old, insert new (breaks cascade)
         await client.query('DELETE FROM work_shifts WHERE schedule_type_id = $1', [id]);
         if (shifts && shifts.length > 0) {
             for (const shift of shifts) {
-                await client.query(`
-                    INSERT INTO work_shifts (schedule_type_id, name, shift_order, start_time, end_time, break_start, break_end, is_overnight, color)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                `, [
-                    id,
-                    shift.name,
-                    shift.shift_order,
-                    shift.start_time,
-                    shift.end_time,
-                    shift.break_start || null,
-                    shift.break_end || null,
-                    shift.is_overnight || false,
-                    shift.color || '#3b82f6'
-                ]);
+                await insertShiftWithBreaks(client, id, shift);
             }
         }
 
@@ -216,28 +240,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 
         await client.query('COMMIT');
 
-        // Fetch full record
-        const fullResult = await pool.query(`
-            SELECT wst.*, 
-                   COALESCE(json_agg(
-                       json_build_object('id', ws.id, 'name', ws.name, 'shift_order', ws.shift_order,
-                           'start_time', ws.start_time, 'end_time', ws.end_time,
-                           'break_start', ws.break_start, 'break_end', ws.break_end,
-                           'is_overnight', ws.is_overnight, 'color', ws.color
-                       ) ORDER BY ws.shift_order
-                   ) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
-                   json_build_object('id', otr.id, 'overtime_type', otr.overtime_type,
-                       'grace_period_minutes', otr.grace_period_minutes,
-                       'min_overtime_minutes', otr.min_overtime_minutes,
-                       'max_overtime_hours', otr.max_overtime_hours,
-                       'rate_multiplier', otr.rate_multiplier
-                   ) as overtime_rule
-            FROM work_schedule_types wst
-            LEFT JOIN work_shifts ws ON ws.schedule_type_id = wst.id
-            LEFT JOIN overtime_rules otr ON otr.schedule_type_id = wst.id
-            WHERE wst.id = $1
-            GROUP BY wst.id, otr.id
-        `, [id]);
+        const fullResult = await pool.query(scheduleFullSelect(), [id]);
 
         res.json(fullResult.rows[0]);
     } catch (error) {
@@ -265,35 +268,7 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
 router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query(`
-            SELECT wst.*, 
-                   COALESCE(json_agg(
-                       json_build_object(
-                           'id', ws.id,
-                           'name', ws.name,
-                           'shift_order', ws.shift_order,
-                           'start_time', ws.start_time,
-                           'end_time', ws.end_time,
-                           'break_start', ws.break_start,
-                           'break_end', ws.break_end,
-                           'is_overnight', ws.is_overnight,
-                           'color', ws.color
-                       ) ORDER BY ws.shift_order
-                   ) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
-                   json_build_object(
-                       'id', otr.id,
-                       'overtime_type', otr.overtime_type,
-                       'grace_period_minutes', otr.grace_period_minutes,
-                       'min_overtime_minutes', otr.min_overtime_minutes,
-                       'max_overtime_hours', otr.max_overtime_hours,
-                       'rate_multiplier', otr.rate_multiplier
-                   ) as overtime_rule
-            FROM work_schedule_types wst
-            LEFT JOIN work_shifts ws ON ws.schedule_type_id = wst.id
-            LEFT JOIN overtime_rules otr ON otr.schedule_type_id = wst.id
-            WHERE wst.id = $1
-            GROUP BY wst.id, otr.id
-        `, [id]);
+        const result = await pool.query(scheduleFullSelect(), [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Jadwal kerja tidak ditemukan' });
@@ -314,7 +289,20 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 router.get('/shifts/all', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT ws.*, wst.name as schedule_name, wst.department, wst.position
+            SELECT ws.*, wst.name as schedule_name, wst.department, wst.position,
+                   COALESCE((
+                       SELECT json_agg(
+                           json_build_object(
+                               'id', wsb.id,
+                               'name', wsb.name,
+                               'break_order', wsb.break_order,
+                               'start_time', wsb.start_time,
+                               'end_time', wsb.end_time
+                           ) ORDER BY wsb.break_order
+                       )
+                       FROM work_shift_breaks wsb
+                       WHERE wsb.shift_id = ws.id
+                   ), '[]'::json) as breaks
             FROM work_shifts ws
             JOIN work_schedule_types wst ON wst.id = ws.schedule_type_id
             WHERE wst.is_active = TRUE
