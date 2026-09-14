@@ -619,6 +619,42 @@ body {
   margin-left: auto;
 }
 
+.dashboard-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.dashboard-history-day {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dashboard-history-day:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.dashboard-history-date {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-bottom: 0.45rem;
+}
+
+.dashboard-history-special {
+  margin-bottom: 0.4rem;
+}
+
+.dashboard-history-slot {
+  align-items: center;
+  min-height: 0;
+  padding: 0.55rem 0.75rem;
+}
+
+.dashboard-history-slot.is-empty {
+  min-height: 44px;
+}
+
 /* Status Cards */
 .status-card {
   display: flex;

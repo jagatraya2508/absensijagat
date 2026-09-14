@@ -6,6 +6,73 @@ import { attendanceAPI, announcementsAPI, scheduleAPI } from '../utils/api';
 import ImageModal from '../components/ImageModal';
 import Icon from '../components/Icon';
 
+function toLocalDate(value) {
+    const date = new Date(value);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function isWeekend(date) {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+}
+
+function lastWorkdayKeys(anchorDate, count = 5) {
+    const keys = [];
+    const cursor = toLocalDate(anchorDate);
+    keys.push(formatDateKey(cursor));
+    cursor.setDate(cursor.getDate() - 1);
+    while (keys.length < count) {
+        if (!isWeekend(cursor)) keys.push(formatDateKey(cursor));
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return keys;
+}
+
+function buildDashboardHistory(records) {
+    if (!Array.isArray(records) || records.length === 0) return [];
+
+    const workRecords = records.filter((r) => r?.recorded_at && (r.type === 'check_in' || r.type === 'check_out'));
+    const anchorSource = workRecords.length > 0 ? workRecords : records.filter((r) => r?.recorded_at);
+    if (anchorSource.length === 0) return [];
+
+    const lastWork = anchorSource.reduce((latest, record) => {
+        const time = new Date(record.recorded_at);
+        return time > latest ? time : latest;
+    }, new Date(0));
+
+    const workdayKeys = lastWorkdayKeys(lastWork, 5);
+    const allowed = new Set(workdayKeys);
+    const byDate = {};
+
+    for (const record of records) {
+        if (!record?.recorded_at) continue;
+        const key = formatDateKey(toLocalDate(record.recorded_at));
+        if (!allowed.has(key)) continue;
+        if (!byDate[key]) byDate[key] = [];
+        byDate[key].push(record);
+    }
+
+    return workdayKeys
+        .filter((key) => byDate[key])
+        .map((dateKey) => {
+            const dayRecords = byDate[dateKey].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+            const checkIns = dayRecords.filter((r) => r.type === 'check_in');
+            const checkOuts = dayRecords.filter((r) => r.type === 'check_out');
+            return {
+                dateKey,
+                date: dayRecords[0].recorded_at,
+                checkIn: checkIns[0] || null,
+                checkOut: checkOuts[checkOuts.length - 1] || null,
+                specials: dayRecords.filter((r) => r.type !== 'check_in' && r.type !== 'check_out')
+            };
+        })
+        .filter((day) => day.checkIn || day.checkOut || day.specials.length > 0);
+}
+
 function MenuIcon({ name, className }) {
     return (
         <div className={`menu-icon ${className}`}>
@@ -29,13 +96,15 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [user?.id]);
 
     async function fetchData() {
         try {
+            const historyParams = { limit: 60 };
+            if (user?.id) historyParams.user_id = user.id;
             const [statusData, historyData, announcementsData] = await Promise.all([
                 attendanceAPI.getToday(),
-                attendanceAPI.getHistory({ limit: 10 }),
+                attendanceAPI.getHistory(historyParams),
                 announcementsAPI.getActive()
             ]);
             setTodayStatus(statusData);
@@ -63,6 +132,8 @@ export default function Dashboard() {
             day: 'numeric'
         });
     }
+
+    const dashboardHistory = buildDashboardHistory(history);
 
     if (loading) {
         return (
@@ -112,8 +183,8 @@ export default function Dashboard() {
             </div>
 
 
-            {/* Riwayat Absensi Terbaru */}
-            {Array.isArray(history) && history.length > 0 && (
+            {/* Riwayat Absensi Terbaru — 5 hari kerja dari tanggal kerja terakhir */}
+            {dashboardHistory.length > 0 && (
                 <div className="card mb-4">
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
                         <h2 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -123,33 +194,41 @@ export default function Dashboard() {
                             Lihat Semua
                         </Link>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                        {history.slice(0, 8).map((record) => (
-                            <div
-                                key={record.id}
-                                className="history-record-item"
-                                style={{
-                                    display: 'flex',
-                                    gap: '0.75rem',
-                                    alignItems: 'center',
-                                    padding: '0.65rem 0.25rem',
-                                    borderBottom: '1px solid rgba(0,0,0,0.05)'
-                                }}
-                            >
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                        <span className={`badge ${record.type === 'check_out' ? 'badge-warning' : record.type === 'leave' ? 'badge-primary' : record.type === 'off_day' ? 'badge-secondary' : 'badge-primary'}`}>
-                                            {record.type === 'check_in' ? 'Masuk' : record.type === 'check_out' ? 'Pulang' : record.type === 'leave' ? 'Izin' : record.type === 'off_day' ? 'Libur' : record.type}
-                                        </span>
-                                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                                            {record.recorded_at ? formatTime(record.recorded_at) : ''}
+                    <div className="dashboard-history-list">
+                        {dashboardHistory.map((day) => (
+                            <div key={day.dateKey} className="dashboard-history-day">
+                                <div className="dashboard-history-date">{formatDate(day.date)}</div>
+                                {day.specials.map((record) => (
+                                    <div key={record.id} className="dashboard-history-special">
+                                        <span className={`badge ${record.type === 'leave' ? 'badge-primary' : 'badge-secondary'}`}>
+                                            {record.type === 'leave' ? 'Izin' : record.type === 'off_day' ? 'Libur' : record.type}
                                         </span>
                                     </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                        {record.recorded_at ? formatDate(record.recorded_at) : ''}
-                                        {record.location_name ? ` · ${record.location_name}` : ''}
+                                ))}
+                                {(day.checkIn || day.checkOut) && (
+                                    <div className="history-io-pair dashboard-history-pair">
+                                        <div className={`history-io-slot dashboard-history-slot ${day.checkIn ? 'is-in' : 'is-empty'}`}>
+                                            {day.checkIn ? (
+                                                <>
+                                                    <span className="badge badge-primary">Masuk</span>
+                                                    <span className="history-io-time">{formatTime(day.checkIn.recorded_at)}</span>
+                                                </>
+                                            ) : (
+                                                <span>Belum absen masuk</span>
+                                            )}
+                                        </div>
+                                        <div className={`history-io-slot dashboard-history-slot ${day.checkOut ? 'is-out' : 'is-empty'}`}>
+                                            {day.checkOut ? (
+                                                <>
+                                                    <span className="badge badge-warning">Pulang</span>
+                                                    <span className="history-io-time">{formatTime(day.checkOut.recorded_at)}</span>
+                                                </>
+                                            ) : (
+                                                <span>Belum absen pulang</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         ))}
                     </div>
