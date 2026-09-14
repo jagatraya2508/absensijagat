@@ -4,6 +4,126 @@ import { useAuth } from '../context/AuthContext';
 import ImageModal from '../components/ImageModal';
 import Icon from '../components/Icon';
 
+function pairCheckInOut(records) {
+    const sorted = [...records].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+    const specials = [];
+    const checkIns = [];
+    const checkOuts = [];
+
+    for (const record of sorted) {
+        if (record.type === 'check_in') checkIns.push(record);
+        else if (record.type === 'check_out') checkOuts.push(record);
+        else specials.push(record);
+    }
+
+    const pairs = [];
+    const max = Math.max(checkIns.length, checkOuts.length);
+    for (let i = 0; i < max; i++) {
+        pairs.push({ checkIn: checkIns[i] || null, checkOut: checkOuts[i] || null });
+    }
+    return { specials, pairs };
+}
+
+function AttendancePhoto({ record, fallbackName, fallbackPhoto, caption, onOpen }) {
+    if (record.photo_path && record.photo_path !== 'manual') {
+        return (
+            <img
+                src={record.photo_path}
+                alt={record.type}
+                className="photo-thumb-lg"
+                onClick={() => onOpen({
+                    src: record.photo_path,
+                    caption,
+                    isOpen: true
+                })}
+            />
+        );
+    }
+    if (record.user_photo || fallbackPhoto) {
+        return (
+            <img
+                src={record.user_photo || fallbackPhoto}
+                alt="Profil"
+                className="photo-thumb-lg"
+                style={{ objectFit: 'cover' }}
+            />
+        );
+    }
+    return (
+        <div
+            className="photo-thumb-lg"
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--primary-500)',
+                color: 'white',
+                fontSize: '1.25rem',
+                fontWeight: 'bold',
+                textTransform: 'uppercase'
+            }}
+        >
+            {(record.user_name || fallbackName || '?').charAt(0)}
+        </div>
+    );
+}
+
+function AttendanceSlot({ record, emptyLabel, fallbackName, fallbackPhoto, isAdmin, onOpen, onDelete, formatTime, formatDate }) {
+    if (!record) {
+        return (
+            <div className="history-io-slot is-empty">
+                <span>{emptyLabel}</span>
+            </div>
+        );
+    }
+
+    const isCheckIn = record.type === 'check_in';
+
+    return (
+        <div className={`history-io-slot ${isCheckIn ? 'is-in' : 'is-out'}`}>
+            <AttendancePhoto
+                record={record}
+                fallbackName={fallbackName}
+                fallbackPhoto={fallbackPhoto}
+                caption={`${record.user_name || fallbackName} - ${formatDate(record.recorded_at)} ${formatTime(record.recorded_at)}`}
+                onOpen={onOpen}
+            />
+            <div className="history-io-meta">
+                <div className="history-io-row">
+                    <span className={`badge ${isCheckIn ? 'badge-primary' : 'badge-warning'}`}>
+                        {isCheckIn ? 'Masuk' : 'Pulang'}
+                    </span>
+                    <span className="history-io-time">{formatTime(record.recorded_at)}</span>
+                </div>
+                <div className="history-io-location">
+                    <Icon name="MapPin" size={14} inline /> {record.location_name || 'Lokasi tidak diketahui'}
+                </div>
+                {record.notes && (
+                    <div className="history-io-notes">
+                        <Icon name="MessageSquare" size={14} inline /> {record.notes}
+                    </div>
+                )}
+                <div className="history-io-footer">
+                    <span className={`badge ${record.is_valid ? 'badge-success' : 'badge-warning'}`}>
+                        {record.is_valid ? 'Valid' : `${Math.round(record.distance_meters || 0)}m`}
+                    </span>
+                    <span className="history-io-coords">
+                        {record.latitude ? parseFloat(record.latitude).toFixed(4) : '-'}, {record.longitude ? parseFloat(record.longitude).toFixed(4) : '-'}
+                    </span>
+                    {isAdmin && (
+                        <button
+                            className="btn btn-danger history-io-delete"
+                            onClick={() => onDelete(record.id)}
+                        >
+                            <Icon name="Trash2" size={14} inline />
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function History() {
     const { user } = useAuth();
     const [records, setRecords] = useState([]);
@@ -296,167 +416,113 @@ export default function History() {
                                                 </div>
                                             )}
                                             <div className="history-record-grid">
-                                                {[...userData.records].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at)).map((record) => (
-                                                    record.type === 'off_day' ? (
-                                                        <div
-                                                            key={record.id}
-                                                            className="history-record-item"
-                                                            style={{
-                                                                display: 'flex',
-                                                                gap: '1rem',
-                                                                alignItems: 'center',
-                                                                padding: '1rem',
-                                                                background: 'rgba(99, 102, 241, 0.1)',
-                                                                borderRadius: 'var(--radius-lg)',
-                                                                border: '1px solid rgba(99, 102, 241, 0.3)'
-                                                            }}
-                                                        >
-                                                            <div style={{
-                                                                width: 50, height: 50,
-                                                                borderRadius: 'var(--radius)',
-                                                                background: 'rgba(99, 102, 241, 0.2)',
-                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                fontSize: '1.5rem', flexShrink: 0
-                                                            }}>
-                                                                <Icon name="Palmtree" size={16} inline />
-                                                            </div>
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ fontWeight: 600, color: 'var(--primary-300)' }}>Hari Libur</div>
-                                                </div>
-                                                <span className="badge badge-primary" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
-                                                    OFF
-                                                </span>
-                                            </div>
-                                        ) : record.type === 'leave' ? (
-                                            <div
-                                                key={record.id}
-                                                className="history-record-item"
-                                                style={{
-                                                    display: 'flex',
-                                                    gap: '1rem',
-                                                    alignItems: 'center',
-                                                    padding: '1rem',
-                                                    background: 'rgba(16, 185, 129, 0.08)',
-                                                    borderRadius: 'var(--radius-lg)',
-                                                    border: '1px solid rgba(16, 185, 129, 0.25)'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: 50, height: 50,
-                                                    borderRadius: 'var(--radius)',
-                                                    background: 'rgba(16, 185, 129, 0.18)',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: '1.5rem', flexShrink: 0
-                                                }}>
-                                                    <Icon name="FileText" size={16} inline />
-                                                </div>
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`}>
-                                                            {getLeaveLabel(record.leave_type)}
-                                                        </span>
-                                                    </div>
-                                                    {record.notes && (
-                                                        <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.35rem' }}>
-                                                            <Icon name="MessageSquare" size={16} inline /> {record.notes}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`} style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
-                                                    IZIN
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div
-                                                key={record.id}
-                                                className="history-record-item"
-                                                style={{
-                                                    display: 'flex',
-                                                    gap: '1rem',
-                                                    alignItems: 'center',
-                                                    padding: '0.75rem',
-                                                    background: 'rgba(255,255,255,0.03)',
-                                                    borderRadius: 'var(--radius-lg)'
-                                                }}
-                                            >
-                                                {record.photo_path && record.photo_path !== 'manual' ? (
-                                                    <img
-                                                        src={record.photo_path}
-                                                        alt={record.type}
-                                                        className="photo-thumb-lg"
-                                                        onClick={() => setSelectedImg({
-                                                            src: record.photo_path,
-                                                            caption: `${record.user_name || user?.name} - ${formatDate(record.recorded_at)} ${formatTime(record.recorded_at)}`,
-                                                            isOpen: true
-                                                        })}
-                                                    />
-                                                ) : (record.user_photo || user?.photo) ? (
-                                                    <img
-                                                        src={record.user_photo || user?.photo}
-                                                        alt="Fallback Profile"
-                                                        className="photo-thumb-lg"
-                                                        style={{ objectFit: 'cover' }}
-                                                    />
-                                                ) : (
-                                                    <div 
-                                                        className="photo-thumb-lg"
-                                                        style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            background: 'var(--primary-500)',
-                                                            color: 'white',
-                                                            fontSize: '1.5rem',
-                                                            fontWeight: 'bold',
-                                                            textTransform: 'uppercase'
-                                                        }}
-                                                    >
-                                                        {(record.user_name || user?.name || '?').charAt(0)}
-                                                    </div>
-                                                )}
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                                        <span className={`badge ${record.type === 'check_in' ? 'badge-primary' : 'badge-warning'}`}>
-                                                            {record.type === 'check_in' ? 'Masuk' : 'Pulang'}
-                                                        </span>
-                                                        <span style={{ fontWeight: 600 }}>{formatTime(record.recorded_at)}</span>
-                                                    </div>
-                                                    <div style={{ fontSize: '0.85rem', color: 'var(--gray-400)' }}>
-                                                        <Icon name="MapPin" size={16} inline /> {record.location_name || 'Lokasi tidak diketahui'}
-                                                    </div>
-                                                    {record.notes && (
-                                                        <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.25rem' }}>
-                                                            <Icon name="MessageSquare" size={16} inline /> {record.notes}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <span className={`badge ${record.is_valid ? 'badge-success' : 'badge-warning'}`}>
-                                                        {record.is_valid ? 'Valid' : `${Math.round(record.distance_meters || 0)}m`}
-                                                    </span>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>
-                                                        {record.latitude ? parseFloat(record.latitude).toFixed(4) : '-'}, {record.longitude ? parseFloat(record.longitude).toFixed(4) : '-'}
-                                                    </div>
-                                                    {isAdmin && (
-                                                        <button
-                                                            className="btn btn-danger"
-                                                            style={{
-                                                                padding: '0.25rem 0.5rem',
-                                                                fontSize: '0.75rem',
-                                                                marginTop: '0.5rem',
-                                                                width: 'auto',
-                                                                marginLeft: 'auto',
-                                                                display: 'block'
-                                                            }}
-                                                            onClick={() => handleDelete(record.id)}
-                                                        >
-                                                            <Icon name="Trash2" size={16} inline />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    ))}
+                                                {(() => {
+                                                    const { specials, pairs } = pairCheckInOut(userData.records);
+                                                    return (
+                                                        <>
+                                                            {specials.map((record) => (
+                                                                record.type === 'off_day' ? (
+                                                                    <div
+                                                                        key={record.id}
+                                                                        className="history-record-item"
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            gap: '1rem',
+                                                                            alignItems: 'center',
+                                                                            padding: '1rem',
+                                                                            background: 'rgba(99, 102, 241, 0.1)',
+                                                                            borderRadius: 'var(--radius-lg)',
+                                                                            border: '1px solid rgba(99, 102, 241, 0.3)',
+                                                                            gridColumn: '1 / -1'
+                                                                        }}
+                                                                    >
+                                                                        <div style={{
+                                                                            width: 50, height: 50,
+                                                                            borderRadius: 'var(--radius)',
+                                                                            background: 'rgba(99, 102, 241, 0.2)',
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                            fontSize: '1.5rem', flexShrink: 0
+                                                                        }}>
+                                                                            <Icon name="Palmtree" size={16} inline />
+                                                                        </div>
+                                                                        <div style={{ flex: 1 }}>
+                                                                            <div style={{ fontWeight: 600, color: 'var(--primary-300)' }}>Hari Libur</div>
+                                                                        </div>
+                                                                        <span className="badge badge-primary" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
+                                                                            OFF
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div
+                                                                        key={record.id}
+                                                                        className="history-record-item"
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            gap: '1rem',
+                                                                            alignItems: 'center',
+                                                                            padding: '1rem',
+                                                                            background: 'rgba(16, 185, 129, 0.08)',
+                                                                            borderRadius: 'var(--radius-lg)',
+                                                                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                                                                            gridColumn: '1 / -1'
+                                                                        }}
+                                                                    >
+                                                                        <div style={{
+                                                                            width: 50, height: 50,
+                                                                            borderRadius: 'var(--radius)',
+                                                                            background: 'rgba(16, 185, 129, 0.18)',
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                            fontSize: '1.5rem', flexShrink: 0
+                                                                        }}>
+                                                                            <Icon name="FileText" size={16} inline />
+                                                                        </div>
+                                                                        <div style={{ flex: 1 }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                                <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`}>
+                                                                                    {getLeaveLabel(record.leave_type)}
+                                                                                </span>
+                                                                            </div>
+                                                                            {record.notes && (
+                                                                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-300)', marginTop: '0.35rem' }}>
+                                                                                    <Icon name="MessageSquare" size={16} inline /> {record.notes}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <span className={`badge ${getLeaveBadgeClass(record.leave_type)}`} style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
+                                                                            IZIN
+                                                                        </span>
+                                                                    </div>
+                                                                )
+                                                            ))}
+                                                            {pairs.map((pair, pairIdx) => (
+                                                                <div key={`${userData.employee_id || 'user'}-io-${pairIdx}`} className="history-io-pair">
+                                                                    <AttendanceSlot
+                                                                        record={pair.checkIn}
+                                                                        emptyLabel="Belum absen masuk"
+                                                                        fallbackName={userData.user_name || user?.name}
+                                                                        fallbackPhoto={user?.photo}
+                                                                        isAdmin={isAdmin}
+                                                                        onOpen={setSelectedImg}
+                                                                        onDelete={handleDelete}
+                                                                        formatTime={formatTime}
+                                                                        formatDate={formatDate}
+                                                                    />
+                                                                    <AttendanceSlot
+                                                                        record={pair.checkOut}
+                                                                        emptyLabel="Belum absen pulang"
+                                                                        fallbackName={userData.user_name || user?.name}
+                                                                        fallbackPhoto={user?.photo}
+                                                                        isAdmin={isAdmin}
+                                                                        onOpen={setSelectedImg}
+                                                                        onDelete={handleDelete}
+                                                                        formatTime={formatTime}
+                                                                        formatDate={formatDate}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     ))}
