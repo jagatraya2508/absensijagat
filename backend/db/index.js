@@ -178,6 +178,32 @@ async function ensureWorkScheduleSchema() {
       AND wst."position" <> ''
       AND wst."position" = p.name
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS work_schedule_departments (
+      schedule_type_id INTEGER NOT NULL REFERENCES work_schedule_types(id) ON DELETE CASCADE,
+      department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+      PRIMARY KEY (schedule_type_id, department_id)
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS work_schedule_positions (
+      schedule_type_id INTEGER NOT NULL REFERENCES work_schedule_types(id) ON DELETE CASCADE,
+      position_id INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+      PRIMARY KEY (schedule_type_id, position_id)
+    )
+  `);
+  await pool.query(`
+    INSERT INTO work_schedule_departments (schedule_type_id, department_id)
+    SELECT id, department_id FROM work_schedule_types
+    WHERE department_id IS NOT NULL
+    ON CONFLICT DO NOTHING
+  `);
+  await pool.query(`
+    INSERT INTO work_schedule_positions (schedule_type_id, position_id)
+    SELECT id, position_id FROM work_schedule_types
+    WHERE position_id IS NOT NULL
+    ON CONFLICT DO NOTHING
+  `);
   try {
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS overtime_rules_schedule_type_id_key ON overtime_rules (schedule_type_id)');
   } catch (_) { /* already exists as table constraint */ }

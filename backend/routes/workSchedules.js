@@ -86,8 +86,36 @@ async function insertShiftWithBreaks(client, scheduleTypeId, shift) {
 function scheduleFullSelect(whereClause = 'WHERE wst.id = $1') {
     return `
         SELECT wst.*,
-               COALESCE(d.name, wst.department) AS department,
-               COALESCE(p.name, wst."position") AS position,
+               COALESCE(
+                   NULLIF((
+                       SELECT string_agg(d2.name, ', ' ORDER BY d2.name)
+                       FROM work_schedule_departments wsd
+                       JOIN departments d2 ON d2.id = wsd.department_id
+                       WHERE wsd.schedule_type_id = wst.id
+                   ), ''),
+                   COALESCE(d.name, wst.department)
+               ) AS department,
+               COALESCE(
+                   NULLIF((
+                       SELECT string_agg(p2.name, ', ' ORDER BY p2.name)
+                       FROM work_schedule_positions wsp
+                       JOIN positions p2 ON p2.id = wsp.position_id
+                       WHERE wsp.schedule_type_id = wst.id
+                   ), ''),
+                   COALESCE(p.name, wst."position")
+               ) AS position,
+               COALESCE((
+                   SELECT json_agg(wsd.department_id ORDER BY d2.name)
+                   FROM work_schedule_departments wsd
+                   JOIN departments d2 ON d2.id = wsd.department_id
+                   WHERE wsd.schedule_type_id = wst.id
+               ), '[]'::json) AS department_ids,
+               COALESCE((
+                   SELECT json_agg(wsp.position_id ORDER BY p2.name)
+                   FROM work_schedule_positions wsp
+                   JOIN positions p2 ON p2.id = wsp.position_id
+                   WHERE wsp.schedule_type_id = wst.id
+               ), '[]'::json) AS position_ids,
                COALESCE(json_agg(${SHIFT_JSON} ORDER BY ws.shift_order) FILTER (WHERE ws.id IS NOT NULL), '[]') as shifts,
                json_build_object(
                    'id', otr.id,
@@ -128,15 +156,67 @@ async function resolveMasterLink(client, table, { id, name }, label) {
 }
 
 async function resolveScheduleMasters(client, body) {
-    const department = await resolveMasterLink(client, 'departments', {
-        id: body.department_id,
-        name: body.department,
-    }, 'Departemen');
-    const position = await resolveMasterLink(client, 'positions', {
-        id: body.position_id,
-        name: body.position,
-    }, 'Jabatan');
-    return { department, position };
+    const hasDeptList = Array.isArray(body.department_ids);
+    const hasPosList = Array.isArray(body.position_ids);
+    const departmentFallback = hasDeptList
+        ? { id: null, name: null }
+        : await resolveMasterLink(client, 'departments', {
+            id: body.department_id,
+            name: body.department,
+        }, 'Departemen');
+    const positionFallback = hasPosList
+        ? { id: null, name: null }
+        : await resolveMasterLink(client, 'positions', {
+            id: body.position_id,
+            name: body.position,
+        }, 'Jabatan');
+    const departments = await resolveMasterList(client, 'departments', body.department_ids, departmentFallback, 'Departemen');
+    const positions = await resolveMasterList(client, 'positions', body.position_ids, positionFallback, 'Jabatan');
+    return {
+        departments,
+        positions,
+        department: departments[0] || { id: null, name: null },
+        position: positions[0] || { id: null, name: null },
+        departmentLabel: departments.length ? departments.map((d) => d.name).join(', ') : null,
+        positionLabel: positions.length ? positions.map((p) => p.name).join(', ') : null,
+    };
+}
+
+function parseIdList(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+async function resolveMasterList(client, table, ids, fallback, label) {
+    const parsed = parseIdList(ids);
+    if (parsed.length === 0) {
+        return fallback?.id ? [fallback] : [];
+    }
+    const result = await client.query(
+        `SELECT id, name FROM ${table} WHERE id = ANY($1::int[]) ORDER BY name`,
+        [parsed]
+    );
+    if (result.rows.length !== parsed.length) {
+        throw httpError(400, `${label} tidak ditemukan di master data`);
+    }
+    return result.rows;
+}
+
+async function replaceScheduleLinks(client, scheduleId, departments, positions) {
+    await client.query('DELETE FROM work_schedule_departments WHERE schedule_type_id = $1', [scheduleId]);
+    await client.query('DELETE FROM work_schedule_positions WHERE schedule_type_id = $1', [scheduleId]);
+    for (const dept of departments) {
+        await client.query(
+            'INSERT INTO work_schedule_departments (schedule_type_id, department_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [scheduleId, dept.id]
+        );
+    }
+    for (const pos of positions) {
+        await client.query(
+            'INSERT INTO work_schedule_positions (schedule_type_id, position_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [scheduleId, pos.id]
+        );
+    }
 }
 
 async function handleScheduleWriteError(res, client, error, label) {
@@ -160,7 +240,17 @@ router.get('/', ...canManage, async (req, res) => {
     try {
         const { department } = req.query;
         let query = scheduleFullSelect(department
-            ? 'WHERE (COALESCE(d.name, wst.department) = $1)'
+            ? `WHERE (
+                EXISTS (
+                    SELECT 1 FROM work_schedule_departments wsd
+                    JOIN departments d2 ON d2.id = wsd.department_id
+                    WHERE wsd.schedule_type_id = wst.id AND d2.name = $1
+                )
+                OR (
+                    NOT EXISTS (SELECT 1 FROM work_schedule_departments wsd WHERE wsd.schedule_type_id = wst.id)
+                    AND COALESCE(d.name, wst.department) = $1
+                )
+            )`
             : '');
         const values = [];
         if (department) {
@@ -188,7 +278,7 @@ router.post('/', ...canManage, async (req, res) => {
 
         await client.query('BEGIN');
 
-        const { department, position } = await resolveScheduleMasters(client, req.body);
+        const { department, position, departments, positions, departmentLabel, positionLabel } = await resolveScheduleMasters(client, req.body);
 
         // If setting as default, unset other defaults for same department/jabatan
         if (is_default) {
@@ -204,8 +294,9 @@ router.post('/', ...canManage, async (req, res) => {
         const schedResult = await client.query(`
             INSERT INTO work_schedule_types (name, type, shift_count, department, "position", department_id, position_id, is_default)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
-        `, [name, type, shift_count || 1, department.name, position.name, department.id, position.id, is_default || false]);
+        `, [name, type, shift_count || 1, departmentLabel, positionLabel, department.id, position.id, is_default || false]);
         const scheduleType = schedResult.rows[0];
+        await replaceScheduleLinks(client, scheduleType.id, departments, positions);
 
         // Create shifts + breaks
         if (shifts && shifts.length > 0) {
@@ -250,7 +341,7 @@ router.put('/:id', ...canManage, async (req, res) => {
 
         await client.query('BEGIN');
 
-        const { department, position } = await resolveScheduleMasters(client, req.body);
+        const { department, position, departments, positions, departmentLabel, positionLabel } = await resolveScheduleMasters(client, req.body);
 
         // If setting as default, unset other defaults for same department/jabatan
         if (is_default) {
@@ -270,7 +361,8 @@ router.put('/:id', ...canManage, async (req, res) => {
                 department_id = $6, position_id = $7,
                 is_default = $8, is_active = $9, updated_at = CURRENT_TIMESTAMP
             WHERE id = $10
-        `, [name, type, shift_count || 1, department.name, position.name, department.id, position.id, is_default || false, is_active !== false, id]);
+        `, [name, type, shift_count || 1, departmentLabel, positionLabel, department.id, position.id, is_default || false, is_active !== false, id]);
+        await replaceScheduleLinks(client, id, departments, positions);
 
         // Replace shifts: delete old, insert new (breaks cascade)
         await client.query('DELETE FROM work_shifts WHERE schedule_type_id = $1', [id]);

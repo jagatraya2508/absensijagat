@@ -78,6 +78,77 @@ function normalizeShiftForForm(s) {
     };
 }
 
+function idsFromSchedule(sched, arrayKey, singleId, nameField, masters) {
+    if (Array.isArray(sched?.[arrayKey])) {
+        return sched[arrayKey].map(String).filter(Boolean);
+    }
+    if (singleId) return [String(singleId)];
+    const names = String(sched?.[nameField] || '').split(',').map(s => s.trim()).filter(Boolean);
+    return names
+        .map(n => masters.find(m => m.name === n)?.id)
+        .filter(Boolean)
+        .map(String);
+}
+
+function PagedChecklist({ title, items, selectedIds, onToggle, onSelectAll, onClear, emptyLabel = 'Tidak ada data.' }) {
+    const PAGE_SIZE = 8;
+    const [page, setPage] = useState(1);
+    const totalPages = Math.max(1, Math.ceil((items?.length || 0) / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const paged = (items || []).slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+    const selectedSet = new Set((selectedIds || []).map(String));
+
+    useEffect(() => { setPage(1); }, [items]);
+
+    return (
+        <div className="form-group">
+            <label className="form-label">{title} ({selectedSet.size} dipilih)</label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                    onClick={onSelectAll}>Pilih Semua</button>
+                <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                    onClick={onClear}>Hapus Semua</button>
+            </div>
+            <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
+                {paged.map(item => {
+                    const id = String(item.id);
+                    const checked = selectedSet.has(id);
+                    return (
+                        <label key={id} style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem',
+                            cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-900)', fontSize: '0.85rem',
+                            background: checked ? 'rgba(59,130,246,0.15)' : 'transparent',
+                        }}>
+                            <input type="checkbox" checked={checked} onChange={() => onToggle(item.id)} />
+                            <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>{item.name}</span>
+                        </label>
+                    );
+                })}
+                {(items || []).length === 0 && (
+                    <p style={{ margin: 0, padding: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>{emptyLabel}</p>
+                )}
+            </div>
+            {(items || []).length > PAGE_SIZE && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.6rem', gap: '0.5rem' }}>
+                    <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                        disabled={pageSafe <= 1}
+                        onClick={() => setPage(p => Math.max(1, p - 1))}>
+                        Sebelumnya
+                    </button>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--gray-700)', fontWeight: 600 }}>
+                        Halaman {pageSafe} dari {totalPages}
+                    </span>
+                    <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                        disabled={pageSafe >= totalPages}
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
+                        Selanjutnya
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function timeToPercent(time) {
     const [h, m] = toTimeInput(time).split(':').map(Number);
     if (Number.isNaN(h) || Number.isNaN(m)) return 0;
@@ -202,6 +273,8 @@ export default function AdminWorkSchedule() {
     const [positions, setPositions] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [allShifts, setAllShifts] = useState([]);
+    const EMP_PAGE_SIZE = 8;
+    const [empPage, setEmpPage] = useState(1);
 
     // Modals
     const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -212,7 +285,7 @@ export default function AdminWorkSchedule() {
 
     // Schedule form
     const [scheduleForm, setScheduleForm] = useState({
-        id: null, name: '', type: 'normal', shift_count: 1, department_id: '', position_id: '', is_default: false,
+        id: null, name: '', type: 'normal', shift_count: 1, department_ids: [], position_ids: [], is_default: false,
         shifts: [defaultNormalShift()],
         overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
     });
@@ -264,7 +337,10 @@ export default function AdminWorkSchedule() {
             if (dept) url += `?department=${encodeURIComponent(dept)}`;
             const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
-            if (res.ok) setEmployees(data);
+            if (res.ok) {
+                setEmployees(data);
+                setEmpPage(1);
+            }
         } catch (e) { console.error(e); }
     }, [token]);
 
@@ -339,7 +415,7 @@ export default function AdminWorkSchedule() {
     // ============================================
     function openNewSchedule() {
         setScheduleForm({
-            id: null, name: '', type: 'normal', shift_count: 1, department_id: '', position_id: '', is_default: false,
+            id: null, name: '', type: 'normal', shift_count: 1, department_ids: [], position_ids: [], is_default: false,
             shifts: [defaultNormalShift()],
             overtime_rule: { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
         });
@@ -354,8 +430,8 @@ export default function AdminWorkSchedule() {
             name: sched.name,
             type: sched.type,
             shift_count: sched.shift_count,
-            department_id: deptId ? String(deptId) : '',
-            position_id: posId ? String(posId) : '',
+            department_ids: idsFromSchedule(sched, 'department_ids', deptId, 'department', departments),
+            position_ids: idsFromSchedule(sched, 'position_ids', posId, 'position', positions),
             is_default: sched.is_default,
             shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(normalizeShiftForForm) : [defaultNormalShift()],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? sched.overtime_rule : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
@@ -369,10 +445,8 @@ export default function AdminWorkSchedule() {
             name: `${sched.name} (Copy)`,
             type: sched.type,
             shift_count: sched.shift_count,
-            department_id: '',
-            position_id: sched.position_id
-                ? String(sched.position_id)
-                : (positions.find(p => p.name === sched.position)?.id ? String(positions.find(p => p.name === sched.position).id) : ''),
+            department_ids: [],
+            position_ids: idsFromSchedule(sched, 'position_ids', sched.position_id, 'position', positions),
             is_default: false, // Don't copy default status
             shifts: sched.shifts && sched.shifts.length > 0 ? sched.shifts.map(s => ({ ...normalizeShiftForForm(s), id: undefined })) : [defaultNormalShift()],
             overtime_rule: sched.overtime_rule && sched.overtime_rule.id ? { ...sched.overtime_rule, id: undefined } : { overtime_type: 'immediate', grace_period_minutes: 0, min_overtime_minutes: 30, max_overtime_hours: 4, rate_multiplier: 1.5 }
@@ -496,8 +570,8 @@ export default function AdminWorkSchedule() {
                 name: scheduleForm.name,
                 type: scheduleForm.type,
                 shift_count: scheduleForm.shift_count,
-                department_id: scheduleForm.department_id || null,
-                position_id: scheduleForm.position_id || null,
+                department_ids: scheduleForm.department_ids || [],
+                position_ids: scheduleForm.position_ids || [],
                 is_default: scheduleForm.is_default,
                 is_active: true,
                 overtime_rule: scheduleForm.overtime_rule,
@@ -724,6 +798,17 @@ export default function AdminWorkSchedule() {
         });
     }
 
+    function toggleScheduleMaster(field, id) {
+        const sid = String(id);
+        setScheduleForm(f => {
+            const current = (f[field] || []).map(String);
+            return {
+                ...f,
+                [field]: current.includes(sid) ? current.filter(x => x !== sid) : [...current, sid]
+            };
+        });
+    }
+
     // ============================================
     // RENDER: TAB CONTENT
     // ============================================
@@ -824,6 +909,7 @@ export default function AdminWorkSchedule() {
                     </div>
                     <button className="btn btn-primary" onClick={() => {
                         setAssignForm({ user_ids: [], shift_id: '', dates: [], assign_mode: 'daily', start_date: '', end_date: '' });
+                        setEmpPage(1);
                         setShowAssignModal(true);
                     }}>+ Assign Shift</button>
                 </div>
@@ -918,6 +1004,7 @@ export default function AdminWorkSchedule() {
                     </div>
                     <button className="btn btn-primary" onClick={() => {
                         setOtForm({ date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '', employee_ids: [] });
+                        setEmpPage(1);
                         setShowOvertimeModal(true);
                     }}>+ Ajukan Lembur</button>
                 </div>
@@ -1050,29 +1137,31 @@ export default function AdminWorkSchedule() {
                     </div>
 
                     <div style={{ padding: '1.5rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '1rem' }}>
-                            <div className="form-group">
-                                <label className="form-label">Nama Jadwal *</label>
-                                <input className="form-input" value={scheduleForm.name}
-                                    onChange={e => setScheduleForm(f => ({ ...f, name: e.target.value }))}
-                                    placeholder="e.g. Jadwal Normal Kantor, 3 Shift Pabrik" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Departemen</label>
-                                <select className="form-input form-select" value={scheduleForm.department_id}
-                                    onChange={e => setScheduleForm(f => ({ ...f, department_id: e.target.value }))}>
-                                    <option value="">Semua Departemen</option>
-                                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Jabatan (Opsional)</label>
-                                <select className="form-input form-select" value={scheduleForm.position_id}
-                                    onChange={e => setScheduleForm(f => ({ ...f, position_id: e.target.value }))}>
-                                    <option value="">Semua Jabatan</option>
-                                    {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                </select>
-                            </div>
+                        <div className="form-group">
+                            <label className="form-label">Nama Jadwal *</label>
+                            <input className="form-input" value={scheduleForm.name}
+                                onChange={e => setScheduleForm(f => ({ ...f, name: e.target.value }))}
+                                placeholder="e.g. Jadwal Normal Kantor, 3 Shift Pabrik" />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <PagedChecklist
+                                title="Departemen"
+                                items={departments}
+                                selectedIds={scheduleForm.department_ids}
+                                onToggle={(id) => toggleScheduleMaster('department_ids', id)}
+                                onSelectAll={() => setScheduleForm(f => ({ ...f, department_ids: departments.map(d => String(d.id)) }))}
+                                onClear={() => setScheduleForm(f => ({ ...f, department_ids: [] }))}
+                                emptyLabel="Belum ada departemen."
+                            />
+                            <PagedChecklist
+                                title="Jabatan (Opsional)"
+                                items={positions}
+                                selectedIds={scheduleForm.position_ids}
+                                onToggle={(id) => toggleScheduleMaster('position_ids', id)}
+                                onSelectAll={() => setScheduleForm(f => ({ ...f, position_ids: positions.map(p => String(p.id)) }))}
+                                onClear={() => setScheduleForm(f => ({ ...f, position_ids: [] }))}
+                                emptyLabel="Belum ada jabatan."
+                            />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
@@ -1338,32 +1427,60 @@ export default function AdminWorkSchedule() {
                             </select>
                         </div>
 
-                        {/* Employee multiselect */}
+                        {/* Employee pagination */}
+                        {(() => {
+                            const empTotalPages = Math.max(1, Math.ceil(employees.length / EMP_PAGE_SIZE));
+                            const empPageSafe = Math.min(empPage, empTotalPages);
+                            const pagedEmployees = employees.slice((empPageSafe - 1) * EMP_PAGE_SIZE, empPageSafe * EMP_PAGE_SIZE);
+                            return (
                         <div className="form-group">
                             <label className="form-label">Pilih Karyawan * ({assignForm.user_ids.length} dipilih)</label>
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                     onClick={() => setAssignForm(f => ({ ...f, user_ids: employees.map(e => e.id) }))}>Pilih Semua</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                     onClick={() => setAssignForm(f => ({ ...f, user_ids: [] }))}>Hapus Semua</button>
                             </div>
-                            <div style={{ maxHeight: '200px', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
-                                {employees.map(emp => (
+                            <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
+                                {pagedEmployees.map(emp => (
                                     <label key={emp.id} style={{
                                         display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem',
-                                        cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-200)', fontSize: '0.85rem',
+                                        cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-900)', fontSize: '0.85rem',
                                         background: assignForm.user_ids.includes(emp.id) ? 'rgba(59,130,246,0.15)' : 'transparent',
                                         transition: 'background 0.15s'
                                     }}>
                                         <input type="checkbox" checked={assignForm.user_ids.includes(emp.id)}
                                             onChange={() => toggleEmployeeSelection(emp.id, assignForm.user_ids, setAssignForm, 'user_ids')} />
-                                        <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>{emp.employee_id}</span>
-                                        {emp.department && <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginLeft: 'auto' }}>{emp.department}</span>}
+                                        <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>
+                                            {emp.name}{emp.employee_id ? ` (${emp.employee_id})` : ''}
+                                        </span>
+                                        {emp.department && <span style={{ fontSize: '0.7rem', color: 'var(--gray-600)', marginLeft: 'auto' }}>{emp.department}</span>}
                                     </label>
                                 ))}
+                                {employees.length === 0 && (
+                                    <p style={{ margin: 0, padding: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>Tidak ada karyawan.</p>
+                                )}
                             </div>
+                            {employees.length > EMP_PAGE_SIZE && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.6rem', gap: '0.5rem' }}>
+                                    <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                                        disabled={empPageSafe <= 1}
+                                        onClick={() => setEmpPage(p => Math.max(1, p - 1))}>
+                                        Sebelumnya
+                                    </button>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--gray-700)', fontWeight: 600 }}>
+                                        Halaman {empPageSafe} dari {empTotalPages}
+                                    </span>
+                                    <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                                        disabled={empPageSafe >= empTotalPages}
+                                        onClick={() => setEmpPage(p => Math.min(empTotalPages, p + 1))}>
+                                        Selanjutnya
+                                    </button>
+                                </div>
+                            )}
                         </div>
+                            );
+                        })()}
 
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button className="btn btn-outline" onClick={() => setShowAssignModal(false)}>Batal</button>
@@ -1454,30 +1571,58 @@ export default function AdminWorkSchedule() {
                                 placeholder="Jelaskan alasan dan pekerjaan lembur..." />
                         </div>
 
-                        {/* Employee multiselect */}
+                        {/* Employee pagination */}
+                        {(() => {
+                            const empTotalPages = Math.max(1, Math.ceil(employees.length / EMP_PAGE_SIZE));
+                            const empPageSafe = Math.min(empPage, empTotalPages);
+                            const pagedEmployees = employees.slice((empPageSafe - 1) * EMP_PAGE_SIZE, empPageSafe * EMP_PAGE_SIZE);
+                            return (
                         <div className="form-group">
                             <label className="form-label">Karyawan Lembur * ({otForm.employee_ids.length} dipilih)</label>
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                     onClick={() => setOtForm(f => ({ ...f, employee_ids: employees.map(e => e.id) }))}>Pilih Semua</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                     onClick={() => setOtForm(f => ({ ...f, employee_ids: [] }))}>Hapus Semua</button>
                             </div>
-                            <div style={{ maxHeight: '180px', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
-                                {employees.map(emp => (
+                            <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
+                                {pagedEmployees.map(emp => (
                                     <label key={emp.id} style={{
                                         display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem',
-                                        cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-200)', fontSize: '0.85rem',
+                                        cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-900)', fontSize: '0.85rem',
                                         background: otForm.employee_ids.includes(emp.id) ? 'rgba(59,130,246,0.15)' : 'transparent',
                                     }}>
                                         <input type="checkbox" checked={otForm.employee_ids.includes(emp.id)}
                                             onChange={() => toggleEmployeeSelection(emp.id, otForm.employee_ids, setOtForm, 'employee_ids')} />
-                                        <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>{emp.employee_id}</span>
+                                        <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>
+                                            {emp.name}{emp.employee_id ? ` (${emp.employee_id})` : ''}
+                                        </span>
                                     </label>
                                 ))}
+                                {employees.length === 0 && (
+                                    <p style={{ margin: 0, padding: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>Tidak ada karyawan.</p>
+                                )}
                             </div>
+                            {employees.length > EMP_PAGE_SIZE && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.6rem', gap: '0.5rem' }}>
+                                    <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                                        disabled={empPageSafe <= 1}
+                                        onClick={() => setEmpPage(p => Math.max(1, p - 1))}>
+                                        Sebelumnya
+                                    </button>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--gray-700)', fontWeight: 600 }}>
+                                        Halaman {empPageSafe} dari {empTotalPages}
+                                    </span>
+                                    <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                                        disabled={empPageSafe >= empTotalPages}
+                                        onClick={() => setEmpPage(p => Math.min(empTotalPages, p + 1))}>
+                                        Selanjutnya
+                                    </button>
+                                </div>
+                            )}
                         </div>
+                            );
+                        })()}
 
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button className="btn btn-outline" onClick={() => setShowOvertimeModal(false)}>Batal</button>

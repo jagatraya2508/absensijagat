@@ -30,6 +30,8 @@ export default function Overtime() {
     const [allShifts, setAllShifts] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const EMP_PAGE_SIZE = 8;
+    const [empPage, setEmpPage] = useState(1);
 
     const fetchRequests = useCallback(async () => {
         setLoading(true);
@@ -74,7 +76,10 @@ export default function Overtime() {
             if (dept) url += `?department=${encodeURIComponent(dept)}`;
             const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
-            if (res.ok) setEmployees(data);
+            if (res.ok) {
+                setEmployees(data);
+                setEmpPage(1);
+            }
         } catch (e) { console.error(e); }
     }, [token, user, isAdmin]);
 
@@ -95,6 +100,7 @@ export default function Overtime() {
             date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '',
             employee_ids: isAdmin ? [] : [user.id]
         });
+        setEmpPage(1);
         setShowModal(true);
     }
 
@@ -110,6 +116,7 @@ export default function Overtime() {
             reason: req.reason || '',
             employee_ids: req.employees ? req.employees.map(e => e.user_id) : []
         });
+        setEmpPage(1);
         if (req.department) fetchEmployees(req.department);
         setShowModal(true);
     }
@@ -414,32 +421,58 @@ export default function Overtime() {
                                     placeholder="Jelaskan alasan dan pekerjaan yang akan dilakukan..." />
                             </div>
 
-                            {/* Employee multiselect only for Admin */}
-                            {isAdmin && (
+                            {/* Employee pagination only for Admin */}
+                            {isAdmin && (() => {
+                                const empTotalPages = Math.max(1, Math.ceil(employees.length / EMP_PAGE_SIZE));
+                                const empPageSafe = Math.min(empPage, empTotalPages);
+                                const pagedEmployees = employees.slice((empPageSafe - 1) * EMP_PAGE_SIZE, empPageSafe * EMP_PAGE_SIZE);
+                                return (
                                 <div className="form-group">
                                     <label className="form-label">Karyawan Lembur * ({otForm.employee_ids.length} dipilih)</label>
                                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                        <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                             onClick={() => setOtForm(f => ({ ...f, employee_ids: employees.map(e => e.id) }))}>Pilih Semua</button>
-                                        <button className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                             onClick={() => setOtForm(f => ({ ...f, employee_ids: [] }))}>Hapus Semua</button>
                                     </div>
-                                    <div style={{ maxHeight: '180px', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
-                                        {employees.map(emp => (
+                                    <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
+                                        {pagedEmployees.map(emp => (
                                             <label key={emp.id} style={{
                                                 display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem',
-                                                cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-200)', fontSize: '0.85rem',
+                                                cursor: 'pointer', borderRadius: 'var(--radius-sm)', color: 'var(--gray-900)', fontSize: '0.85rem',
                                                 background: otForm.employee_ids.includes(emp.id) ? 'rgba(59,130,246,0.15)' : 'transparent',
                                             }}>
                                                 <input type="checkbox" checked={otForm.employee_ids.includes(emp.id)}
                                                     onChange={() => toggleEmployeeSelection(emp.id)} />
-                                                <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                                                <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{emp.employee_id}</span>
+                                                <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>
+                                                    {emp.name}{emp.employee_id ? ` (${emp.employee_id})` : ''}
+                                                </span>
                                             </label>
                                         ))}
+                                        {employees.length === 0 && (
+                                            <p style={{ margin: 0, padding: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>Tidak ada karyawan.</p>
+                                        )}
                                     </div>
+                                    {employees.length > EMP_PAGE_SIZE && (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.6rem', gap: '0.5rem' }}>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                                                disabled={empPageSafe <= 1}
+                                                onClick={() => setEmpPage(p => Math.max(1, p - 1))}>
+                                                Sebelumnya
+                                            </button>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-700)', fontWeight: 600 }}>
+                                                Halaman {empPageSafe} dari {empTotalPages}
+                                            </span>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                                                disabled={empPageSafe >= empTotalPages}
+                                                onClick={() => setEmpPage(p => Math.min(empTotalPages, p + 1))}>
+                                                Selanjutnya
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                                );
+                            })()}
 
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                                 <button className="btn btn-outline" onClick={() => { setShowModal(false); setEditingId(null); }}>Batal</button>
