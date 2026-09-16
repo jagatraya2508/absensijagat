@@ -141,19 +141,19 @@ export default function AdminManualAttendance() {
                                 key={request.id}
                                 style={{
                                     padding: '1.25rem',
-                                    background: 'rgba(255,255,255,0.03)',
+                                    background: 'var(--gray-50)',
                                     borderRadius: 'var(--radius-lg)',
-                                    border: request.status === 'pending' ? '2px solid var(--warning-500)' : '1px solid rgba(255,255,255,0.1)'
+                                    border: request.status === 'pending' ? '2px solid var(--warning-500)' : '1px solid var(--gray-200)'
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                            <span style={{ fontSize: '1.25rem' }}><Icon name="User" size={16} inline /></span>
-                                            <strong style={{ color: 'white' }}>{request.employee_name}</strong>
-                                            <span style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>({request.employee_id})</span>
+                                            <span style={{ fontSize: '1.25rem', color: 'var(--gray-700)' }}><Icon name="User" size={16} inline /></span>
+                                            <strong style={{ color: 'var(--gray-900)' }}>{request.employee_name}</strong>
+                                            <span style={{ color: 'var(--gray-500)', fontSize: '0.85rem' }}>({request.employee_id})</span>
                                         </div>
-                                        <p style={{ margin: 0, color: 'var(--gray-300)', fontSize: '0.9rem' }}>
+                                        <p style={{ margin: 0, color: 'var(--gray-600)', fontSize: '0.9rem' }}>
                                             {format(new Date(request.date), 'dd MMMM yyyy', { locale: id })}
                                             <span style={{ marginLeft: '0.5rem', color: 'var(--primary-400)' }}>
                                                 (Masuk: {request.time_in ? request.time_in.substring(0, 5) : '-'} | Pulang: {request.time_out ? request.time_out.substring(0, 5) : '-'})
@@ -172,11 +172,11 @@ export default function AdminManualAttendance() {
 
                                 <div style={{
                                     padding: '0.75rem',
-                                    background: 'rgba(255,255,255,0.05)',
+                                    background: 'var(--gray-100)',
                                     borderRadius: 'var(--radius)',
                                     marginBottom: '0.75rem'
                                 }}>
-                                    <p style={{ margin: 0, color: 'var(--gray-200)', fontSize: '0.9rem' }}>
+                                    <p style={{ margin: 0, color: 'var(--gray-800)', fontSize: '0.9rem' }}>
                                         <strong>Alasan:</strong> {request.reason}
                                     </p>
                                     {request.attachment_path && (
@@ -198,17 +198,17 @@ export default function AdminManualAttendance() {
                                     <p style={{
                                         margin: '0 0 0.75rem',
                                         padding: '0.5rem',
-                                        background: 'rgba(255,255,255,0.05)',
+                                        background: 'var(--gray-100)',
                                         borderRadius: 'var(--radius)',
                                         fontSize: '0.85rem',
-                                        color: 'var(--gray-400)'
+                                        color: 'var(--gray-700)'
                                     }}>
                                         <strong>Catatan Admin:</strong> {request.admin_notes}
                                     </p>
                                 )}
 
                                 {request.status === 'pending' && (
-                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+                                    <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
                                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                             <button
                                                 className="btn btn-success"
@@ -229,7 +229,7 @@ export default function AdminManualAttendance() {
                                 )}
 
                                 {request.status === 'approved' && (
-                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+                                    <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
                                         <button
                                             className="btn btn-outline"
                                             onClick={() => handleCancelApproval(request)}
@@ -277,7 +277,8 @@ export default function AdminManualAttendance() {
                         <form onSubmit={handleProcess}>
                         <div style={{
                             padding: '1rem',
-                            background: 'rgba(255,255,255,0.03)',
+                            background: 'var(--gray-50)',
+                            border: '1px solid var(--gray-200)',
                             borderRadius: 'var(--radius)',
                             marginBottom: '1rem'
                         }}>

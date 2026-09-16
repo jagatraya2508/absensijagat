@@ -145,9 +145,9 @@ export default function AdminEmploymentStatuses() {
                             <tbody>
                                 {filteredData.map(item => (
                                     <tr key={item.id}>
-                                        <td style={{ color: 'var(--gray-400)' }}>#{item.id}</td>
+                                        <td style={{ color: 'var(--gray-500)' }}>#{item.id}</td>
                                         <td style={{ fontWeight: 500 }}>{item.name}</td>
-                                        <td style={{ color: 'var(--gray-300)' }}>{item.description || '-'}</td>
+                                        <td style={{ color: 'var(--gray-600)' }}>{item.description || '-'}</td>
                                         <td style={{ textAlign: 'center' }}>
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                                                 <button

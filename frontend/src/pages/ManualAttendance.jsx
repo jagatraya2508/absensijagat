@@ -153,19 +153,19 @@ export default function ManualAttendance() {
                                 key={request.id}
                                 style={{
                                     padding: '1rem',
-                                    background: 'rgba(255,255,255,0.03)',
+                                    background: 'var(--gray-50)',
                                     borderRadius: 'var(--radius-lg)',
-                                    border: '1px solid rgba(255,255,255,0.1)'
+                                    border: '1px solid var(--gray-200)'
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <span style={{ fontSize: '1.5rem' }}><Icon name="Clock" size={16} inline /></span>
+                                        <span style={{ fontSize: '1.5rem', color: 'var(--gray-700)' }}><Icon name="Clock" size={16} inline /></span>
                                         <div>
-                                            <h4 style={{ margin: 0, color: 'white' }}>{format(new Date(request.date), 'dd MMMM yyyy', { locale: id })}</h4>
-                                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--gray-400)' }}>
-                                                Masuk: <strong>{request.time_in ? request.time_in.substring(0, 5) : '-'}</strong> | 
-                                                Pulang: <strong>{request.time_out ? request.time_out.substring(0, 5) : '-'}</strong>
+                                            <h4 style={{ margin: 0, color: 'var(--gray-900)' }}>{format(new Date(request.date), 'dd MMMM yyyy', { locale: id })}</h4>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--gray-600)' }}>
+                                                Masuk: <strong style={{ color: 'var(--gray-800)' }}>{request.time_in ? request.time_in.substring(0, 5) : '-'}</strong> | 
+                                                Pulang: <strong style={{ color: 'var(--gray-800)' }}>{request.time_out ? request.time_out.substring(0, 5) : '-'}</strong>
                                             </p>
                                         </div>
                                     </div>
@@ -174,8 +174,8 @@ export default function ManualAttendance() {
                                     </span>
                                 </div>
 
-                                <p style={{ margin: '0.75rem 0', color: 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                    {request.reason}
+                                <p style={{ margin: '0.75rem 0', color: 'var(--gray-800)', fontSize: '0.9rem', padding: '0.75rem', background: 'var(--gray-100)', borderRadius: 'var(--radius)' }}>
+                                    <strong>Alasan:</strong> {request.reason}
                                 </p>
 
                                 {request.attachment_path && (
