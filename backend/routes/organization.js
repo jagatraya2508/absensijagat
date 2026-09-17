@@ -35,13 +35,25 @@ router.use(async (req, res, next) => {
 router.get('/', authenticateToken, canManageOrg, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT u.id, u.employee_id, u.name, u.email, u.role, u.photo,
+            SELECT u.id, u.employee_id, u.name, u.email, u.role,
+                   NULLIF(TRIM(u.photo), '') AS photo,
+                   att.photo_path AS attendance_photo,
                    ed.department, ed.position, ed.supervisor_id,
                    supervisor.name as supervisor_name,
                    supervisor.employee_id as supervisor_employee_id
             FROM users u
             LEFT JOIN employee_details ed ON ed.user_id = u.id
             LEFT JOIN users supervisor ON supervisor.id = ed.supervisor_id
+            LEFT JOIN LATERAL (
+                SELECT ar.photo_path
+                FROM attendance_records ar
+                WHERE ar.user_id = u.id
+                  AND ar.photo_path IS NOT NULL
+                  AND ar.photo_path <> ''
+                  AND ar.photo_path <> 'manual'
+                ORDER BY ar.recorded_at DESC
+                LIMIT 1
+            ) att ON true
             ORDER BY u.name ASC
         `);
 

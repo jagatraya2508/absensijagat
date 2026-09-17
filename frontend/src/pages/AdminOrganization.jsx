@@ -2,6 +2,52 @@ import { useEffect, useMemo, useState } from 'react';
 import { organizationAPI } from '../utils/api';
 import Icon from '../components/Icon';
 
+function resolveMediaUrl(path) {
+    if (!path || path === 'manual') return '';
+    const value = String(path).trim();
+    if (!value) return '';
+    if (/^(https?:|blob:|data:)/i.test(value)) return value;
+    const normalized = value.startsWith('/') ? value : `/${value}`;
+    const api = import.meta.env.VITE_API_URL;
+    if (api && /^https?:/i.test(api)) {
+        return `${api.replace(/\/api\/?$/, '')}${normalized}`;
+    }
+    return normalized;
+}
+
+function ProfileAvatar({ photo, fallbackPhoto, name, size = 32 }) {
+    const sources = [resolveMediaUrl(photo), resolveMediaUrl(fallbackPhoto)].filter(Boolean);
+    const [index, setIndex] = useState(0);
+    const src = sources[index];
+
+    return (
+        <div style={{
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            flexShrink: 0,
+            background: 'var(--gray-200)',
+            color: '#111',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: size * 0.4,
+            border: '1px solid var(--gray-300)'
+        }}>
+            {src ? (
+                <img
+                    src={src}
+                    alt={name || ''}
+                    onError={() => setIndex((i) => i + 1)}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+            ) : (name || '?').charAt(0)}
+        </div>
+    );
+}
+
 function OrgNode({ node, depth = 0 }) {
     const [open, setOpen] = useState(depth < 2);
     const hasChildren = node.children && node.children.length > 0;
@@ -29,21 +75,12 @@ function OrgNode({ node, depth = 0 }) {
                         {open ? <Icon name="ChevronDown" size={12} /> : <Icon name="ChevronRight" size={12} />}
                     </button>
                 ) : (
-                    <span style={{ width: 28, textAlign: 'center', opacity: 0.35 }}>•</span>
+                    <span style={{ width: 28, textAlign: 'center', color: '#111' }}>•</span>
                 )}
-                <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, fontSize: '0.8rem'
-                }}>
-                    {node.photo ? (
-                        <img src={node.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                    ) : (node.name || '?').charAt(0)}
-                </div>
+                <ProfileAvatar photo={node.photo} fallbackPhoto={node.attendance_photo} name={node.name} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: 'white' }}>{node.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>
+                    <div style={{ fontWeight: 700, color: '#111' }}>{node.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#111' }}>
                         {node.position || node.role} {node.department ? `• ${node.department}` : ''}
                     </div>
                 </div>
@@ -114,7 +151,7 @@ export default function AdminOrganization() {
         <div>
             <div className="page-header">
                 <h1 className="page-title"><Icon name="Building2" size={16} inline /> Struktur Organisasi</h1>
-                <p className="page-subtitle">Tentukan atasan tiap karyawan. Rantai ini dipakai untuk approval izin & cuti bertingkat.</p>
+                <p className="page-subtitle" style={{ color: '#111' }}>Tentukan atasan tiap karyawan. Rantai ini dipakai untuk approval izin & cuti bertingkat.</p>
             </div>
 
             {error && <div className="alert alert-danger mb-4"><Icon name="AlertTriangle" size={16} inline /> {error}</div>}
@@ -160,7 +197,7 @@ export default function AdminOrganization() {
                     </div>
                 ) : (
                     <div>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-400)', marginBottom: '1rem' }}>
+                        <p style={{ fontSize: '0.85rem', color: '#111', marginBottom: '1rem' }}>
                             Orang tanpa atasan tampil di tingkat teratas. Tetapkan atasan di tabel bawah agar rantai approval berjalan.
                         </p>
                         {data.tree.map((node) => (
@@ -194,12 +231,17 @@ export default function AdminOrganization() {
                             {filteredMembers.map((member) => (
                                 <tr key={member.id}>
                                     <td>
-                                        <div style={{ fontWeight: 600 }}>{member.name}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{member.employee_id} • {member.role}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                            <ProfileAvatar photo={member.photo} fallbackPhoto={member.attendance_photo} name={member.name} />
+                                            <div>
+                                                <div style={{ fontWeight: 600 }}>{member.name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#111' }}>{member.employee_id} • {member.role}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         <div>{member.department || '-'}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{member.position || '-'}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#111' }}>{member.position || '-'}</div>
                                     </td>
                                     <td>
                                         <select
@@ -222,7 +264,7 @@ export default function AdminOrganization() {
                             ))}
                             {filteredMembers.length === 0 && (
                                 <tr>
-                                    <td colSpan={3} style={{ textAlign: 'center', color: 'var(--gray-400)', padding: '1.5rem' }}>
+                                    <td colSpan={3} style={{ textAlign: 'center', color: '#111', padding: '1.5rem' }}>
                                         Tidak ada data
                                     </td>
                                 </tr>
