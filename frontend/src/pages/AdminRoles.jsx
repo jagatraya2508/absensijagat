@@ -427,13 +427,14 @@ export default function AdminRoles() {
             {/* Modal Tambah/Edit */}
             {isModalOpen && (
                 <div className="modal-overlay" onClick={handleCloseModal}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '960px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '960px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editingRole ? 'Edit Role' : 'Tambah Role Baru'}</h2>
                             <button className="modal-close" onClick={handleCloseModal}>&times;</button>
                         </div>
                         
-                        <form onSubmit={handleSubmit} className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                            <div className="modal-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Nama Role (ID Unik)</label>
@@ -521,8 +522,6 @@ export default function AdminRoles() {
                                         display: 'grid', 
                                         gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
                                         gap: '1rem',
-                                        maxHeight: 'min(58vh, 560px)',
-                                        overflowY: 'auto',
                                         padding: '0.25rem 0.35rem 0.5rem 0'
                                     }}>
                                         {Object.keys(groupedPermissions).length === 0 ? (
@@ -572,8 +571,15 @@ export default function AdminRoles() {
                                     </div>
                                 </>
                             )}
+                            </div>
 
-                            <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
+                            {error && isModalOpen && (
+                                <div className="alert alert-danger" style={{ margin: '0 1.5rem' }}>
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="modal-footer" style={{ flexShrink: 0, background: '#fff' }}>
                                 <button type="button" className="btn btn-outline" onClick={handleCloseModal}>
                                     Batal
                                 </button>

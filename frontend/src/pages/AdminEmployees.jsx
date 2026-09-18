@@ -223,6 +223,14 @@ export default function AdminEmployees() {
             if (!payload.supervisor_id) {
                 payload.supervisor_id = null;
             }
+            const moneyFields = [
+                'basic_salary', 'transport_allowance', 'meal_allowance', 'overtime_rate',
+                'driver_subuh_allowance', 'driver_rit_allowance', 'driver_inap_allowance',
+                'driver_ritase_dekat_allowance', 'driver_ritase_jauh_allowance'
+            ];
+            moneyFields.forEach(f => {
+                payload[f] = payload[f] === '' || payload[f] == null ? 0 : parseFloat(payload[f]) || 0;
+            });
             rateFields.forEach(f => {
                 if (payload[f] !== '' && payload[f] != null) {
                     payload[f] = parseFloat(payload[f]) / 100;
@@ -249,6 +257,37 @@ export default function AdminEmployees() {
             }
             return next;
         });
+    }
+
+    function parseMoneyInput(raw) {
+        if (raw === '') return '';
+        const n = parseFloat(raw);
+        return Number.isNaN(n) ? '' : n;
+    }
+
+    function updateMoneyField(field, raw) {
+        updateField(field, parseMoneyInput(raw));
+    }
+
+    function commitMoneyField(field, raw) {
+        if (raw === '' || raw == null) {
+            updateField(field, 0);
+            return;
+        }
+        const n = parseFloat(raw);
+        updateField(field, Number.isNaN(n) ? 0 : n);
+    }
+
+    function moneyInputProps(field) {
+        return {
+            className: 'form-input',
+            type: 'number',
+            min: '0',
+            value: formData[field] ?? '',
+            onChange: e => updateMoneyField(field, e.target.value),
+            onBlur: e => commitMoneyField(field, e.target.value),
+            onFocus: e => e.target.select()
+        };
     }
 
     function toggleLocation(locId) {
@@ -1035,19 +1074,19 @@ export default function AdminEmployees() {
                                             <label className="form-label">
                                                 {formData.salary_type === 'daily' ? 'Gaji per Hari (Rp)' : formData.salary_type === 'weekly' ? 'Gaji per Minggu (Rp)' : 'Gaji per Bulan (Rp)'}
                                             </label>
-                                            <input className="form-input" type="number" value={formData.basic_salary} onChange={e => updateField('basic_salary', parseFloat(e.target.value) || 0)} />
+                                            <input {...moneyInputProps('basic_salary')} />
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tunjangan Transport (Rp/bln)</label>
-                                            <input className="form-input" type="number" value={formData.transport_allowance} onChange={e => updateField('transport_allowance', parseFloat(e.target.value) || 0)} />
+                                            <input {...moneyInputProps('transport_allowance')} />
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tunjangan Makan (Rp/bln)</label>
-                                            <input className="form-input" type="number" value={formData.meal_allowance} onChange={e => updateField('meal_allowance', parseFloat(e.target.value) || 0)} />
+                                            <input {...moneyInputProps('meal_allowance')} />
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tarif Lembur/Jam (Rp)</label>
-                                            <input className="form-input" type="number" value={formData.overtime_rate} onChange={e => updateField('overtime_rate', parseFloat(e.target.value) || 0)} />
+                                            <input {...moneyInputProps('overtime_rate')} />
                                         </div>
 
                                         {/* Driver Toggle */}
@@ -1088,23 +1127,23 @@ export default function AdminEmployees() {
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', animation: 'fadeIn 0.3s ease' }}>
                                                     <div className="form-group" style={{ margin: 0 }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Moon" size={16} inline /> Uang Jalan Subuh (Rp)</label>
-                                                        <input className="form-input" type="number" value={formData.driver_subuh_allowance} onChange={e => updateField('driver_subuh_allowance', parseFloat(e.target.value) || 0)} />
+                                                        <input {...moneyInputProps('driver_subuh_allowance')} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="RefreshCw" size={16} inline /> Uang Mel / RIT (Rp)</label>
-                                                        <input className="form-input" type="number" value={formData.driver_rit_allowance} onChange={e => updateField('driver_rit_allowance', parseFloat(e.target.value) || 0)} />
+                                                        <input {...moneyInputProps('driver_rit_allowance')} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Building2" size={16} inline /> Uang Menginap/Hari (Rp)</label>
-                                                        <input className="form-input" type="number" value={formData.driver_inap_allowance} onChange={e => updateField('driver_inap_allowance', parseFloat(e.target.value) || 0)} />
+                                                        <input {...moneyInputProps('driver_inap_allowance')} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Truck" size={16} inline /> Uang Ritase Jarak Dekat (Rp)</label>
-                                                        <input className="form-input" type="number" value={formData.driver_ritase_dekat_allowance || 0} onChange={e => updateField('driver_ritase_dekat_allowance', parseFloat(e.target.value) || 0)} />
+                                                        <input {...moneyInputProps('driver_ritase_dekat_allowance')} />
                                                     </div>
                                                     <div className="form-group" style={{ margin: 0 }}>
                                                         <label className="form-label" style={{ fontSize: '0.78rem' }}><Icon name="Truck" size={16} inline /> Uang Ritase Jarak Jauh (Rp)</label>
-                                                        <input className="form-input" type="number" value={formData.driver_ritase_jauh_allowance || 0} onChange={e => updateField('driver_ritase_jauh_allowance', parseFloat(e.target.value) || 0)} />
+                                                        <input {...moneyInputProps('driver_ritase_jauh_allowance')} />
                                                     </div>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--gray-400)', gridColumn: '1 / -1', marginTop: '-0.25rem', marginBottom: '0.25rem', lineHeight: 1.2 }}>
                                                         *Otomatis dihitung mulai dari perjalanan (RIT) ke-2 dan seterusnya
