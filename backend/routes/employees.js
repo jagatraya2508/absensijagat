@@ -267,7 +267,7 @@ router.get('/', authenticateToken, hasPermission('admin.employees'), async (req,
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN vehicle_types vt ON ed.vehicle_type_id = vt.id
             LEFT JOIN users supervisor ON supervisor.id = ed.supervisor_id
-            WHERE u.role = 'employee'
+            WHERE u.role != 'admin'
             ORDER BY u.name ASC
         `);
         res.json(result.rows);

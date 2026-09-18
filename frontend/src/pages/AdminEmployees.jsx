@@ -64,6 +64,8 @@ export default function AdminEmployees() {
     const [success, setSuccess] = useState('');
     const [search, setSearch] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 10;
     const [documents, setDocuments] = useState([]);
     const [uploadingDoc, setUploadingDoc] = useState(false);
     const [docType, setDocType] = useState('KTP');
@@ -363,6 +365,53 @@ export default function AdminEmployees() {
 
         return result;
     }, [employees, search, sortConfig]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, sortConfig]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const pagedEmployees = filteredEmployees.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+    const pageStart = filteredEmployees.length === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+    const pageEnd = Math.min(pageSafe * PAGE_SIZE, filteredEmployees.length);
+
+    const pageNumbers = useMemo(() => {
+        const total = totalPages;
+        const current = pageSafe;
+        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+        const pages = new Set([1, total, current, current - 1, current + 1]);
+        if (current <= 3) {
+            pages.add(2); pages.add(3); pages.add(4);
+        }
+        if (current >= total - 2) {
+            pages.add(total - 1); pages.add(total - 2); pages.add(total - 3);
+        }
+        const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+        const result = [];
+        sorted.forEach((p, i) => {
+            if (i > 0 && p - sorted[i - 1] > 1) result.push('ellipsis-' + sorted[i - 1]);
+            result.push(p);
+        });
+        return result;
+    }, [totalPages, pageSafe]);
+
+    const pagerBtnStyle = (active, disabled) => ({
+        minWidth: 36,
+        height: 36,
+        padding: '0 0.55rem',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 'var(--radius-md)',
+        border: active ? '1px solid var(--primary, #7f1d1d)' : '1px solid var(--gray-200)',
+        background: active ? 'var(--primary, #7f1d1d)' : '#fff',
+        color: active ? '#fff' : 'var(--gray-800)',
+        fontWeight: 600,
+        fontSize: '0.85rem',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
+    });
 
     // Export to Excel
     function handleExportExcel() {
@@ -669,6 +718,7 @@ export default function AdminEmployees() {
                         <p className="empty-state-text">Belum ada karyawan</p>
                     </div>
                 ) : (
+                    <div>
                     <div className="table-container">
                         <table className="table">
                             <thead>
@@ -701,7 +751,7 @@ export default function AdminEmployees() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredEmployees.map(emp => (
+                                {pagedEmployees.map(emp => (
                                     <tr key={emp.id}>
                                         <td style={{ fontWeight: 500 }}>{emp.employee_id}</td>
                                         <td>{emp.name}</td>
@@ -724,6 +774,77 @@ export default function AdminEmployees() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem',
+                        padding: '0.85rem 1.1rem 1.1rem',
+                        borderTop: '1px solid var(--gray-100)',
+                    }}>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--gray-600)' }}>
+                            Menampilkan {pageStart}-{pageEnd} dari {filteredEmployees.length} karyawan
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                title="Halaman pertama"
+                                disabled={pageSafe <= 1}
+                                onClick={() => setPage(1)}
+                                style={pagerBtnStyle(false, pageSafe <= 1)}
+                            >
+                                <Icon name="ChevronsLeft" size={16} />
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                title="Halaman sebelumnya"
+                                disabled={pageSafe <= 1}
+                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                style={pagerBtnStyle(false, pageSafe <= 1)}
+                            >
+                                <Icon name="ChevronLeft" size={16} />
+                            </button>
+                            {pageNumbers.map((item) => (
+                                typeof item === 'number' ? (
+                                    <button
+                                        key={item}
+                                        type="button"
+                                        className="btn btn-outline"
+                                        onClick={() => setPage(item)}
+                                        style={pagerBtnStyle(item === pageSafe, false)}
+                                    >
+                                        {item}
+                                    </button>
+                                ) : (
+                                    <span key={item} style={{ padding: '0 0.25rem', color: 'var(--gray-500)' }}>…</span>
+                                )
+                            ))}
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                title="Halaman berikutnya"
+                                disabled={pageSafe >= totalPages}
+                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                style={pagerBtnStyle(false, pageSafe >= totalPages)}
+                            >
+                                <Icon name="ChevronRight" size={16} />
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                title="Halaman terakhir"
+                                disabled={pageSafe >= totalPages}
+                                onClick={() => setPage(totalPages)}
+                                style={pagerBtnStyle(false, pageSafe >= totalPages)}
+                            >
+                                <Icon name="ChevronsRight" size={16} />
+                            </button>
+                        </div>
+                    </div>
                     </div>
                 )}
             </div>
