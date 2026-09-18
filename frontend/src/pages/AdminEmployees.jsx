@@ -133,9 +133,12 @@ export default function AdminEmployees() {
     async function fetchEmployees() {
         try {
             const data = await employeesAPI.getAll();
-            setEmployees(data);
+            setEmployees(Array.isArray(data) ? data : []);
+            setError('');
         } catch (err) {
             console.error('Failed to fetch employees:', err);
+            setEmployees([]);
+            setError(err.message || 'Gagal memuat data karyawan');
         } finally {
             setLoading(false);
         }
@@ -554,6 +557,12 @@ export default function AdminEmployees() {
                 <h1 className="page-title"><Icon name="User" size={16} inline /> Data Karyawan</h1>
                 <p className="page-subtitle">Kelola data lengkap karyawan</p>
             </div>
+
+            {error && !showModal && (
+                <div className="alert alert-danger mb-3">
+                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}
+                </div>
+            )}
 
             {success && (
                 <div className="alert alert-success mb-3">

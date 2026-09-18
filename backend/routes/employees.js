@@ -6,7 +6,7 @@ const fs = require('fs');
 const ExcelJS = require('exceljs');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
 const { wouldCreateCycle, ensureOrgApprovalSchema } = require('../utils/leaveApproval');
 const { getActiveLicenseInfo } = require('../utils/licenseCheck');
 
@@ -251,7 +251,7 @@ function applyCellBorder(cell, color = 'FFD1D5DB') {
 }
 
 // Get all employees with details
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
@@ -278,7 +278,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
-router.get('/template', authenticateToken, isAdmin, async (req, res) => {
+router.get('/template', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
         const [depts, positions, empStatuses, divisions] = await Promise.all([
             pool.query('SELECT name FROM departments ORDER BY name ASC'),
@@ -455,7 +455,7 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
-router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
+router.post('/import', authenticateToken, hasPermission('admin.employees'), (req, res, next) => {
     excelUpload.single('file')(req, res, (err) => {
         if (err) {
             return res.status(400).json({ error: err.message || 'Gagal mengunggah file' });
@@ -761,7 +761,7 @@ router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
 });
 
 // Get single employee detail
-router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
         const { id } = req.params;
         const userResult = await pool.query(
@@ -796,7 +796,7 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update employee details
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
         const { id } = req.params;
         const {
@@ -999,7 +999,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 // ========== DOCUMENT MANAGEMENT ==========
 
 // Get documents for an employee
-router.get('/:id/documents', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id/documents', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
         const result = await pool.query(
             'SELECT id, doc_type, doc_name, file_path, file_size, mime_type, uploaded_at, notes FROM employee_documents WHERE user_id = $1 ORDER BY uploaded_at DESC',
@@ -1013,7 +1013,7 @@ router.get('/:id/documents', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Upload document for an employee
-router.post('/:id/documents', authenticateToken, isAdmin, docUpload.single('file'), async (req, res) => {
+router.post('/:id/documents', authenticateToken, hasPermission('admin.employees'), docUpload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'Tidak ada file yang diunggah' });
@@ -1037,7 +1037,7 @@ router.post('/:id/documents', authenticateToken, isAdmin, docUpload.single('file
 });
 
 // Delete document
-router.delete('/:id/documents/:docId', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id/documents/:docId', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
         // Get file path first
         const docResult = await pool.query(
