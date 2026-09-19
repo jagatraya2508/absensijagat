@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
 
-// Register face for a user (Admin only)
-router.post('/register/:userId', authenticateToken, isAdmin, async (req, res) => {
+// Register face for a user (permission: admin.face_registration)
+router.post('/register/:userId', authenticateToken, hasPermission('admin.face_registration'), async (req, res) => {
     try {
         const { userId } = req.params;
         const { face_descriptor } = req.body;
@@ -123,14 +123,14 @@ router.get('/my-descriptor', authenticateToken, async (req, res) => {
     }
 });
 
-// Get all users with face registration status (Admin)
-router.get('/users-status', authenticateToken, isAdmin, async (req, res) => {
+// Get all users with face registration status
+router.get('/users-status', authenticateToken, hasPermission('admin.face_registration'), async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT id, employee_id, name, 
+            SELECT id, employee_id, name, role,
                    CASE WHEN face_descriptor IS NOT NULL THEN true ELSE false END as has_face
             FROM users 
-            WHERE role = 'employee'
+            WHERE COALESCE(role, '') NOT IN ('kiosk')
             ORDER BY name
         `);
 
@@ -165,8 +165,8 @@ router.get('/all-descriptors', authenticateToken, hasPermission('admin.kiosk'), 
     }
 });
 
-// Delete face registration (Admin only)
-router.delete('/:userId', authenticateToken, isAdmin, async (req, res) => {
+// Delete face registration
+router.delete('/:userId', authenticateToken, hasPermission('admin.face_registration'), async (req, res) => {
     try {
         const { userId } = req.params;
 

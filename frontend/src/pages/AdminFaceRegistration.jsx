@@ -62,9 +62,10 @@ export default function AdminFaceRegistration() {
 
     // Filtered & sorted users
     const filteredUsers = useMemo(() => {
+        const q = search.toLowerCase();
         let result = users.filter(u =>
-            u.name.toLowerCase().includes(search.toLowerCase()) ||
-            u.employee_id.toLowerCase().includes(search.toLowerCase())
+            (u.name || '').toLowerCase().includes(q) ||
+            (u.employee_id || '').toLowerCase().includes(q)
         );
 
         // Apply status filter
