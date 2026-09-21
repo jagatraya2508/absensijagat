@@ -305,6 +305,19 @@ CREATE TABLE IF NOT EXISTS payroll_items (
     net_salary DECIMAL(15,2) DEFAULT 0,
     salary_type VARCHAR(10) DEFAULT 'monthly',
     working_days INTEGER DEFAULT 0,
+    driver_subuh_days INTEGER DEFAULT 0,
+    driver_subuh_amount DECIMAL(15,2) DEFAULT 0,
+    driver_rit_total INTEGER DEFAULT 0,
+    driver_rit_amount DECIMAL(15,2) DEFAULT 0,
+    driver_overnight_days INTEGER DEFAULT 0,
+    driver_overnight_amount DECIMAL(15,2) DEFAULT 0,
+    driver_total_allowance DECIMAL(15,2) DEFAULT 0,
+    driver_extra_rit_dekat INTEGER DEFAULT 0,
+    driver_extra_rit_jauh INTEGER DEFAULT 0,
+    driver_ritase_dekat_amount DECIMAL(15,2) DEFAULT 0,
+    driver_ritase_jauh_amount DECIMAL(15,2) DEFAULT 0,
+    tuang_amount DECIMAL(15,2) DEFAULT 0,
+    tuang_days INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -826,6 +839,8 @@ CREATE TABLE IF NOT EXISTS driver_activities (
     rit_count INTEGER DEFAULT 1,
     rit_notes TEXT,
     is_overnight BOOLEAN DEFAULT FALSE,
+    ritase_dekat INTEGER DEFAULT 0,
+    ritase_jauh INTEGER DEFAULT 0,
     notes TEXT,
     created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -909,6 +924,21 @@ ALTER TABLE license_info ADD COLUMN IF NOT EXISTS machine_id VARCHAR(32);
 ALTER TABLE work_schedule_types ADD COLUMN IF NOT EXISTS "position" VARCHAR(100);
 ALTER TABLE work_schedule_types ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL;
 ALTER TABLE work_schedule_types ADD COLUMN IF NOT EXISTS position_id INTEGER REFERENCES positions(id) ON DELETE SET NULL;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_subuh_days INTEGER DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_subuh_amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_rit_total INTEGER DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_rit_amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_overnight_days INTEGER DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_overnight_amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_total_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_extra_rit_dekat INTEGER DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_extra_rit_jauh INTEGER DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_ritase_dekat_amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_ritase_jauh_amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS tuang_amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS tuang_days INTEGER DEFAULT 0;
+ALTER TABLE driver_activities ADD COLUMN IF NOT EXISTS ritase_dekat INTEGER DEFAULT 0;
+ALTER TABLE driver_activities ADD COLUMN IF NOT EXISTS ritase_jauh INTEGER DEFAULT 0;
 
 -- Posisi live kendaraan / karyawan lapangan
 CREATE TABLE IF NOT EXISTS live_tracking_latest (

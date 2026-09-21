@@ -371,7 +371,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Generate payroll error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        res.status(500).json({ error: error.message || 'Terjadi kesalahan server' });
     } finally {
         client.release();
     }
