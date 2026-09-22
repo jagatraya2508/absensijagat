@@ -480,23 +480,60 @@ router.get('/:id/slip/:userId', authenticateToken, async (req, res) => {
     }
 });
 
-// Delete payroll run (draft only)
+// Delete payroll run (draft or finalized). Reverse loan deductions tied to this run.
 router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
-        const check = await pool.query('SELECT status FROM payroll_runs WHERE id = $1', [id]);
+        await client.query('BEGIN');
+
+        const check = await client.query(
+            'SELECT id, status FROM payroll_runs WHERE id = $1 FOR UPDATE',
+            [id]
+        );
         if (check.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Payroll tidak ditemukan' });
         }
-        if (check.rows[0].status === 'finalized') {
-            return res.status(400).json({ error: 'Tidak dapat menghapus payroll yang sudah difinalisasi' });
+
+        const payments = await client.query(`
+            SELECT lp.id, lp.loan_id, lp.amount
+            FROM loan_payments lp
+            JOIN payroll_items pi ON lp.payroll_item_id = pi.id
+            WHERE pi.payroll_run_id = $1
+            ORDER BY lp.id DESC
+        `, [id]);
+
+        for (const payment of payments.rows) {
+            const loanResult = await client.query(
+                'SELECT * FROM employee_loans WHERE id = $1 FOR UPDATE',
+                [payment.loan_id]
+            );
+            if (loanResult.rows.length > 0) {
+                const loan = loanResult.rows[0];
+                const newBalance = parseFloat(loan.remaining_balance) + parseFloat(payment.amount);
+                const newPaid = Math.max(0, parseInt(loan.paid_installments, 10) - 1);
+                let newStatus = loan.status;
+                if (loan.status !== 'cancelled') {
+                    newStatus = newBalance > 0 ? 'active' : 'paid_off';
+                }
+                await client.query(
+                    'UPDATE employee_loans SET remaining_balance=$1, paid_installments=$2, status=$3, updated_at=CURRENT_TIMESTAMP WHERE id=$4',
+                    [newBalance, newPaid, newStatus, loan.id]
+                );
+            }
+            await client.query('DELETE FROM loan_payments WHERE id = $1', [payment.id]);
         }
 
-        await pool.query('DELETE FROM payroll_runs WHERE id = $1', [id]);
+        await client.query('DELETE FROM payroll_runs WHERE id = $1', [id]);
+        await client.query('COMMIT');
         res.json({ message: 'Payroll berhasil dihapus' });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('Delete payroll error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        res.status(500).json({ error: error.message || 'Terjadi kesalahan server' });
+    } finally {
+        client.release();
     }
 });
 

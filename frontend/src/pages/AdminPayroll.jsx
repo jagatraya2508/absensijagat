@@ -67,11 +67,20 @@ export default function AdminPayroll() {
         } catch (err) { alert(err.message); }
     }
 
-    async function handleDelete(id) {
-        if (!confirm('Yakin ingin menghapus payroll draft ini?')) return;
+    async function handleDelete(run) {
+        const period = `${monthNames[run.period_month - 1]} ${run.period_year}`;
+        const isFinal = run.status === 'finalized';
+        const message = isFinal
+            ? `Payroll ${period} sudah Final. Menghapusnya juga membatalkan potongan pinjaman dari payroll ini. Lanjutkan?`
+            : `Yakin ingin menghapus payroll ${period}?`;
+        if (!confirm(message)) return;
         try {
-            await payrollAPI.delete(id);
-            setSuccess('Payroll berhasil dihapus');
+            await payrollAPI.delete(run.id);
+            setSuccess(`Payroll ${period} berhasil dihapus`);
+            if (selectedRun?.id === run.id) {
+                setShowDetailModal(false);
+                setSelectedRun(null);
+            }
             fetchRuns();
         } catch (err) { alert(err.message); }
     }
@@ -172,9 +181,7 @@ export default function AdminPayroll() {
                                                 <button className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => openDetail(run)}><Icon name="ClipboardList" size={16} inline /> Detail</button>
                                                 <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => exportPayroll(run, 'pdf')}><Icon name="FileText" size={16} inline /> PDF</button>
                                                 <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => exportPayroll(run, 'excel')}><Icon name="BarChart3" size={16} inline /> Excel</button>
-                                                {run.status === 'draft' && (
-                                                    <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: 'var(--danger-500)' }} onClick={() => handleDelete(run.id)}><Icon name="Trash2" size={16} inline /></button>
-                                                )}
+                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: 'var(--danger-500)' }} onClick={() => handleDelete(run)}><Icon name="Trash2" size={16} inline /> Hapus</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -318,6 +325,7 @@ export default function AdminPayroll() {
                                 <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportPayroll(selectedRun, 'excel')}><Icon name="BarChart3" size={16} inline /> Export Excel</button>
                             </div>
                             <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+                                <button className="btn btn-outline" style={{ color: 'var(--danger-500)' }} onClick={() => handleDelete(selectedRun)}><Icon name="Trash2" size={16} inline /> Hapus</button>
                                 <button className="btn btn-outline" onClick={() => setShowDetailModal(false)}>Tutup</button>
                                 {selectedRun.status === 'draft' && (
                                     <button className="btn btn-success" onClick={() => handleFinalize(selectedRun.id)}><Icon name="CheckCircle2" size={16} inline /> Finalisasi Payroll</button>
