@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const CATEGORY_MAP = {
@@ -350,7 +350,7 @@ export default function DailyWorkReport() {
 
             const table1Rows = currentReport.items.map(formatRow);
 
-            doc.autoTable({
+            autoTable(doc, {
                 head: [tableColumn],
                 body: table1Rows,
                 startY: 28,
@@ -368,7 +368,7 @@ export default function DailyWorkReport() {
 
             const table2Rows = pendingData.map(formatRow);
 
-            doc.autoTable({
+            autoTable(doc, {
                 head: [tableColumn],
                 body: table2Rows,
                 startY: finalY + 18,

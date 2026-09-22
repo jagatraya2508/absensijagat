@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { authAPI, licenseAPI, rolesAPI } from '../utils/api';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Icon from '../components/Icon';
 
@@ -336,7 +336,7 @@ export default function AdminUsers() {
             new Date(user.created_at).toLocaleDateString('id-ID')
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 28,
             head: [['No', 'Employee ID', 'Nama', 'Email', 'Role', 'Tanggal Daftar']],
             body: tableData,

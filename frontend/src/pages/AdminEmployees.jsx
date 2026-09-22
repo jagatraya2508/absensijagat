@@ -2,7 +2,7 @@ import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI, employmentStatusesAPI, divisionsAPI } from '../utils/api';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const TABS = [
@@ -534,7 +534,7 @@ export default function AdminEmployees() {
             emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 28,
             head: [['No', 'ID Karyawan', 'Nama', 'Departemen', 'Divisi', 'Jabatan', 'Status', 'Gaji Pokok', 'Tipe Gaji']],
             body: tableData,
