@@ -182,6 +182,62 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* Attendance Buttons - Compact & Side by Side */}
+            <div className="attendance-action-grid gap-3 mb-4">
+                {todayStatus?.is_off_day ? (
+                    <div
+                        style={{
+                            gridColumn: '1 / -1',
+                            background: 'rgba(99, 102, 241, 0.15)',
+                            border: '1px solid rgba(99, 102, 241, 0.4)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: '1.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.75rem'
+                        }}
+                    >
+                        <span style={{ fontSize: '1.8rem' }}><Icon name="Palmtree" size={16} inline /></span>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--theme-primary)' }}>Hari Ini Libur</div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--gray-700)' }}>Absensi tidak diperlukan hari ini</div>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <Link
+                            to="/attendance?type=check-in"
+                            className={`btn-attendance-compact ${todayStatus?.checked_in ? 'disabled' : 'primary'}`}
+                            style={{ pointerEvents: todayStatus?.checked_in ? 'none' : 'auto' }}
+                        >
+                            <div className="icon-wrapper">
+                                <span className="icon"><Icon name="Download" size={16} inline /></span>
+                            </div>
+                            <div className="text-wrapper">
+                                <span className="label">Check-in</span>
+                                <span className="sub-label">{todayStatus?.checked_in ? 'Sudah Absen' : 'Masuk Kerja'}</span>
+                            </div>
+                            {todayStatus?.checked_in && <div className="status-badge"><Icon name="Check" size={16} inline /></div>}
+                        </Link>
+
+                        <Link
+                            to="/attendance?type=check-out"
+                            className={`btn-attendance-compact ${(!todayStatus?.checked_in || todayStatus?.checked_out) ? 'disabled' : 'danger'}`}
+                            style={{ pointerEvents: (!todayStatus?.checked_in || todayStatus?.checked_out) ? 'none' : 'auto' }}
+                        >
+                            <div className="icon-wrapper">
+                                <span className="icon"><Icon name="Upload" size={16} inline /></span>
+                            </div>
+                            <div className="text-wrapper">
+                                <span className="label">Check-out</span>
+                                <span className="sub-label">{todayStatus?.checked_out ? 'Sudah Absen' : 'Pulang Kerja'}</span>
+                            </div>
+                            {todayStatus?.checked_out && <div className="status-badge"><Icon name="Check" size={16} inline /></div>}
+                        </Link>
+                    </>
+                )}
+            </div>
 
             {/* Riwayat Absensi Terbaru — 5 hari kerja dari tanggal kerja terakhir */}
             {dashboardHistory.length > 0 && (
@@ -235,65 +291,59 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* Quick Actions & Menus (Talenta Style) */}
-            <div className="mb-4">
-                {/* Attendance Buttons - Compact & Side by Side */}
-                <div className="attendance-action-grid gap-3 mb-4">
-                    {todayStatus?.is_off_day ? (
-                        <div
-                            style={{
-                                gridColumn: '1 / -1',
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                border: '1px solid rgba(99, 102, 241, 0.4)',
-                                borderRadius: 'var(--radius-lg)',
-                                padding: '1.25rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.75rem'
-                            }}
-                        >
-                            <span style={{ fontSize: '1.8rem' }}><Icon name="Palmtree" size={16} inline /></span>
-                            <div>
-                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--theme-primary)' }}>Hari Ini Libur</div>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-700)' }}>Absensi tidak diperlukan hari ini</div>
+            {/* Announcements */}
+            {announcements.length > 0 && (
+                <div className="mb-4">
+                    <div style={{ marginBottom: '0.75rem' }}>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <Icon name="Megaphone" size={18} /> Pengumuman
+                        </h2>
+                    </div>
+                    {announcements.map(item => (
+                        <div key={item.id} className="card-glass mb-3" style={{
+                            background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
+                            borderLeft: '4px solid var(--primary-500)',
+                            padding: '1rem 1.5rem',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}>
+                                <Icon name="Megaphone" size={72} />
+                            </div>
+                            <div className="d-flex align-items-center gap-3 mb-2">
+                                <div style={{
+                                    background: 'var(--primary-500)',
+                                    color: 'white',
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <Icon name="Megaphone" size={16} />
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)' }}>
+                                        {item.title}
+                                    </h3>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
+                                        {formatDate(item.created_at)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style={{ paddingLeft: '3.25rem' }}>
+                                <p style={{ margin: 0, whiteSpace: 'pre-line', color: 'var(--gray-800)', lineHeight: '1.6' }}>
+                                    {item.content}
+                                </p>
                             </div>
                         </div>
-                    ) : (
-                        <>
-                            <Link
-                                to="/attendance?type=check-in"
-                                className={`btn-attendance-compact ${todayStatus?.checked_in ? 'disabled' : 'primary'}`}
-                                style={{ pointerEvents: todayStatus?.checked_in ? 'none' : 'auto' }}
-                            >
-                                <div className="icon-wrapper">
-                                    <span className="icon"><Icon name="Download" size={16} inline /></span>
-                                </div>
-                                <div className="text-wrapper">
-                                    <span className="label">Check-in</span>
-                                    <span className="sub-label">{todayStatus?.checked_in ? 'Sudah Absen' : 'Masuk Kerja'}</span>
-                                </div>
-                                {todayStatus?.checked_in && <div className="status-badge"><Icon name="Check" size={16} inline /></div>}
-                            </Link>
-
-                            <Link
-                                to="/attendance?type=check-out"
-                                className={`btn-attendance-compact ${(!todayStatus?.checked_in || todayStatus?.checked_out) ? 'disabled' : 'danger'}`}
-                                style={{ pointerEvents: (!todayStatus?.checked_in || todayStatus?.checked_out) ? 'none' : 'auto' }}
-                            >
-                                <div className="icon-wrapper">
-                                    <span className="icon"><Icon name="Upload" size={16} inline /></span>
-                                </div>
-                                <div className="text-wrapper">
-                                    <span className="label">Check-out</span>
-                                    <span className="sub-label">{todayStatus?.checked_out ? 'Sudah Absen' : 'Pulang Kerja'}</span>
-                                </div>
-                                {todayStatus?.checked_out && <div className="status-badge"><Icon name="Check" size={16} inline /></div>}
-                            </Link>
-                        </>
-                    )}
+                    ))}
                 </div>
+            )}
 
+            {/* Quick Actions & Menus (Talenta Style) */}
+            <div className="mb-4">
                 {/* ===== MENU KARYAWAN ===== */}
                 <div className="menu-grid">
                     <Link to="/attendance" className="menu-item">
@@ -688,57 +738,6 @@ export default function Dashboard() {
                             </div>
                         )}
                     </div>
-                </div>
-            )}
-
-            {/* Announcements Section (Bottom) */}
-            {announcements.length > 0 && (
-                <div className="mb-4">
-                    <div style={{ marginBottom: '0.75rem' }}>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <Icon name="Megaphone" size={18} /> Pengumuman
-                        </h2>
-                    </div>
-                    {announcements.map(item => (
-                        <div key={item.id} className="card-glass mb-3" style={{
-                            background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
-                            borderLeft: '4px solid var(--primary-500)',
-                            padding: '1rem 1.5rem',
-                            position: 'relative',
-                            overflow: 'hidden'
-                        }}>
-                            <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.08 }}>
-                                <Icon name="Megaphone" size={72} />
-                            </div>
-                            <div className="d-flex align-items-center gap-3 mb-2">
-                                <div style={{
-                                    background: 'var(--primary-500)',
-                                    color: 'white',
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <Icon name="Megaphone" size={16} />
-                                </div>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--theme-primary)' }}>
-                                        {item.title}
-                                    </h3>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
-                                        {formatDate(item.created_at)}
-                                    </span>
-                                </div>
-                            </div>
-                            <div style={{ paddingLeft: '3.25rem' }}>
-                                <p style={{ margin: 0, whiteSpace: 'pre-line', color: 'var(--gray-800)', lineHeight: '1.6' }}>
-                                    {item.content}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
                 </div>
             )}
 
