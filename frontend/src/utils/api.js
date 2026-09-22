@@ -595,6 +595,10 @@ export const employeesAPI = {
         method: 'PUT',
         body: JSON.stringify(data),
     }),
+    setReceivesTuang: (id, receives_tuang) => request(`/employees/${id}/receives-tuang`, {
+        method: 'PATCH',
+        body: JSON.stringify({ receives_tuang }),
+    }),
     getDocuments: (id) => request(`/employees/${id}/documents`),
     uploadDocument: (id, formData) => request(`/employees/${id}/documents`, {
         method: 'POST',

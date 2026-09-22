@@ -257,7 +257,7 @@ router.get('/', authenticateToken, hasPermission('admin.employees'), async (req,
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
                    ed.nik, ed.phone, ed.department, ed.division, ed.position, ed.employment_status, ed.join_date,
                    ed.basic_salary, ed.salary_type, ed.gender, ed.bpjs_kesehatan_no, ed.npwp,
-                   ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking, ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
+                   ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking, COALESCE(ed.receives_tuang, true) as receives_tuang, ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
                    ed.bpjs_kes_enrolled, ed.bpjs_jht_enrolled, ed.bpjs_jp_enrolled, ed.bpjs_jkk_enrolled, ed.bpjs_jkm_enrolled, ed.pph21_enabled,
                    ed.bpjs_kes_employee_rate, ed.bpjs_kes_company_rate, ed.bpjs_jht_employee_rate, ed.bpjs_jht_company_rate,
                    ed.bpjs_jp_employee_rate, ed.bpjs_jp_company_rate, ed.bpjs_jkk_rate, ed.bpjs_jkm_rate,
@@ -812,7 +812,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
             no_kk,
-            location_ids, vehicle_type_id, supervisor_id
+            location_ids, vehicle_type_id, supervisor_id, receives_tuang
         } = req.body;
 
 
@@ -988,10 +988,40 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             );
         }
 
+        if (receives_tuang !== undefined) {
+            await pool.query(
+                `UPDATE employee_details SET receives_tuang = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [receives_tuang !== false, id]
+            );
+        }
+
         const latest = await pool.query('SELECT * FROM employee_details WHERE user_id = $1', [id]);
         res.json(latest.rows[0] || result.rows[0]);
     } catch (error) {
         console.error('Update employee error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
+    }
+});
+
+router.patch('/:id/receives-tuang', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const enabled = req.body.receives_tuang !== false;
+        const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
+        if (userCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+        }
+        const result = await pool.query(`
+            INSERT INTO employee_details (user_id, receives_tuang, updated_at)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                receives_tuang = EXCLUDED.receives_tuang,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING receives_tuang
+        `, [id, enabled]);
+        res.json({ receives_tuang: result.rows[0].receives_tuang });
+    } catch (error) {
+        console.error('Update receives_tuang error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
     }
 });

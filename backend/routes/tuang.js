@@ -14,6 +14,7 @@ router.get('/employees', async (req, res) => {
             FROM users u
             LEFT JOIN employee_details ed ON ed.user_id = u.id
             WHERE u.role = 'employee'
+              AND COALESCE(ed.receives_tuang, true) = true
         `;
         if (department) {
             values.push(department);
@@ -34,7 +35,9 @@ router.get('/departments', async (req, res) => {
             SELECT DISTINCT ed.department
             FROM employee_details ed
             JOIN users u ON u.id = ed.user_id
-            WHERE u.role = 'employee' AND ed.department IS NOT NULL AND ed.department != ''
+            WHERE u.role = 'employee'
+              AND COALESCE(ed.receives_tuang, true) = true
+              AND ed.department IS NOT NULL AND ed.department != ''
             ORDER BY ed.department
         `);
         res.json(result.rows.map(r => r.department));
@@ -121,6 +124,14 @@ router.post('/bulk', async (req, res) => {
             const userId = parseInt(entry.user_id, 10);
             const amount = parseFloat(entry.amount) || 0;
             if (!userId) continue;
+
+            const eligible = await client.query(
+                'SELECT COALESCE(receives_tuang, true) as receives_tuang FROM employee_details WHERE user_id = $1',
+                [userId]
+            );
+            if (eligible.rows.length > 0 && eligible.rows[0].receives_tuang === false) {
+                continue;
+            }
 
             if (amount <= 0) {
                 const del = await client.query(

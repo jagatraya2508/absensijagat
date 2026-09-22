@@ -63,6 +63,7 @@ export default function AdminEmployees() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [search, setSearch] = useState('');
+    const [tuangFilter, setTuangFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
@@ -83,7 +84,7 @@ export default function AdminEmployees() {
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
-        is_driver: false, is_collector: false, is_sales: false, use_tracking: false, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
+        is_driver: false, is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
         vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
         bpjs_kes_enrolled: true, bpjs_jht_enrolled: true, bpjs_jp_enrolled: true,
@@ -173,6 +174,7 @@ export default function AdminEmployees() {
                 is_collector: d.is_collector || false,
                 is_sales: d.is_sales || false,
                 use_tracking: d.use_tracking || false,
+                receives_tuang: d.receives_tuang !== false,
                 driver_subuh_allowance: d.driver_subuh_allowance || 0,
                 driver_rit_allowance: d.driver_rit_allowance || 0,
                 driver_inap_allowance: d.driver_inap_allowance || 0,
@@ -264,6 +266,17 @@ export default function AdminEmployees() {
         });
     }
 
+    async function toggleReceivesTuang(emp, enabled) {
+        const previous = emp.receives_tuang !== false;
+        setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, receives_tuang: enabled } : e));
+        try {
+            await employeesAPI.setReceivesTuang(emp.id, enabled);
+        } catch (err) {
+            setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, receives_tuang: previous } : e));
+            alert(err.message || 'Gagal mengubah status tuang');
+        }
+    }
+
     function parseMoneyInput(raw) {
         if (raw === '') return '';
         const n = parseFloat(raw);
@@ -342,6 +355,12 @@ export default function AdminEmployees() {
             employmentStatusLabel(e.employment_status).toLowerCase().includes(search.toLowerCase())
         );
 
+        if (tuangFilter === 'yes') {
+            result = result.filter(e => e.receives_tuang !== false);
+        } else if (tuangFilter === 'no') {
+            result = result.filter(e => e.receives_tuang === false);
+        }
+
         // Sort
         if (sortConfig.key) {
             result = [...result].sort((a, b) => {
@@ -364,11 +383,11 @@ export default function AdminEmployees() {
         }
 
         return result;
-    }, [employees, search, sortConfig]);
+    }, [employees, search, tuangFilter, sortConfig]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, sortConfig]);
+    }, [search, tuangFilter, sortConfig]);
 
     const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE));
     const pageSafe = Math.min(page, totalPages);
@@ -631,6 +650,17 @@ export default function AdminEmployees() {
                             onChange={e => setSearch(e.target.value)}
                             style={{ maxWidth: 240 }}
                         />
+                        <select
+                            className="form-input form-select"
+                            value={tuangFilter}
+                            onChange={e => setTuangFilter(e.target.value)}
+                            title="Filter penerima tuang"
+                            style={{ maxWidth: 180 }}
+                        >
+                            <option value="all">Semua Tuang</option>
+                            <option value="yes">Dapat Tuang</option>
+                            <option value="no">Tidak Dapat Tuang</option>
+                        </select>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
                                 className="btn"
@@ -747,6 +777,7 @@ export default function AdminEmployees() {
                                     <th onClick={() => handleSort('salary_type')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Tipe <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'salary_type' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('salary_type')}</span>
                                     </th>
+                                    <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Tuang</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -764,6 +795,15 @@ export default function AdminEmployees() {
                                             <span className={`badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
                                                 {emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
                                             </span>
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={emp.receives_tuang !== false}
+                                                onChange={e => toggleReceivesTuang(emp, e.target.checked)}
+                                                title={emp.receives_tuang !== false ? 'Dapat tuang (klik untuk menonaktifkan)' : 'Tidak dapat tuang (klik untuk mengaktifkan)'}
+                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                            />
                                         </td>
                                         <td>
                                             <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }} onClick={() => openDetail(emp)}>
@@ -1217,6 +1257,40 @@ export default function AdminEmployees() {
                                         <div className="form-group">
                                             <label className="form-label">Tarif Lembur/Jam (Rp)</label>
                                             <input {...moneyInputProps('overtime_rate')} />
+                                        </div>
+
+                                        <div style={{ gridColumn: '1 / -1', padding: '1rem', background: 'rgba(234,88,12,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(234,88,12,0.2)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.receives_tuang !== false}
+                                                        onChange={e => updateField('receives_tuang', e.target.checked)}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{
+                                                        width: 44, height: 24, borderRadius: 12,
+                                                        background: formData.receives_tuang !== false ? 'linear-gradient(135deg, #ea580c, #f97316)' : 'var(--gray-600)',
+                                                        position: 'relative', display: 'inline-block',
+                                                        transition: 'background 0.3s', flexShrink: 0
+                                                    }}>
+                                                        <span style={{
+                                                            position: 'absolute', top: 3, left: formData.receives_tuang !== false ? 23 : 3,
+                                                            width: 18, height: 18, borderRadius: '50%',
+                                                            background: '#fff', transition: 'left 0.3s',
+                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                                                        }} />
+                                                    </span>
+                                                </label>
+                                                <div>
+                                                    <span style={{ fontWeight: 600, color: formData.receives_tuang !== false ? '#ea580c' : 'var(--gray-300)', fontSize: '0.9rem' }}>
+                                                        Penerima Insentif Tuang
+                                                    </span>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
+                                                        Nonaktifkan jika karyawan ini tidak mendapat tuang produksi. Nama tidak akan muncul di daftar Input Harian Tuang.
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Driver Toggle */}
