@@ -2,25 +2,6 @@ import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { payrollAPI } from '../utils/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-function downloadFile(path, filename) {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        alert('Gagal download: Anda harus login terlebih dahulu.');
-        return;
-    }
-    const separator = path.includes('?') ? '&' : '?';
-    const url = `${API_BASE}${path}${separator}token=${token}`;
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
-
 export default function AdminPayroll() {
     const [runs, setRuns] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -103,6 +84,31 @@ export default function AdminPayroll() {
         } catch (err) { alert('Gagal memuat slip gaji'); }
     }
 
+    async function exportPayroll(run, type) {
+        try {
+            if (type === 'pdf') {
+                await payrollAPI.exportPdf(run.id, run.period_year, run.period_month);
+            } else {
+                await payrollAPI.exportExcel(run.id, run.period_year, run.period_month);
+            }
+        } catch (err) {
+            alert(err.message || 'Gagal mengunduh file payroll');
+        }
+    }
+
+    async function exportSlip(type) {
+        if (!selectedSlip) return;
+        try {
+            if (type === 'pdf') {
+                await payrollAPI.exportSlipPdf(selectedSlip.payroll_run_id, selectedSlip.user_id, selectedSlip.employee_id);
+            } else {
+                await payrollAPI.exportSlipExcel(selectedSlip.payroll_run_id, selectedSlip.user_id, selectedSlip.employee_id);
+            }
+        } catch (err) {
+            alert(err.message || 'Gagal mengunduh slip gaji');
+        }
+    }
+
     function formatCurrency(val) {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
     }
@@ -164,8 +170,8 @@ export default function AdminPayroll() {
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                 <button className="btn btn-primary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => openDetail(run)}><Icon name="ClipboardList" size={16} inline /> Detail</button>
-                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => downloadFile(`/payroll/${run.id}/export/pdf`, `payroll-${run.period_year}-${run.period_month}.pdf`)}><Icon name="FileText" size={16} inline /> PDF</button>
-                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => downloadFile(`/payroll/${run.id}/export/excel`, `payroll-${run.period_year}-${run.period_month}.xlsx`)}><Icon name="BarChart3" size={16} inline /> Excel</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => exportPayroll(run, 'pdf')}><Icon name="FileText" size={16} inline /> PDF</button>
+                                                <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }} onClick={() => exportPayroll(run, 'excel')}><Icon name="BarChart3" size={16} inline /> Excel</button>
                                                 {run.status === 'draft' && (
                                                     <button className="btn btn-outline" style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: 'var(--danger-500)' }} onClick={() => handleDelete(run.id)}><Icon name="Trash2" size={16} inline /></button>
                                                 )}
@@ -308,8 +314,8 @@ export default function AdminPayroll() {
                         </div>
                         <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedRun.id}/export/pdf`, `payroll-${selectedRun.period_year}-${selectedRun.period_month}.pdf`)}><Icon name="FileText" size={16} inline /> Export PDF</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedRun.id}/export/excel`, `payroll-${selectedRun.period_year}-${selectedRun.period_month}.xlsx`)}><Icon name="BarChart3" size={16} inline /> Export Excel</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportPayroll(selectedRun, 'pdf')}><Icon name="FileText" size={16} inline /> Export PDF</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportPayroll(selectedRun, 'excel')}><Icon name="BarChart3" size={16} inline /> Export Excel</button>
                             </div>
                             <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
                                 <button className="btn btn-outline" onClick={() => setShowDetailModal(false)}>Tutup</button>
@@ -429,8 +435,8 @@ export default function AdminPayroll() {
                         </div>
                         <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedSlip.payroll_run_id}/slip/${selectedSlip.user_id}/pdf`, `slip-gaji-${selectedSlip.employee_id}.pdf`)}><Icon name="FileText" size={16} inline /> PDF</button>
-                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => downloadFile(`/payroll/${selectedSlip.payroll_run_id}/slip/${selectedSlip.user_id}/excel`, `slip-gaji-${selectedSlip.employee_id}.xlsx`)}><Icon name="BarChart3" size={16} inline /> Excel</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportSlip('pdf')}><Icon name="FileText" size={16} inline /> PDF</button>
+                                <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportSlip('excel')}><Icon name="BarChart3" size={16} inline /> Excel</button>
                                 <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => window.print()}><Icon name="Printer" size={16} inline /> Print</button>
                             </div>
                             <button className="btn btn-outline" style={{ marginLeft: 'auto' }} onClick={() => setShowSlipModal(false)}>Tutup</button>

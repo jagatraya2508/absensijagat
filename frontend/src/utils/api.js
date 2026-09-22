@@ -90,6 +90,32 @@ async function request(endpoint, options = {}, attempt = 1) {
     return data;
 }
 
+async function downloadAuthenticatedFile(endpoint, filename) {
+    const token = getToken();
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (!response.ok || contentType.includes('application/json') || contentType.includes('text/html')) {
+        let message = 'Gagal mengunduh file';
+        try {
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                message = data.error || message;
+            }
+        } catch (_) { /* ignore */ }
+        throw new Error(message);
+    }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+}
+
 // Auth API
 export const authAPI = {
     login: (employee_id, password) =>
@@ -672,6 +698,14 @@ export const payrollAPI = {
     }),
     getSlip: (runId, userId) => request(`/payroll/${runId}/slip/${userId}`),
     delete: (id) => request(`/payroll/${id}`, { method: 'DELETE' }),
+    exportPdf: (id, year, month) =>
+        downloadAuthenticatedFile(`/payroll/${id}/export/pdf`, `payroll-${year}-${month}.pdf`),
+    exportExcel: (id, year, month) =>
+        downloadAuthenticatedFile(`/payroll/${id}/export/excel`, `payroll-${year}-${month}.xlsx`),
+    exportSlipPdf: (runId, userId, employeeId) =>
+        downloadAuthenticatedFile(`/payroll/${runId}/slip/${userId}/pdf`, `slip-gaji-${employeeId}.pdf`),
+    exportSlipExcel: (runId, userId, employeeId) =>
+        downloadAuthenticatedFile(`/payroll/${runId}/slip/${userId}/excel`, `slip-gaji-${employeeId}.xlsx`),
 };
 
 export const tuangAPI = {
