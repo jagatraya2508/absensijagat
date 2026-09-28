@@ -1,7 +1,35 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
+
+async function getPayslipLogoFile() {
+    const result = await pool.query(
+        `SELECT key, value FROM settings WHERE key IN ('payslip_show_logo', 'app_logo')`
+    );
+    const map = {};
+    result.rows.forEach(row => { map[row.key] = row.value; });
+    if (map.payslip_show_logo === 'false' || !map.app_logo) return null;
+
+    const ext = path.extname(map.app_logo).toLowerCase();
+    if (!['.png', '.jpg', '.jpeg'].includes(ext)) return null;
+
+    let filePath = null;
+    if (map.app_logo.startsWith('/uploads/')) {
+        filePath = path.join(__dirname, '..', map.app_logo);
+    } else if (map.app_logo.startsWith('/')) {
+        const relative = map.app_logo.replace(/^\//, '');
+        filePath = [
+            path.join(__dirname, '../../frontend/public', relative),
+            path.join(__dirname, '../../frontend/dist', relative),
+        ].find(candidate => fs.existsSync(candidate)) || null;
+    }
+
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    return filePath;
+}
 
 // PPh 21 progressive tax calculation (annual)
 function calculatePPh21(annualTaxableIncome) {
@@ -39,6 +67,43 @@ function getPTKP(taxStatus) {
         'K/3': 72000000,
     };
     return ptkpMap[taxStatus] || 54000000;
+}
+
+// Approved manual records plus approved pengajuan lembur (SPL).
+// SPL hours use actual hours when filled, otherwise the requested estimate.
+// Amount = hours × tarif lembur karyawan × pengali rate shift (default 1,5).
+async function sumEmployeeOvertime(client, userId, year, month, hourlyRate) {
+    const records = await client.query(`
+        SELECT COALESCE(SUM(hours), 0) AS hours,
+               COALESCE(SUM(total_amount), 0) AS amount
+        FROM overtime_records
+        WHERE user_id = $1
+          AND status = 'approved'
+          AND date >= make_date($2, $3, 1)
+          AND date < (make_date($2, $3, 1) + INTERVAL '1 month')
+    `, [userId, year, month]);
+
+    const requests = await client.query(`
+        SELECT COALESCE(SUM(COALESCE(ore.actual_hours, otr.estimated_hours)), 0) AS hours,
+               COALESCE(SUM(
+                   COALESCE(ore.actual_hours, otr.estimated_hours)
+                   * $4::numeric
+                   * COALESCE(rl.rate_multiplier, 1.5)
+               ), 0) AS amount
+        FROM overtime_requests otr
+        JOIN overtime_request_employees ore ON ore.overtime_request_id = otr.id
+        LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+        LEFT JOIN overtime_rules rl ON rl.schedule_type_id = ws.schedule_type_id
+        WHERE ore.user_id = $1
+          AND otr.status IN ('approved', 'completed')
+          AND otr.date >= make_date($2, $3, 1)
+          AND otr.date < (make_date($2, $3, 1) + INTERVAL '1 month')
+    `, [userId, year, month, hourlyRate]);
+
+    return {
+        hours: parseFloat(records.rows[0].hours) + parseFloat(requests.rows[0].hours),
+        amount: parseFloat(records.rows[0].amount) + parseFloat(requests.rows[0].amount)
+    };
 }
 
 // Get all payroll runs
@@ -202,19 +267,9 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                 basicSalary = baseSalaryRate;
             }
 
-            // Get approved overtime for this month
-            const overtimeResult = await client.query(`
-                SELECT COALESCE(SUM(hours), 0) as total_hours,
-                       COALESCE(SUM(total_amount), 0) as total_amount
-                FROM overtime_records
-                WHERE user_id = $1
-                  AND EXTRACT(MONTH FROM date) = $2
-                  AND EXTRACT(YEAR FROM date) = $3
-                  AND status = 'approved'
-            `, [emp.id, month, year]);
-
-            const overtimeHours = parseFloat(overtimeResult.rows[0].total_hours);
-            const overtimeAmount = parseFloat(overtimeResult.rows[0].total_amount);
+            const overtime = await sumEmployeeOvertime(client, emp.id, year, month, parseFloat(emp.overtime_rate) || 50000);
+            const overtimeHours = overtime.hours;
+            const overtimeAmount = overtime.amount;
 
             // Calculate driver allowances
             let driverSubuhDays = 0, driverSubuhAmount = 0;
@@ -772,6 +827,7 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'Slip gaji tidak ditemukan' });
         const slip = result.rows[0];
+        const logoFile = await getPayslipLogoFile();
 
         const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -781,6 +837,13 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
         doc.pipe(res);
 
         // Header
+        if (logoFile) {
+            const fitW = 150;
+            const fitH = 58;
+            const startY = doc.y;
+            doc.image(logoFile, (doc.page.width - fitW) / 2, startY, { fit: [fitW, fitH], align: 'center', valign: 'center' });
+            doc.y = startY + fitH + 10;
+        }
         doc.fontSize(18).font('Helvetica-Bold').text('SLIP GAJI', { align: 'center' });
         doc.fontSize(11).font('Helvetica').text(`Periode: ${monthNamesID[slip.period_month]} ${slip.period_year}`, { align: 'center' });
         doc.moveDown(1);

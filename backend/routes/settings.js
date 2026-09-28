@@ -155,6 +155,25 @@ router.put('/theme', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+// Show or hide the company logo on the payslip (Admin only)
+router.put('/payslip-logo', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const showLogo = req.body.show_logo === true || req.body.show_logo === 'true';
+        const value = showLogo ? 'true' : 'false';
+
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('payslip_show_logo', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [value]
+        );
+
+        res.json({ message: 'Pengaturan logo slip gaji berhasil disimpan', payslip_show_logo: value });
+    } catch (error) {
+        console.error('Update payslip logo setting error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 // Update company name (Admin only)
 router.put('/company-name', authenticateToken, isAdmin, async (req, res) => {
     try {

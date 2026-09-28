@@ -166,9 +166,7 @@ body {
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
-    padding: 1rem;
-    padding-top: 3.75rem;
-    padding-bottom: 1.5rem;
+    padding: calc(3.75rem + env(safe-area-inset-top)) 1rem calc(1.5rem + env(safe-area-inset-bottom));
   }
 }
 
@@ -202,11 +200,20 @@ body {
 
 .sidebar-logo {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
   padding-bottom: 1.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 1.5rem;
+}
+
+.sidebar-logo-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-close {
+  display: none;
 }
 
 .sidebar-logo-icon {
@@ -225,6 +232,8 @@ body {
   font-weight: 800;
   color: white;
   letter-spacing: -0.02em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .sidebar-logo span {
@@ -378,6 +387,68 @@ body {
   transform: scale(1.1);
 }
 
+.sidebar-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  margin: 0.15rem 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-left: 3px solid transparent;
+  flex-shrink: 0;
+}
+
+.sidebar-group.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-left-color: var(--theme-primary-light);
+}
+
+.sidebar-submenu {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  margin-left: 1.15rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid transparent;
+  gap: 0.15rem;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+}
+
+.sidebar-submenu.is-open {
+  opacity: 1;
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+  border-left-color: rgba(255, 255, 255, 0.18);
+}
+
+.sidebar-submenu .sidebar-link {
+  font-size: 0.82rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.sidebar-section {
+  margin: 1.1rem 0 0.35rem;
+  padding: 0 0.75rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
 /* Mobile Bottom Nav */
 .mobile-nav {
   display: none;
@@ -395,10 +466,14 @@ body {
 @media (max-width: 768px) {
   .sidebar {
     display: flex;
-    transform: translateX(-100%);
+    transform: translateX(-105%);
     transition: transform 0.28s ease;
-    width: min(280px, 86vw);
+    width: min(300px, 88vw);
+    height: 100dvh;
+    overflow: hidden;
+    padding: calc(0.9rem + env(safe-area-inset-top)) 0.85rem calc(0.85rem + env(safe-area-inset-bottom));
     box-shadow: 8px 0 32px rgba(0, 0, 0, 0.28);
+    z-index: 140;
   }
 
   .sidebar.open,
@@ -406,12 +481,57 @@ body {
     transform: translateX(0);
   }
 
+  .sidebar-logo {
+    padding-bottom: 1rem;
+    margin-bottom: 0.85rem;
+    align-items: center;
+  }
+
+  .sidebar-logo h1 {
+    font-size: 1.05rem;
+  }
+
+  .sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.14);
+    color: white;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .sidebar-link {
+    align-items: center;
+    line-height: 1.25;
+    white-space: normal;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .sidebar-group {
+    min-height: 44px;
+  }
+
+  .sidebar-submenu {
+    margin-left: 0.7rem;
+  }
+
+  .sidebar-user-name,
+  .sidebar-user-role {
+    overflow-wrap: anywhere;
+  }
+
   .mobile-menu-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     position: fixed;
-    top: 0.7rem;
+    top: calc(0.7rem + env(safe-area-inset-top));
     left: 0.7rem;
     z-index: 120;
     width: 42px;
@@ -425,12 +545,17 @@ body {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   }
 
+  .sidebar-open .mobile-menu-btn {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   .sidebar-overlay {
     display: block;
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
-    z-index: 90;
+    z-index: 130;
   }
 
   .mobile-nav {
@@ -1610,6 +1735,149 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   gap: 0.75rem;
 }
 
+/* Payroll detail: full-page sheet so every column stays readable */
+.modal-overlay.payroll-detail-overlay {
+  padding: 0.75rem;
+  z-index: 1200;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.payroll-detail-overlay.is-full {
+  padding: 0;
+}
+
+/* Slip sits on top of the full-page payroll sheet */
+.modal-overlay.payroll-slip-overlay {
+  z-index: 1400;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal.payroll-slip-modal {
+  max-width: 560px;
+  width: 100%;
+  max-height: min(90vh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.payroll-slip-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.modal.payroll-detail-modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+}
+
+.modal.payroll-detail-modal.is-full {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+}
+
+.payroll-detail-modal .modal-header,
+.payroll-detail-modal .modal-footer {
+  flex-shrink: 0;
+}
+
+.payroll-detail-modal .modal-footer {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.payroll-detail-modal .modal-footer .btn {
+  width: auto;
+}
+
+.payroll-detail-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+}
+
+.payroll-detail-modal .modal-body::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.payroll-detail-modal .modal-body::-webkit-scrollbar-thumb {
+  background: rgba(109, 0, 0, 0.35);
+  border-radius: 999px;
+  border: 3px solid #fff;
+}
+
+.payroll-detail-modal .payroll-detail-table {
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.95rem;
+}
+
+.payroll-detail-modal .payroll-detail-table th,
+.payroll-detail-modal .payroll-detail-table td {
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+}
+
+.payroll-detail-modal .payroll-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f7f3f3;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+.payroll-detail-modal .payroll-detail-table th:first-child,
+.payroll-detail-modal .payroll-detail-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 190px;
+  background: #fff;
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.payroll-detail-modal .payroll-detail-table thead th:first-child {
+  z-index: 4;
+  background: #f7f3f3;
+}
+
+.payroll-detail-modal .payroll-detail-table tbody tr:nth-child(even) td:first-child {
+  background: #fafafa;
+}
+
+.payroll-detail-modal .payroll-detail-table tbody tr:hover td:first-child {
+  background: #f6f1f1;
+}
+
+.payroll-detail-modal .payroll-detail-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 0 -1px 0 rgba(109, 0, 0, 0.12);
+}
+
+.payroll-detail-modal .payroll-detail-table tfoot td:first-child {
+  z-index: 4;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1956,11 +2224,23 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
     font-size: 16px;
   }
 
-  /* Button improvements */
+  /* Full-width only for standalone actions, not table or toolbar buttons */
   .btn {
     padding: 0.875rem 1.25rem;
     font-size: 0.9rem;
+    max-width: 100%;
+  }
+
+  .card-header > .btn,
+  .modal-footer .btn,
+  .login-card .btn,
+  form > .btn {
     width: 100%;
+  }
+
+  .table .btn,
+  .card-header div .btn {
+    width: auto;
   }
 
   .btn-lg {
@@ -2204,12 +2484,15 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   }
 
   .main-content {
-    padding: 0.75rem;
-    padding-bottom: 5rem;
+    padding: calc(3.6rem + env(safe-area-inset-top)) 0.75rem calc(1.25rem + env(safe-area-inset-bottom));
+  }
+
+  .page-header {
+    padding-right: 46px;
   }
 
   .page-title {
-    font-size: 1.35rem;
+    font-size: 1.15rem !important;
   }
 
   .card {
@@ -2267,6 +2550,7 @@ body {
 
   .btn,
   .sidebar-link,
+  .sidebar-group,
   .mobile-nav-link {
     min-height: 44px;
   }
@@ -2595,21 +2879,35 @@ body {
   color: var(--theme-primary) !important;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .menu-grid {
-    grid-template-columns: repeat(4, 1fr);
-    /* Keep 4 for mobile if possible, or 3? Talenta usually 4 */
-    gap: 0.5rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  .menu-item {
+    min-width: 0;
+    padding: 0.75rem 0.4rem;
+    min-height: 96px;
   }
 
   .menu-icon {
-    width: 40px;
-    height: 40px;
-    font-size: 1.25rem;
+    width: 42px;
+    height: 42px;
+    font-size: 1.15rem;
   }
 
   .menu-label {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2852,8 +3150,8 @@ body {
 
 @media (max-width: 768px) {
   .global-logo-container {
-    top: 1.25rem;
-    right: 1rem;
+    top: calc(0.85rem + env(safe-area-inset-top));
+    right: 0.85rem;
   }
   .global-logo {
     height: 18px;

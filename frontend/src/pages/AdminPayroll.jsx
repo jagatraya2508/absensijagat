@@ -1,8 +1,11 @@
 import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
 import { payrollAPI } from '../utils/api';
+import { useSettings } from '../context/SettingsContext';
 
 export default function AdminPayroll() {
+    const { settings } = useSettings();
+    const showPayslipLogo = settings.payslip_show_logo !== 'false' && !!settings.app_logo;
     const [runs, setRuns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -49,7 +52,7 @@ export default function AdminPayroll() {
         try {
             const data = await payrollAPI.getById(run.id);
             setSelectedRun(data);
-            setIsMaximized(false);
+            setIsMaximized(true);
             setShowDetailModal(true);
         } catch (err) { 
             console.error('Error in openDetail:', err);
@@ -234,8 +237,8 @@ export default function AdminPayroll() {
 
             {/* Detail Modal */}
             {showDetailModal && selectedRun && (
-                <div className="modal-overlay">
-                    <div className="modal" onClick={e => e.stopPropagation()} style={isMaximized ? { width: '100vw', height: '100vh', maxWidth: '100%', maxHeight: '100%', margin: 0, borderRadius: 0, display: 'flex', flexDirection: 'column' } : { maxWidth: 1200, width: '95%', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+                <div className={`modal-overlay payroll-detail-overlay${isMaximized ? ' is-full' : ''}`}>
+                    <div className={`modal payroll-detail-modal${isMaximized ? ' is-full' : ''}`} onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">
                                 Payroll {monthNames[selectedRun.period_month - 1]} {selectedRun.period_year}
@@ -250,9 +253,9 @@ export default function AdminPayroll() {
                                 <button className="modal-close" onClick={() => setShowDetailModal(false)}><Icon name="X" size={16} /></button>
                             </div>
                         </div>
-                        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
+                        <div className="modal-body">
                             {selectedRun.items && selectedRun.items.length > 0 ? (
-                                <table className="table" style={{ fontSize: '0.8rem', minWidth: 1100 }}>
+                                <table className="table payroll-detail-table">
                                     <thead>
                                         <tr>
                                             <th>Karyawan</th>
@@ -338,15 +341,23 @@ export default function AdminPayroll() {
 
             {/* Slip Gaji Modal */}
             {showSlipModal && selectedSlip && (
-                <div className="modal-overlay">
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 550 }}>
+                <div className="modal-overlay payroll-slip-overlay">
+                    <div className="modal payroll-slip-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title"><Icon name="FileText" size={16} inline /> Slip Gaji</h3>
                             <button className="modal-close" onClick={() => setShowSlipModal(false)}><Icon name="X" size={16} /></button>
                         </div>
-                        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        <div className="modal-body">
                             {/* Header */}
                             <div style={{ textAlign: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                {showPayslipLogo && (
+                                    <img
+                                        src={settings.app_logo}
+                                        alt="Logo perusahaan"
+                                        style={{ height: 64, maxWidth: 220, objectFit: 'contain', margin: '0 auto 0.75rem', display: 'block' }}
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                )}
                                 <h3 style={{ marginBottom: '0.25rem' }}>SLIP GAJI</h3>
                                 <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>Periode: {monthNames[selectedSlip.period_month - 1]} {selectedSlip.period_year}</p>
                             </div>

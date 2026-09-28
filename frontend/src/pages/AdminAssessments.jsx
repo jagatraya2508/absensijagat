@@ -445,19 +445,19 @@ export default function AdminAssessments() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Skor Kehadiran (40%)</label>
-                                    <input type="number" className="form-input" min="0" max="100" step="0.1"
+                                    <input type="number" className="form-input" min="0" max="100" step="0.01"
                                         value={form.attendance_score}
                                         onChange={e => setForm(f => ({ ...f, attendance_score: e.target.value }))} />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Skor Sikap (30%)</label>
-                                    <input type="number" className="form-input" min="0" max="100" step="0.1"
+                                    <input type="number" className="form-input" min="0" max="100" step="0.01"
                                         value={form.attitude_score}
                                         onChange={e => setForm(f => ({ ...f, attitude_score: e.target.value }))} />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Skor Kinerja (30%)</label>
-                                    <input type="number" className="form-input" min="0" max="100" step="0.1"
+                                    <input type="number" className="form-input" min="0" max="100" step="0.01"
                                         value={form.performance_score}
                                         onChange={e => setForm(f => ({ ...f, performance_score: e.target.value }))} />
                                 </div>

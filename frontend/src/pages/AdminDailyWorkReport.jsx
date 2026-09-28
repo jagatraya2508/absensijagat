@@ -1,6 +1,7 @@
 import Icon from '../components/Icon';
 import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS_MAP = {
     completed: { label: 'Selesai', icon: 'CheckCircle2', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
@@ -30,6 +31,7 @@ const REPORT_STATUS_MAP = {
 };
 
 export default function AdminDailyWorkReport() {
+    const { hasPermission } = useAuth();
     const [reports, setReports] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -41,7 +43,8 @@ export default function AdminDailyWorkReport() {
     const [error, setError] = useState('');
 
     // Filters
-    const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+    const [filterDateFrom, setFilterDateFrom] = useState(new Date().toISOString().split('T')[0]);
+    const [filterDateTo, setFilterDateTo] = useState(new Date().toISOString().split('T')[0]);
     const [filterStatus, setFilterStatus] = useState('');
     const [filterSearch, setFilterSearch] = useState('');
 
@@ -52,10 +55,8 @@ export default function AdminDailyWorkReport() {
         try {
             setLoading(true);
             const params = {};
-            if (filterDate) {
-                params.start_date = filterDate;
-                params.end_date = filterDate;
-            }
+            if (filterDateFrom) params.start_date = filterDateFrom;
+            if (filterDateTo) params.end_date = filterDateTo;
             if (filterStatus) params.status = filterStatus;
             if (filterSearch) params.search = filterSearch;
 
@@ -66,14 +67,14 @@ export default function AdminDailyWorkReport() {
         } finally {
             setLoading(false);
         }
-    }, [filterDate, filterStatus, filterSearch]);
+    }, [filterDateFrom, filterDateTo, filterStatus, filterSearch]);
 
     const fetchStats = useCallback(async () => {
         try {
-            const data = await dailyWorkReportAPI.adminGetStats(filterDate);
+            const data = await dailyWorkReportAPI.adminGetStats(filterDateFrom);
             setStats(data);
         } catch (e) { console.error(e); }
-    }, [filterDate]);
+    }, [filterDateFrom]);
 
     useEffect(() => {
         fetchReports();
@@ -190,13 +191,24 @@ export default function AdminDailyWorkReport() {
             <div className="card" style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}><Icon name="Calendar" size={16} inline /> Tanggal:</label>
+                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}><Icon name="Calendar" size={16} inline /> Dari:</label>
                         <input
                             type="date"
-                            value={filterDate}
-                            onChange={e => setFilterDate(e.target.value)}
+                            value={filterDateFrom}
+                            onChange={e => setFilterDateFrom(e.target.value)}
                             className="form-input"
                             style={{ width: 'auto' }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Sampai:</label>
+                        <input
+                            type="date"
+                            value={filterDateTo}
+                            onChange={e => setFilterDateTo(e.target.value)}
+                            className="form-input"
+                            style={{ width: 'auto' }}
+                            min={filterDateFrom}
                         />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -224,7 +236,7 @@ export default function AdminDailyWorkReport() {
                             style={{ flex: 1 }}
                         />
                     </div>
-                    <button className="btn btn-secondary" onClick={() => { setFilterDate(new Date().toISOString().split('T')[0]); setFilterStatus(''); setFilterSearch(''); }} style={{ fontSize: '0.8rem' }}>
+                    <button className="btn btn-secondary" onClick={() => { const today = new Date().toISOString().split('T')[0]; setFilterDateFrom(today); setFilterDateTo(today); setFilterStatus(''); setFilterSearch(''); }} style={{ fontSize: '0.8rem' }}>
                         <Icon name="RefreshCw" size={16} inline /> Reset
                     </button>
                 </div>
@@ -311,7 +323,7 @@ export default function AdminDailyWorkReport() {
                                                 >
                                                     <Icon name="Eye" size={16} inline /> Detail
                                                 </button>
-                                                {report.status === 'submitted' && (
+                                                {report.status === 'submitted' && hasPermission('admin.daily_work_report') && (
                                                     <button
                                                         className="btn btn-primary"
                                                         onClick={() => openReview(report)}
@@ -320,7 +332,7 @@ export default function AdminDailyWorkReport() {
                                                         <Icon name="CheckCircle2" size={16} inline /> Review
                                                     </button>
                                                 )}
-                                                {report.status === 'reviewed' && (
+                                                {report.status === 'reviewed' && hasPermission('admin.daily_work_report') && (
                                                     <button
                                                         className="btn btn-secondary"
                                                         onClick={() => openReview(report)}
@@ -478,7 +490,7 @@ export default function AdminDailyWorkReport() {
                             <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>
                                 Tutup
                             </button>
-                            {selectedReport.status === 'submitted' && (
+                            {selectedReport.status === 'submitted' && hasPermission('admin.daily_work_report') && (
                                 <button className="btn btn-primary" onClick={() => {
                                     setShowDetailModal(false);
                                     openReview(selectedReport);
@@ -486,7 +498,7 @@ export default function AdminDailyWorkReport() {
                                     <Icon name="CheckCircle2" size={16} inline /> Review Laporan
                                 </button>
                             )}
-                            {selectedReport.status === 'reviewed' && (
+                            {selectedReport.status === 'reviewed' && hasPermission('admin.daily_work_report') && (
                                 <button className="btn btn-secondary" onClick={() => {
                                     setShowDetailModal(false);
                                     openReview(selectedReport);

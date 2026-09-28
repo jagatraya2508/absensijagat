@@ -135,7 +135,7 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
 export default function AdminSettings() {
     const navigate = useNavigate();
     const { logout } = useAuth();
-    const { settings, updateLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
+    const { settings, updateLogo, updatePayslipShowLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
 
     // Company Name state
     const [editCompanyName, setEditCompanyName] = useState(companyName || 'Absensi');
@@ -179,6 +179,9 @@ export default function AdminSettings() {
     });
     const [smtpLoading, setSmtpLoading] = useState(false);
     const [smtpMessage, setSmtpMessage] = useState({ type: '', text: '' });
+    const [showPayslipLogo, setShowPayslipLogo] = useState(settings.payslip_show_logo !== 'false');
+    const [payslipLogoLoading, setPayslipLogoLoading] = useState(false);
+    const [payslipLogoMessage, setPayslipLogoMessage] = useState({ type: '', text: '' });
 
     // Backup & Restore state
     const [backupLoading, setBackupLoading] = useState(false);
@@ -205,6 +208,10 @@ export default function AdminSettings() {
     useEffect(() => {
         setEditCompanyName(companyName || 'Absensi');
     }, [companyName]);
+
+    useEffect(() => {
+        setShowPayslipLogo(settings.payslip_show_logo !== 'false');
+    }, [settings.payslip_show_logo]);
 
     useEffect(() => {
         fetchLeaveSettings();
@@ -941,6 +948,46 @@ export default function AdminSettings() {
                             currentLogoUrl={settings.favicon_logo || settings.app_logo} 
                             updateLogoFn={updateLogo} 
                         />
+
+                        <div style={{ padding: '0.25rem 0 1.25rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showPayslipLogo}
+                                    disabled={payslipLogoLoading}
+                                    onChange={async (e) => {
+                                        const next = e.target.checked;
+                                        setShowPayslipLogo(next);
+                                        setPayslipLogoLoading(true);
+                                        setPayslipLogoMessage({ type: '', text: '' });
+                                        try {
+                                            await updatePayslipShowLogo(next);
+                                            setPayslipLogoMessage({
+                                                type: 'success',
+                                                text: next ? 'Logo akan tampil di slip gaji' : 'Logo disembunyikan dari slip gaji'
+                                            });
+                                        } catch (error) {
+                                            setShowPayslipLogo(!next);
+                                            setPayslipLogoMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan logo slip' });
+                                        } finally {
+                                            setPayslipLogoLoading(false);
+                                        }
+                                    }}
+                                    style={{ width: '18px', height: '18px', marginTop: '0.15rem' }}
+                                />
+                                <div>
+                                    <div style={{ fontWeight: 600 }}>Tampilkan logo pada slip gaji</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Logo Utama Aplikasi muncul di atas judul slip, termasuk saat diunduh PDF. Matikan jika slip tidak perlu menampilkan logo.
+                                    </div>
+                                </div>
+                            </label>
+                            {payslipLogoMessage.text && (
+                                <div className={`alert alert-${payslipLogoMessage.type}`} style={{ marginTop: '1rem' }}>
+                                    {payslipLogoMessage.text}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 

@@ -102,6 +102,15 @@ function AppLayout({ children }) {
         setSidebarOpen(false);
     }, [location.pathname]);
 
+    useEffect(() => {
+        if (!sidebarOpen) return undefined;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = previous;
+        };
+    }, [sidebarOpen]);
+
     return (
         <div className={`app-container${sidebarOpen ? ' sidebar-open' : ''}`}>
             <button
@@ -632,7 +641,7 @@ function AppRoutes() {
             <Route
                 path="/admin/daily-work-report"
                 element={
-                    <ProtectedRoute permission="admin.daily_work_report">
+                    <ProtectedRoute>
                         <AppLayout>
                             <AdminDailyWorkReport />
                         </AppLayout>

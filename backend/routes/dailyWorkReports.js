@@ -388,9 +388,22 @@ router.delete('/items/:itemId', async (req, res) => {
 // ============================================
 
 // GET /admin/all - Admin: List semua laporan karyawan
-router.get('/admin/all', hasPermission('admin.daily_work_report'), async (req, res) => {
+router.get('/admin/all', async (req, res) => {
     try {
         const { start_date, end_date, status, user_id, search } = req.query;
+
+        let hasAccess = false;
+        if (req.user.role === 'admin') {
+            hasAccess = true;
+        } else {
+            const permCheck = await pool.query(
+                `SELECT 1 FROM role_permissions rp 
+                 JOIN roles r ON rp.role_id = r.id 
+                 WHERE r.name = $1 AND rp.permission_key = $2`,
+                [req.user.role, 'admin.daily_work_report']
+            );
+            hasAccess = permCheck.rows.length > 0;
+        }
 
         let query = `
             SELECT dwr.*, 
@@ -407,6 +420,12 @@ router.get('/admin/all', hasPermission('admin.daily_work_report'), async (req, r
         `;
         const params = [];
         let paramIndex = 1;
+
+        if (!hasAccess) {
+            query += ` AND dwr.user_id = $${paramIndex}`;
+            params.push(req.user.id);
+            paramIndex++;
+        }
 
         if (start_date) {
             query += ` AND dwr.report_date >= $${paramIndex}`;
@@ -445,19 +464,44 @@ router.get('/admin/all', hasPermission('admin.daily_work_report'), async (req, r
 });
 
 // GET /admin/stats - Admin: Statistik laporan
-router.get('/admin/stats', hasPermission('admin.daily_work_report'), async (req, res) => {
+router.get('/admin/stats', async (req, res) => {
     try {
         const { date } = req.query;
         const targetDate = date || new Date().toISOString().split('T')[0];
 
-        const stats = await pool.query(`
-            SELECT 
-                (SELECT COUNT(DISTINCT user_id) FROM daily_work_reports WHERE report_date = $1) as total_submitted,
-                (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'draft') as draft_count,
-                (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'submitted') as submitted_count,
-                (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'reviewed') as reviewed_count,
-                (SELECT COUNT(*) FROM users WHERE role != 'admin') as total_employees
-        `, [targetDate]);
+        let hasAccess = false;
+        if (req.user.role === 'admin') {
+            hasAccess = true;
+        } else {
+            const permCheck = await pool.query(
+                `SELECT 1 FROM role_permissions rp 
+                 JOIN roles r ON rp.role_id = r.id 
+                 WHERE r.name = $1 AND rp.permission_key = $2`,
+                [req.user.role, 'admin.daily_work_report']
+            );
+            hasAccess = permCheck.rows.length > 0;
+        }
+
+        let stats;
+        if (hasAccess) {
+            stats = await pool.query(`
+                SELECT 
+                    (SELECT COUNT(DISTINCT user_id) FROM daily_work_reports WHERE report_date = $1) as total_submitted,
+                    (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'draft') as draft_count,
+                    (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'submitted') as submitted_count,
+                    (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'reviewed') as reviewed_count,
+                    (SELECT COUNT(*) FROM users WHERE role != 'admin') as total_employees
+            `, [targetDate]);
+        } else {
+            stats = await pool.query(`
+                SELECT 
+                    (SELECT COUNT(DISTINCT user_id) FROM daily_work_reports WHERE report_date = $1 AND user_id = $2) as total_submitted,
+                    (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'draft' AND user_id = $2) as draft_count,
+                    (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'submitted' AND user_id = $2) as submitted_count,
+                    (SELECT COUNT(*) FROM daily_work_reports WHERE report_date = $1 AND status = 'reviewed' AND user_id = $2) as reviewed_count,
+                    1 as total_employees
+            `, [targetDate, req.user.id]);
+        }
 
         res.json(stats.rows[0]);
     } catch (error) {

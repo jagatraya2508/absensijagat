@@ -525,6 +525,10 @@ export const settingsAPI = {
         method: 'PUT',
         body: JSON.stringify(data),
     }),
+    updatePayslipLogo: (showLogo) => request('/settings/payslip-logo', {
+        method: 'PUT',
+        body: JSON.stringify({ show_logo: showLogo }),
+    }),
 };
 
 // Database backup & restore (admin only)

@@ -48,7 +48,7 @@ router.get('/daily', authenticateToken, isAdmin, async (req, res) => {
         AND $1::date BETWEEN lr.start_date AND lr.end_date
       LEFT JOIN user_off_days uod ON u.id = uod.user_id
         AND uod.off_date = $1::date
-      WHERE u.role = 'employee'
+      WHERE u.role IN ('employee', 'manager')
       ORDER BY u.name`,
             [targetDate]
         );
@@ -103,7 +103,7 @@ router.get('/monthly', authenticateToken, isAdmin, async (req, res) => {
       FROM users u
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
-      WHERE u.role = 'employee'
+      WHERE u.role IN ('employee', 'manager')
       GROUP BY u.id, u.employee_id, u.name
       ORDER BY u.name`,
             [startDate, endDate]
@@ -192,7 +192,7 @@ router.get('/export/daily/pdf', authenticateToken, isAdmin, async (req, res) => 
       LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
       LEFT JOIN user_off_days uod ON u.id = uod.user_id
         AND uod.off_date = $1::date
-      WHERE u.role = 'employee'
+      WHERE u.role IN ('employee', 'manager')
       ORDER BY u.name`,
             [targetDate]
         );
@@ -292,7 +292,7 @@ router.get('/export/daily/excel', authenticateToken, isAdmin, async (req, res) =
       LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
       LEFT JOIN user_off_days uod ON u.id = uod.user_id
         AND uod.off_date = $1::date
-      WHERE u.role = 'employee'
+      WHERE u.role IN ('employee', 'manager')
       ORDER BY u.name`,
             [targetDate]
         );
@@ -383,7 +383,7 @@ router.get('/export/monthly/pdf', authenticateToken, isAdmin, async (req, res) =
       FROM users u
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
-      WHERE u.role = 'employee'
+      WHERE u.role IN ('employee', 'manager')
       GROUP BY u.id, u.employee_id, u.name
       ORDER BY u.name`,
             [startDate, endDate]
@@ -480,7 +480,7 @@ router.get('/export/monthly/excel', authenticateToken, isAdmin, async (req, res)
       FROM users u
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
-      WHERE u.role = 'employee'
+      WHERE u.role IN ('employee', 'manager')
       GROUP BY u.id, u.employee_id, u.name
       ORDER BY u.name`,
             [startDate, endDate]
@@ -884,7 +884,7 @@ router.get('/history', authenticateToken, isAdmin, async (req, res) => {
                 AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
-            WHERE u.role = 'employee' ${userFilter}
+            WHERE u.role IN ('employee', 'manager') ${userFilter}
                 AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
@@ -949,7 +949,7 @@ router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) =
                 AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
-            WHERE u.role = 'employee' ${userFilter}
+            WHERE u.role IN ('employee', 'manager') ${userFilter}
                 AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
@@ -1087,7 +1087,7 @@ router.get('/export/history/excel', authenticateToken, isAdmin, async (req, res)
                 AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
-            WHERE u.role = 'employee' ${userFilter}
+            WHERE u.role IN ('employee', 'manager') ${userFilter}
                 AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
