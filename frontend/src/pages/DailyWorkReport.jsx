@@ -1,4 +1,5 @@
 import Icon from '../components/Icon';
+import ListPagination, { slicePage } from '../components/ListPagination';
 import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -48,6 +49,10 @@ export default function DailyWorkReport() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [summary, setSummary] = useState('');
+    const [itemsPage, setItemsPage] = useState(1);
+    const [historyPage, setHistoryPage] = useState(1);
+    const [pendingPage, setPendingPage] = useState(1);
+    const [schedulePage, setSchedulePage] = useState(1);
 
     const [itemForm, setItemForm] = useState({
         title: '', description: '', category: 'task',
@@ -497,6 +502,15 @@ export default function DailyWorkReport() {
         { key: 'schedule', label: 'Jadwal Penyelesaian', icon: 'Calendar' }
     ];
 
+    const reportItems = currentReport?.items || [];
+    const pagedItems = slicePage(reportItems, itemsPage);
+    const pagedHistory = slicePage(reports, historyPage);
+    const priorityOrder = ['urgent', 'high', 'medium', 'low'];
+    const orderedPending = priorityOrder.flatMap((priority) => pendingItems.filter((item) => item.priority === priority));
+    const pagedPending = slicePage(orderedPending, pendingPage);
+    const orderedSchedule = [...scheduleItems].sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || '')));
+    const pagedSchedule = slicePage(orderedSchedule, schedulePage);
+
     return (
         <div className="page-container">
             <div className="page-header">
@@ -524,7 +538,13 @@ export default function DailyWorkReport() {
                 {tabItems.map(tab => (
                     <button
                         key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
+                        onClick={() => {
+                            setActiveTab(tab.key);
+                            setItemsPage(1);
+                            setHistoryPage(1);
+                            setPendingPage(1);
+                            setSchedulePage(1);
+                        }}
                         style={{
                             flex: 1, padding: '10px 16px', border: 'none', borderRadius: 'var(--radius-md)',
                             background: activeTab === tab.key ? 'var(--theme-primary)' : 'transparent',
@@ -550,7 +570,7 @@ export default function DailyWorkReport() {
                                 <input
                                     type="date"
                                     value={selectedDate}
-                                    onChange={e => setSelectedDate(e.target.value)}
+                                    onChange={e => { setSelectedDate(e.target.value); setItemsPage(1); }}
                                     className="form-input"
                                     style={{ width: 'auto' }}
                                 />
@@ -659,6 +679,7 @@ export default function DailyWorkReport() {
                                         <p style={{ fontSize: '0.8rem' }}>Klik "Tambah Pekerjaan" untuk memulai</p>
                                     </div>
                                 ) : (
+                                    <>
                                     <div className="table-responsive">
                                         <table className="table">
                                             <thead>
@@ -674,7 +695,7 @@ export default function DailyWorkReport() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {currentReport.items.map(item => (
+                                                {pagedItems.items.map(item => (
                                                     <tr key={item.id}>
                                                         <td style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>
                                                             {item.start_time ? item.start_time.substring(0, 5) : '-'}
@@ -770,6 +791,8 @@ export default function DailyWorkReport() {
                                             </tbody>
                                         </table>
                                     </div>
+                                    <ListPagination page={itemsPage} total={reportItems.length} onPageChange={setItemsPage} itemLabel="pekerjaan" />
+                                    </>
                                 )}
                             </div>
 
@@ -779,11 +802,12 @@ export default function DailyWorkReport() {
                                 {reports.length === 0 ? (
                                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Belum ada riwayat laporan</p>
                                 ) : (
+                                    <>
                                     <div style={{ display: 'grid', gap: 8 }}>
-                                        {reports.slice(0, 10).map(r => (
+                                        {pagedHistory.items.map(r => (
                                             <div
                                                 key={r.id}
-                                                onClick={() => setSelectedDate(r.report_date.split('T')[0])}
+                                                onClick={() => { setSelectedDate(r.report_date.split('T')[0]); setItemsPage(1); }}
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: 12,
                                                     padding: '10px 14px', borderRadius: 'var(--radius-md)',
@@ -808,6 +832,8 @@ export default function DailyWorkReport() {
                                             </div>
                                         ))}
                                     </div>
+                                    <ListPagination page={historyPage} total={reports.length} onPageChange={setHistoryPage} itemLabel="laporan" />
+                                    </>
                                 )}
                             </div>
                         </>
@@ -850,8 +876,8 @@ export default function DailyWorkReport() {
                             </div>
 
                             {/* Group by Priority */}
-                            {['urgent', 'high', 'medium', 'low'].map(priority => {
-                                const items = pendingItems.filter(i => i.priority === priority);
+                            {priorityOrder.map(priority => {
+                                const items = pagedPending.items.filter(i => i.priority === priority);
                                 if (items.length === 0) return null;
                                 return (
                                     <div key={priority} style={{ marginBottom: 16 }}>
@@ -931,6 +957,7 @@ export default function DailyWorkReport() {
                                     </div>
                                 );
                             })}
+                            <ListPagination page={pendingPage} total={orderedPending.length} onPageChange={setPendingPage} itemLabel="pekerjaan" />
                         </>
                     )}
                 </div>
@@ -952,7 +979,7 @@ export default function DailyWorkReport() {
                             {/* Group by date */}
                             {(() => {
                                 const grouped = {};
-                                scheduleItems.forEach(item => {
+                                pagedSchedule.items.forEach(item => {
                                     const date = item.due_date?.split('T')[0] || 'no-date';
                                     if (!grouped[date]) grouped[date] = [];
                                     grouped[date].push(item);
@@ -1035,6 +1062,7 @@ export default function DailyWorkReport() {
                                     );
                                 });
                             })()}
+                            <ListPagination page={schedulePage} total={orderedSchedule.length} onPageChange={setSchedulePage} itemLabel="pekerjaan" />
                         </>
                     )}
                 </div>

@@ -1,4 +1,5 @@
 import Icon from '../components/Icon';
+import ListPagination, { slicePage } from '../components/ListPagination';
 import { useState, useEffect, useCallback } from 'react';
 import { dailyWorkReportAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +48,8 @@ export default function AdminDailyWorkReport() {
     const [filterDateTo, setFilterDateTo] = useState(new Date().toISOString().split('T')[0]);
     const [filterStatus, setFilterStatus] = useState('');
     const [filterSearch, setFilterSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [detailPage, setDetailPage] = useState(1);
 
     // Review form
     const [reviewForm, setReviewForm] = useState({ review_notes: '', status: 'reviewed' });
@@ -92,6 +95,7 @@ export default function AdminDailyWorkReport() {
         try {
             const data = await dailyWorkReportAPI.getById(report.id);
             setSelectedReport(data);
+            setDetailPage(1);
             setShowDetailModal(true);
         } catch (e) {
             alert('Gagal memuat detail: ' + e.message);
@@ -137,6 +141,8 @@ export default function AdminDailyWorkReport() {
         if (!timeStr) return '-';
         return timeStr.substring(0, 5);
     }
+
+    const pagedReports = slicePage(reports, page);
 
     return (
         <div className="page-container">
@@ -195,7 +201,7 @@ export default function AdminDailyWorkReport() {
                         <input
                             type="date"
                             value={filterDateFrom}
-                            onChange={e => setFilterDateFrom(e.target.value)}
+                            onChange={e => { setFilterDateFrom(e.target.value); setPage(1); }}
                             className="form-input"
                             style={{ width: 'auto' }}
                         />
@@ -205,7 +211,7 @@ export default function AdminDailyWorkReport() {
                         <input
                             type="date"
                             value={filterDateTo}
-                            onChange={e => setFilterDateTo(e.target.value)}
+                            onChange={e => { setFilterDateTo(e.target.value); setPage(1); }}
                             className="form-input"
                             style={{ width: 'auto' }}
                             min={filterDateFrom}
@@ -215,7 +221,7 @@ export default function AdminDailyWorkReport() {
                         <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Status:</label>
                         <select
                             value={filterStatus}
-                            onChange={e => setFilterStatus(e.target.value)}
+                            onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
                             className="form-input"
                             style={{ width: 'auto' }}
                         >
@@ -230,13 +236,13 @@ export default function AdminDailyWorkReport() {
                         <input
                             type="text"
                             value={filterSearch}
-                            onChange={e => setFilterSearch(e.target.value)}
+                            onChange={e => { setFilterSearch(e.target.value); setPage(1); }}
                             className="form-input"
                             placeholder="Cari nama karyawan..."
                             style={{ flex: 1 }}
                         />
                     </div>
-                    <button className="btn btn-secondary" onClick={() => { const today = new Date().toISOString().split('T')[0]; setFilterDateFrom(today); setFilterDateTo(today); setFilterStatus(''); setFilterSearch(''); }} style={{ fontSize: '0.8rem' }}>
+                    <button className="btn btn-secondary" onClick={() => { const today = new Date().toISOString().split('T')[0]; setFilterDateFrom(today); setFilterDateTo(today); setFilterStatus(''); setFilterSearch(''); setPage(1); }} style={{ fontSize: '0.8rem' }}>
                         <Icon name="RefreshCw" size={16} inline /> Reset
                     </button>
                 </div>
@@ -258,6 +264,7 @@ export default function AdminDailyWorkReport() {
                         </p>
                     </div>
                 ) : (
+                    <>
                     <div className="table-responsive">
                         <table className="table">
                             <thead>
@@ -272,7 +279,7 @@ export default function AdminDailyWorkReport() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {reports.map(report => (
+                                {pagedReports.items.map(report => (
                                     <tr key={report.id}>
                                         <td>
                                             <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{report.user_name}</div>
@@ -348,6 +355,8 @@ export default function AdminDailyWorkReport() {
                             </tbody>
                         </table>
                     </div>
+                    <ListPagination page={page} total={reports.length} onPageChange={setPage} itemLabel="laporan" />
+                    </>
                 )}
             </div>
 
@@ -414,7 +423,7 @@ export default function AdminDailyWorkReport() {
                                 </p>
                             ) : (
                                 <div style={{ display: 'grid', gap: 8 }}>
-                                    {selectedReport.items.map(item => (
+                                    {slicePage(selectedReport.items, detailPage).items.map(item => (
                                         <div key={item.id} style={{
                                             padding: '12px 14px', borderRadius: 'var(--radius-md)',
                                             background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
@@ -485,6 +494,7 @@ export default function AdminDailyWorkReport() {
                                     ))}
                                 </div>
                             )}
+                            <ListPagination page={detailPage} total={selectedReport.items?.length || 0} onPageChange={setDetailPage} itemLabel="pekerjaan" />
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>

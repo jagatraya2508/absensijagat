@@ -5,6 +5,8 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Icon from '../components/Icon';
 
+const USER_PAGE_SIZE = 10;
+
 export default function AdminUsers() {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
@@ -23,6 +25,7 @@ export default function AdminUsers() {
     const [success, setSuccess] = useState('');
     const [changingRole, setChangingRole] = useState(null); // track which user's role is being changed
     const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
     const [showImportModal, setShowImportModal] = useState(false);
     const [importFile, setImportFile] = useState(null);
@@ -243,6 +246,12 @@ export default function AdminUsers() {
         return result;
     }, [users, search, sortConfig]);
 
+    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USER_PAGE_SIZE));
+    const pageSafe = Math.min(Math.max(1, page), totalPages);
+    const pagedUsers = filteredUsers.slice((pageSafe - 1) * USER_PAGE_SIZE, pageSafe * USER_PAGE_SIZE);
+    const pageStart = filteredUsers.length === 0 ? 0 : (pageSafe - 1) * USER_PAGE_SIZE + 1;
+    const pageEnd = Math.min(pageSafe * USER_PAGE_SIZE, filteredUsers.length);
+
     // Export to Excel
     function handleExportExcel() {
         const data = filteredUsers.map((user, i) => ({
@@ -378,7 +387,7 @@ export default function AdminUsers() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Cari user..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 220 }} /> <button className="btn" onClick={handleExportPDF} title="Ekspor ke PDF" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                            placeholder="Cari user..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} style={{ maxWidth: 220 }} /> <button className="btn" onClick={handleExportPDF} title="Ekspor ke PDF" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
                                 background: 'linear-gradient(135deg, #ef4444, #f87171)', color: '#fff',
                                 border: 'none', borderRadius: 'var(--radius-md)',
                                 display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -420,7 +429,7 @@ export default function AdminUsers() {
                     </div>
                 ) : filteredUsers.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon"><Icon name="Users" size={28} /></div> <p className="empty-state-text">Belum ada user terdaftar</p> </div> ) : ( <div className="table-container"> <table className="table"> <thead> <tr> <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                        <div className="empty-state-icon"><Icon name="Users" size={28} /></div> <p className="empty-state-text">Belum ada user terdaftar</p> </div> ) : ( <> <div className="table-container"> <table className="table"> <thead> <tr> <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Employee ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
                                     </th>
                                     <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
@@ -439,7 +448,7 @@ export default function AdminUsers() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredUsers.map((user) => (
+                                {pagedUsers.map((user) => (
                                     <tr key={user.id}>
                                         <td style={{ fontWeight: 500 }}>{user.employee_id}</td>
                                         <td>{user.name}</td>
@@ -497,7 +506,7 @@ export default function AdminUsers() {
                                                     Reset Password </button> <button className="btn btn-outline" style={{ padding:'0.5rem 0.75rem', fontSize: '0.8rem', color: 'var(--danger-500)' }}
                                                     onClick={() => handleDelete(user.id)}
                                                 >
-                                                    Hapus </button> </div> </td> </tr> ))} </tbody> </table> </div> )} </div> {/* Modal */} {showModal && ( <div className="modal-overlay"> <div className="modal" onClick={(e) => e.stopPropagation()}> <div className="modal-header"> <h3 className="modal-title"> {editingUser ?'Edit User' : 'Tambah User Baru'}
+                                                    Hapus </button> </div> </td> </tr> ))} </tbody> </table> </div> {filteredUsers.length > USER_PAGE_SIZE && ( <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}> <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}> Menampilkan {pageStart}–{pageEnd} dari {filteredUsers.length} user </span> <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}> <button type="button" className="btn btn-outline" title="Halaman awal" aria-label="Halaman awal" disabled={pageSafe <= 1} onClick={() => setPage(1)} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}> <Icon name="ChevronsLeft" size={16} /> </button> <button type="button" className="btn btn-outline" title="Halaman sebelumnya" aria-label="Halaman sebelumnya" disabled={pageSafe <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}> <Icon name="ChevronLeft" size={16} /> </button> <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--gray-800)', padding: '0 0.35rem', whiteSpace: 'nowrap' }}> {pageSafe} / {totalPages} </span> <button type="button" className="btn btn-outline" title="Halaman berikutnya" aria-label="Halaman berikutnya" disabled={pageSafe >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}> <Icon name="ChevronRight" size={16} /> </button> <button type="button" className="btn btn-outline" title="Halaman akhir" aria-label="Halaman akhir" disabled={pageSafe >= totalPages} onClick={() => setPage(totalPages)} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}> <Icon name="ChevronsRight" size={16} /> </button> </div> </div> )} </> )} </div> {/* Modal */} {showModal && ( <div className="modal-overlay"> <div className="modal" onClick={(e) => e.stopPropagation()}> <div className="modal-header"> <h3 className="modal-title"> {editingUser ?'Edit User' : 'Tambah User Baru'}
                             </h3>
                             <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
                         </div>

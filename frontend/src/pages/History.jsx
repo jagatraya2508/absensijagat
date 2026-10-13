@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import ImageModal from '../components/ImageModal';
 import Icon from '../components/Icon';
 
+const HISTORY_PAGE_SIZE = 10;
+
 function pairCheckInOut(records) {
     const sorted = [...records].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
     const specials = [];
@@ -139,6 +141,7 @@ export default function History() {
     const [endDate, setEndDate] = useState(_lastDay);
     const [selectedUser, setSelectedUser] = useState('all');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [page, setPage] = useState(1);
     const [exporting, setExporting] = useState(false);
 
     // Image Modal State
@@ -166,7 +169,7 @@ export default function History() {
         setLoading(true);
         setError('');
         try {
-            const params = { limit: 100 };
+            const params = { limit: 5000 };
             if (startDate) params.start_date = startDate;
             if (endDate) params.end_date = endDate;
             if (isAdmin && selectedUser) params.user_id = selectedUser;
@@ -184,6 +187,7 @@ export default function History() {
 
     function handleFilter(e) {
         e.preventDefault();
+        setPage(1);
         fetchHistory();
     }
 
@@ -221,6 +225,28 @@ export default function History() {
         }
         return acc;
     }, {}) : {};
+
+    const historyEntries = Object.keys(groupedRecords)
+        .sort((a, b) => {
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        })
+        .flatMap((date) => Object.values(groupedRecords[date]).map((userData) => ({ date, userData })));
+    const totalPages = Math.max(1, Math.ceil(historyEntries.length / HISTORY_PAGE_SIZE));
+    const pageSafe = Math.min(Math.max(1, page), totalPages);
+    const pagedEntries = historyEntries.slice((pageSafe - 1) * HISTORY_PAGE_SIZE, pageSafe * HISTORY_PAGE_SIZE);
+    const pageStart = historyEntries.length === 0 ? 0 : (pageSafe - 1) * HISTORY_PAGE_SIZE + 1;
+    const pageEnd = Math.min(pageSafe * HISTORY_PAGE_SIZE, historyEntries.length);
+    const pagedDates = [];
+    const pagedByDate = new Map();
+    for (const entry of pagedEntries) {
+        if (!pagedByDate.has(entry.date)) {
+            pagedByDate.set(entry.date, []);
+            pagedDates.push(entry.date);
+        }
+        pagedByDate.get(entry.date).push(entry.userData);
+    }
 
     function getLeaveLabel(leaveType) {
         switch (leaveType) {
@@ -294,7 +320,7 @@ export default function History() {
                         <select
                             className="form-input form-select"
                             value={sortOrder}
-                            onChange={(e) => setSortOrder(e.target.value)}
+                            onChange={(e) => { setSortOrder(e.target.value); setPage(1); }}
                         >
                             <option value="desc">Terbaru</option>
                             <option value="asc">Terlama</option>
@@ -310,6 +336,7 @@ export default function History() {
                             setStartDate(_firstDay);
                             setEndDate(_lastDay);
                             setSelectedUser('all');
+                            setPage(1);
                             setTimeout(fetchHistory, 0);
                         }}
                     >
@@ -383,14 +410,9 @@ export default function History() {
                     </div>
                 </div>
             ) : (
-                Object.keys(groupedRecords)
-                    .sort((a, b) => {
-                        const dateA = new Date(a);
-                        const dateB = new Date(b);
-                        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-                    })
-                    .map((date) => {
-                        const dayUsers = groupedRecords[date];
+                <>
+                {pagedDates.map((date) => {
+                        const dayUsers = pagedByDate.get(date);
                         return (
                             <div key={date} className="card mb-3 history-day-card">
                                 <div className="card-header">
@@ -529,7 +551,32 @@ export default function History() {
                                 </div>
                             </div>
                         );
-                    })
+                    })}
+                {historyEntries.length > HISTORY_PAGE_SIZE && (
+                    <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>
+                            Menampilkan {pageStart}–{pageEnd} dari {historyEntries.length} riwayat
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <button type="button" className="btn btn-outline" title="Halaman awal" aria-label="Halaman awal" disabled={pageSafe <= 1} onClick={() => setPage(1)} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}>
+                                <Icon name="ChevronsLeft" size={16} />
+                            </button>
+                            <button type="button" className="btn btn-outline" title="Halaman sebelumnya" aria-label="Halaman sebelumnya" disabled={pageSafe <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}>
+                                <Icon name="ChevronLeft" size={16} />
+                            </button>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--gray-800)', padding: '0 0.35rem', whiteSpace: 'nowrap' }}>
+                                {pageSafe} / {totalPages}
+                            </span>
+                            <button type="button" className="btn btn-outline" title="Halaman berikutnya" aria-label="Halaman berikutnya" disabled={pageSafe >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}>
+                                <Icon name="ChevronRight" size={16} />
+                            </button>
+                            <button type="button" className="btn btn-outline" title="Halaman akhir" aria-label="Halaman akhir" disabled={pageSafe >= totalPages} onClick={() => setPage(totalPages)} style={{ padding: '0.4rem 0.65rem', minWidth: 40 }}>
+                                <Icon name="ChevronsRight" size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+                </>
             )}
 
             <ImageModal
