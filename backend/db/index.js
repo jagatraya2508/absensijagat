@@ -33,6 +33,29 @@ pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS employment_sta
   .catch((err) => console.warn('DB patch employment_status:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS division VARCHAR(150)')
   .catch((err) => console.warn('DB patch division:', err.message));
+pool.query(`
+  ALTER TABLE employee_details 
+    ADD COLUMN IF NOT EXISTS driver_subuh_allowance DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS driver_rit_allowance DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS driver_inap_allowance DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS driver_ritase_dekat_allowance DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS driver_ritase_jauh_allowance DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS driver_ritase_allowance DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS bpjs_kes_enrolled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS bpjs_jht_enrolled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS bpjs_jp_enrolled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS bpjs_jkk_enrolled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS bpjs_jkm_enrolled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS pph21_enabled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS bpjs_kes_employee_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_kes_company_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_jht_employee_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_jht_company_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_jp_employee_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_jp_company_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_jkk_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS bpjs_jkm_rate DECIMAL(6,4)
+`).catch((err) => console.warn('DB patch employee_details driver/bpjs columns:', err.message));
 
 async function ensurePrerequisiteUniques() {
   const stmts = [

@@ -208,6 +208,26 @@ CREATE TABLE IF NOT EXISTS employee_details (
     is_sales BOOLEAN DEFAULT FALSE,
     use_tracking BOOLEAN DEFAULT FALSE,
     receives_tuang BOOLEAN DEFAULT TRUE,
+    driver_subuh_allowance DECIMAL(15,2) DEFAULT 0,
+    driver_rit_allowance DECIMAL(15,2) DEFAULT 0,
+    driver_inap_allowance DECIMAL(15,2) DEFAULT 0,
+    driver_ritase_dekat_allowance DECIMAL(15,2) DEFAULT 0,
+    driver_ritase_jauh_allowance DECIMAL(15,2) DEFAULT 0,
+    driver_ritase_allowance DECIMAL(15,2) DEFAULT 0,
+    bpjs_kes_enrolled BOOLEAN DEFAULT TRUE,
+    bpjs_jht_enrolled BOOLEAN DEFAULT TRUE,
+    bpjs_jp_enrolled BOOLEAN DEFAULT TRUE,
+    bpjs_jkk_enrolled BOOLEAN DEFAULT TRUE,
+    bpjs_jkm_enrolled BOOLEAN DEFAULT TRUE,
+    pph21_enabled BOOLEAN DEFAULT TRUE,
+    bpjs_kes_employee_rate DECIMAL(6,4),
+    bpjs_kes_company_rate DECIMAL(6,4),
+    bpjs_jht_employee_rate DECIMAL(6,4),
+    bpjs_jht_company_rate DECIMAL(6,4),
+    bpjs_jp_employee_rate DECIMAL(6,4),
+    bpjs_jp_company_rate DECIMAL(6,4),
+    bpjs_jkk_rate DECIMAL(6,4),
+    bpjs_jkm_rate DECIMAL(6,4),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -901,6 +921,26 @@ ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS supervisor_id INTEGER REFE
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS employment_status VARCHAR(150);
 ALTER TABLE employee_details ALTER COLUMN employment_status TYPE VARCHAR(150);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS division VARCHAR(150);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_subuh_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_rit_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_inap_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_ritase_dekat_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_ritase_jauh_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_ritase_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_kes_enrolled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jht_enrolled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jp_enrolled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jkk_enrolled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jkm_enrolled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS pph21_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_kes_employee_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_kes_company_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jht_employee_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jht_company_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jp_employee_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jp_company_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jkk_rate DECIMAL(6,4);
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS bpjs_jkm_rate DECIMAL(6,4);
 UPDATE employee_details SET employment_status = 'Permanen' WHERE lower(employment_status) IN ('permanen', 'tetap', 'pkwtt', 'permanent');
 UPDATE employee_details SET employment_status = 'Kontrak' WHERE lower(employment_status) IN ('kontrak', 'pkwt', 'contract');
 UPDATE employee_details SET employment_status = 'Honor Harian' WHERE lower(replace(employment_status, '_', ' ')) IN ('honor harian', 'honor', 'borongan');
