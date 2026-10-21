@@ -33,6 +33,10 @@ pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS employment_sta
   .catch((err) => console.warn('DB patch employment_status:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS division VARCHAR(150)')
   .catch((err) => console.warn('DB patch division:', err.message));
+pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS appreciation_allowance DECIMAL(15,2) DEFAULT 0')
+  .catch((err) => console.warn('DB patch appreciation_allowance:', err.message));
+pool.query('ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS appreciation_allowance DECIMAL(15,2) DEFAULT 0')
+  .catch((err) => console.warn('DB patch payroll appreciation_allowance:', err.message));
 pool.query(`
   ALTER TABLE employee_details 
     ADD COLUMN IF NOT EXISTS driver_subuh_allowance DECIMAL(15,2) DEFAULT 0,

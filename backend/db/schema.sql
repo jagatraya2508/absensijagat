@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS employee_details (
     salary_type VARCHAR(10) DEFAULT 'monthly' CHECK (salary_type IN ('daily', 'weekly', 'monthly')),
     transport_allowance DECIMAL(15,2) DEFAULT 0,
     meal_allowance DECIMAL(15,2) DEFAULT 0,
+    appreciation_allowance DECIMAL(15,2) DEFAULT 0,
     overtime_rate DECIMAL(15,2) DEFAULT 50000,
     tax_status VARCHAR(10) DEFAULT 'TK/0',
     emergency_contact_name VARCHAR(100),
@@ -309,6 +310,7 @@ CREATE TABLE IF NOT EXISTS payroll_items (
     basic_salary DECIMAL(15,2) DEFAULT 0,
     transport_allowance DECIMAL(15,2) DEFAULT 0,
     meal_allowance DECIMAL(15,2) DEFAULT 0,
+    appreciation_allowance DECIMAL(15,2) DEFAULT 0,
     overtime_hours DECIMAL(6,1) DEFAULT 0,
     overtime_amount DECIMAL(15,2) DEFAULT 0,
     bpjs_kes_employee DECIMAL(15,2) DEFAULT 0,
@@ -980,6 +982,8 @@ ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_ritase_dekat_amount DE
 ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS driver_ritase_jauh_amount DECIMAL(15,2) DEFAULT 0;
 ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS tuang_amount DECIMAL(15,2) DEFAULT 0;
 ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS tuang_days INTEGER DEFAULT 0;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS appreciation_allowance DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS appreciation_allowance DECIMAL(15,2) DEFAULT 0;
 ALTER TABLE driver_activities ADD COLUMN IF NOT EXISTS ritase_dekat INTEGER DEFAULT 0;
 ALTER TABLE driver_activities ADD COLUMN IF NOT EXISTS ritase_jauh INTEGER DEFAULT 0;
 

@@ -275,7 +275,7 @@ export default function AdminPayroll() {
                                     <tbody>
                                         {selectedRun.items.map(item => {
                                             const bpjsTotal = parseFloat(item.bpjs_kes_employee) + parseFloat(item.bpjs_jht_employee) + parseFloat(item.bpjs_jp_employee);
-                                            const tunjangan = parseFloat(item.transport_allowance) + parseFloat(item.meal_allowance);
+                                            const tunjangan = parseFloat(item.transport_allowance) + parseFloat(item.meal_allowance) + parseFloat(item.appreciation_allowance || 0);
                                             return (
                                                 <tr key={item.id}>
                                                     <td style={{ fontWeight: 500 }}>
@@ -305,7 +305,7 @@ export default function AdminPayroll() {
                                         <tr style={{ borderTop: '2px solid rgba(255,255,255,0.2)' }}>
                                             <td style={{ fontWeight: 700 }}>TOTAL</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.basic_salary), 0))}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance) + parseFloat(i.appreciation_allowance || 0), 0))}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>{selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_hours), 0)} jam</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_amount), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.tuang_amount || 0), 0))}</td>
@@ -377,6 +377,7 @@ export default function AdminPayroll() {
                                     ['Gaji Pokok', selectedSlip.basic_salary],
                                     ['Tunjangan Transport', selectedSlip.transport_allowance],
                                     ['Tunjangan Makan', selectedSlip.meal_allowance],
+                                    ['Tunjangan Apresiasi', selectedSlip.appreciation_allowance],
                                     ['Lembur (' + selectedSlip.overtime_hours + ' jam)', selectedSlip.overtime_amount],
                                     ...(parseFloat(selectedSlip.tuang_amount) > 0 ? [['Insentif Tuang (' + (selectedSlip.tuang_days || 0) + ' hari)', selectedSlip.tuang_amount]] : []),
                                 ].map(([label, val]) => (

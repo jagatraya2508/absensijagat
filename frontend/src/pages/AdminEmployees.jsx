@@ -83,7 +83,7 @@ export default function AdminEmployees() {
         department: '', division: '', position: '', employment_status: '', join_date: '', supervisor_id: '',
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
-        basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, overtime_rate: 50000,
+        basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0, overtime_rate: 50000,
         is_driver: false, is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
         vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
@@ -169,7 +169,9 @@ export default function AdminEmployees() {
                 bpjs_ketenagakerjaan_no: d.bpjs_ketenagakerjaan_no || '',
                 basic_salary: d.basic_salary || 0, salary_type: d.salary_type || 'monthly',
                 transport_allowance: d.transport_allowance || 0,
-                meal_allowance: d.meal_allowance || 0, overtime_rate: d.overtime_rate || 50000,
+                meal_allowance: d.meal_allowance || 0,
+                appreciation_allowance: d.appreciation_allowance || 0,
+                overtime_rate: d.overtime_rate || 50000,
                 is_driver: d.is_driver || false,
                 is_collector: d.is_collector || false,
                 is_sales: d.is_sales || false,
@@ -231,7 +233,7 @@ export default function AdminEmployees() {
                 payload.supervisor_id = null;
             }
             const moneyFields = [
-                'basic_salary', 'transport_allowance', 'meal_allowance', 'overtime_rate',
+                'basic_salary', 'transport_allowance', 'meal_allowance', 'appreciation_allowance', 'overtime_rate',
                 'driver_subuh_allowance', 'driver_rit_allowance', 'driver_inap_allowance',
                 'driver_ritase_dekat_allowance', 'driver_ritase_jauh_allowance'
             ];
@@ -1253,6 +1255,10 @@ export default function AdminEmployees() {
                                         <div className="form-group">
                                             <label className="form-label">Tunjangan Makan (Rp/bln)</label>
                                             <input {...moneyInputProps('meal_allowance')} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Tunjangan Apresiasi (Rp/bln)</label>
+                                            <input {...moneyInputProps('appreciation_allowance')} />
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tarif Lembur/Jam (Rp)</label>

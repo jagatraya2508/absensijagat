@@ -193,6 +193,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                    COALESCE(ed.salary_type, 'monthly') as salary_type,
                    COALESCE(ed.transport_allowance, 0) as transport_allowance,
                    COALESCE(ed.meal_allowance, 0) as meal_allowance,
+                   COALESCE(ed.appreciation_allowance, 0) as appreciation_allowance,
                    COALESCE(ed.overtime_rate, 50000) as overtime_rate,
                    COALESCE(ed.tax_status, 'TK/0') as tax_status,
                    COALESCE(ed.is_driver, false) as is_driver,
@@ -230,6 +231,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
             const baseSalaryRate = parseFloat(emp.basic_salary);
             const transportAllowance = parseFloat(emp.transport_allowance);
             const mealAllowance = parseFloat(emp.meal_allowance);
+            const appreciationAllowance = parseFloat(emp.appreciation_allowance) || 0;
 
             // Count actual attendance (check-in days) for this employee in this month
             const attendanceResult = await client.query(`
@@ -357,7 +359,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
             const bpjsJkm = emp.bpjs_jkm_enrolled ? bpjsBase * getRate(emp.bpjs_jkm_rate, 'BPJS_JKM', 'company_rate', 0.003) : 0;
 
             // Gross income (including driver allowances)
-            const grossIncome = basicSalary + transportAllowance + mealAllowance + overtimeAmount + driverTotalAllowance + tuangAmount;
+            const grossIncome = basicSalary + transportAllowance + mealAllowance + appreciationAllowance + overtimeAmount + driverTotalAllowance + tuangAmount;
 
             // Calculate PPh 21 (monthly) - only if enabled for this employee
             let monthlyPPh = 0;
@@ -396,8 +398,8 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                     driver_subuh_days, driver_subuh_amount, driver_rit_total, driver_rit_amount,
                     driver_overnight_days, driver_overnight_amount, driver_total_allowance,
                     driver_extra_rit_dekat, driver_extra_rit_jauh, driver_ritase_dekat_amount, driver_ritase_jauh_amount,
-                    tuang_amount, tuang_days
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
+                    tuang_amount, tuang_days, appreciation_allowance
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
             `, [
                 payrollRunId, emp.id, basicSalary, transportAllowance, mealAllowance,
                 overtimeHours, overtimeAmount,
@@ -408,7 +410,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
                 driverSubuhDays, driverSubuhAmount, driverRitTotal, driverRitAmount,
                 driverOvernightDays, driverOvernightAmount, driverTotalAllowance,
                 driverExtraRitDekat, driverExtraRitJauh, driverRitaseDekatAmount, driverRitaseJauhAmount,
-                tuangAmount, tuangDays
+                tuangAmount, tuangDays, appreciationAllowance
             ]);
         }
 
@@ -664,7 +666,7 @@ router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
         itemsResult.rows.forEach((item, idx) => {
             if (y > 530) { doc.addPage(); y = 30; }
             const bpjs = parseFloat(item.bpjs_kes_employee) + parseFloat(item.bpjs_jht_employee) + parseFloat(item.bpjs_jp_employee);
-            const tunj = parseFloat(item.transport_allowance) + parseFloat(item.meal_allowance);
+            const tunj = parseFloat(item.transport_allowance) + parseFloat(item.meal_allowance) + parseFloat(item.appreciation_allowance || 0);
 
             doc.text(String(idx + 1), cols[0].x, y, { width: cols[0].w });
             doc.text(item.user_name, cols[1].x, y, { width: cols[1].w });
@@ -736,17 +738,17 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
         const ws = workbook.addWorksheet('Payroll');
 
         // Title
-        ws.mergeCells('A1:L1');
+        ws.mergeCells('A1:P1');
         ws.getCell('A1').value = 'LAPORAN PAYROLL';
         ws.getCell('A1').font = { bold: true, size: 16 };
         ws.getCell('A1').alignment = { horizontal: 'center' };
 
-        ws.mergeCells('A2:L2');
+        ws.mergeCells('A2:P2');
         ws.getCell('A2').value = `Periode: ${monthNamesID[run.period_month]} ${run.period_year} | Status: ${run.status === 'finalized' ? 'Final' : 'Draft'}`;
         ws.getCell('A2').alignment = { horizontal: 'center' };
 
         // Header
-        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'Jam Lembur', 'Nilai Lembur', 'Tuang', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
+        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'T. Apresiasi', 'Jam Lembur', 'Nilai Lembur', 'Tuang', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
         ws.getRow(4).values = headers;
         ws.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         ws.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
@@ -764,6 +766,7 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
                 parseFloat(item.basic_salary),
                 parseFloat(item.transport_allowance),
                 parseFloat(item.meal_allowance),
+                parseFloat(item.appreciation_allowance || 0),
                 parseFloat(item.overtime_hours),
                 parseFloat(item.overtime_amount),
                 parseFloat(item.tuang_amount || 0),
@@ -776,13 +779,13 @@ router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => 
         });
 
         // Total row
-        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', '', totalNet]);
+        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', '', '', totalNet]);
         totalRow.font = { bold: true };
-        totalRow.getCell(15).numFmt = '#,##0';
+        totalRow.getCell(16).numFmt = '#,##0';
 
         // Format currency columns
-        for (let col = 5; col <= 15; col++) {
-            if (col === 8) {
+        for (let col = 5; col <= 16; col++) {
+            if (col === 9) {
                 // Jam Lembur
                 ws.getColumn(col).numFmt = '0';
                 ws.getColumn(col).width = 12;
@@ -878,6 +881,7 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
         addRow('Gaji Pokok', slip.basic_salary);
         addRow('Tunjangan Transport', slip.transport_allowance);
         addRow('Tunjangan Makan', slip.meal_allowance);
+        addRow('Tunjangan Apresiasi', slip.appreciation_allowance);
         addRow(`Lembur (${slip.overtime_hours} jam)`, slip.overtime_amount);
         // Driver allowances (if any)
         if (parseFloat(slip.driver_total_allowance) > 0) {
@@ -1012,6 +1016,7 @@ router.get('/:id/slip/:userId/excel', authenticateToken, async (req, res) => {
             ['Gaji Pokok', parseFloat(slip.basic_salary)],
             ['Tunjangan Transport', parseFloat(slip.transport_allowance)],
             ['Tunjangan Makan', parseFloat(slip.meal_allowance)],
+            ['Tunjangan Apresiasi', parseFloat(slip.appreciation_allowance || 0)],
             [`Lembur (${slip.overtime_hours} jam)`, parseFloat(slip.overtime_amount)],
         ];
         if (parseFloat(slip.tuang_amount) > 0) {

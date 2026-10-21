@@ -103,6 +103,7 @@ const EXCEL_HEADER_MAP = {
     'gaji pokok': 'basic_salary',
     gaji: 'basic_salary',
     'tipe gaji': 'salary_type',
+    'tunjangan apresiasi': 'appreciation_allowance',
     npwp: 'npwp',
     'bpjs kesehatan': 'bpjs_kesehatan_no',
     'no bpjs kesehatan': 'bpjs_kesehatan_no',
@@ -317,6 +318,7 @@ router.get('/template', authenticateToken, hasPermission('admin.employees'), asy
             { header: 'Tanggal Masuk', key: 'join_date', width: 16 },
             { header: 'Gaji Pokok', key: 'basic_salary', width: 14 },
             { header: 'Tipe Gaji', key: 'salary_type', width: 14 },
+            { header: 'Tunjangan Apresiasi', key: 'appreciation_allowance', width: 20 },
             { header: 'NPWP', key: 'npwp', width: 18 },
             { header: 'BPJS Kesehatan', key: 'bpjs_kesehatan_no', width: 18 },
             { header: 'BPJS Ketenagakerjaan', key: 'bpjs_ketenagakerjaan_no', width: 20 },
@@ -325,15 +327,15 @@ router.get('/template', authenticateToken, hasPermission('admin.employees'), asy
             { header: 'Nama Rekening', key: 'bank_holder', width: 22 }
         ];
         sheet.columns = columns;
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27].forEach((col) => {
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 24, 25, 26, 27, 28].forEach((col) => {
             sheet.getColumn(col).numFmt = '@';
         });
         applyHeaderStyle(sheet.getRow(1));
         sheet.getRow(1).height = 28;
 
         const sampleRows = [
-            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', '3174010101900001', '', '081234567890', 'Jl. Merdeka No. 1', 'Jakarta', '1990-01-15', 'Laki-laki', 'Menikah', 'Islam', 'S1', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[0]?.name || 'Staff', empStatuses.rows[0]?.name || 'Permanen', '2024-01-02', '5000000', 'Bulanan', '', '', '', 'BCA', '1234567890', 'Budi Santoso'],
-            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', '3174010202920002', '', '081298765432', 'Jl. Sudirman No. 2', 'Bandung', '1992-02-20', 'Perempuan', 'Belum Menikah', 'Islam', 'SMA', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[1]?.name || positions.rows[0]?.name || 'Staff', empStatuses.rows[1]?.name || empStatuses.rows[0]?.name || 'Kontrak', '2024-03-01', '4500000', 'Bulanan', '', '', '', 'Mandiri', '0987654321', 'Siti Aminah']
+            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', '3174010101900001', '', '081234567890', 'Jl. Merdeka No. 1', 'Jakarta', '1990-01-15', 'Laki-laki', 'Menikah', 'Islam', 'S1', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[0]?.name || 'Staff', empStatuses.rows[0]?.name || 'Permanen', '2024-01-02', '5000000', 'Bulanan', '0', '', '', '', 'BCA', '1234567890', 'Budi Santoso'],
+            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', '3174010202920002', '', '081298765432', 'Jl. Sudirman No. 2', 'Bandung', '1992-02-20', 'Perempuan', 'Belum Menikah', 'Islam', 'SMA', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[1]?.name || positions.rows[0]?.name || 'Staff', empStatuses.rows[1]?.name || empStatuses.rows[0]?.name || 'Kontrak', '2024-03-01', '4500000', 'Bulanan', '0', '', '', '', 'Mandiri', '0987654321', 'Siti Aminah']
         ];
         sampleRows.forEach((values, idx) => {
             const row = sheet.addRow(values);
@@ -432,6 +434,7 @@ router.get('/template', authenticateToken, hasPermission('admin.employees'), asy
             ['Tanggal', 'Gunakan format YYYY-MM-DD (contoh 2024-01-15) atau pilih tanggal di Excel.'],
             ['Departemen, Divisi & Jabatan', 'Pilih dari dropdown Referensi, atau ketik nama yang sama dengan master data.'],
             ['Status Karyawan', 'Pilih dari dropdown Referensi sesuai master Status Karyawan, atau ketik nama yang sama.'],
+            ['Tunjangan Apresiasi', 'Isi nominal per bulan. Kosongkan jika tidak diubah untuk karyawan yang sudah ada, atau isi 0 jika tidak ada.'],
             ['Baris contoh', 'Hapus atau ganti baris contoh sebelum diunggah.'],
             ['Batas lisensi', 'Pembuatan akun baru tidak boleh melebihi sisa kuota lisensi.'],
             ['Format file', 'Simpan sebagai .xlsx (Excel 2007 atau lebih baru).']
@@ -602,6 +605,7 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                 join_date: readDate(row, 'join_date'),
                 basic_salary: readNum(row, 'basic_salary'),
                 salary_type: salaryType,
+                appreciation_allowance: readNum(row, 'appreciation_allowance'),
                 npwp: read(row, 'npwp') || null,
                 bpjs_kesehatan_no: read(row, 'bpjs_kesehatan_no') || null,
                 bpjs_ketenagakerjaan_no: read(row, 'bpjs_ketenagakerjaan_no') || null,
@@ -641,9 +645,9 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                             department, division, position, employment_status, join_date,
                             bank_name, bank_account, bank_holder,
                             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
-                            basic_salary, salary_type, no_kk, updated_at
+                            basic_salary, salary_type, no_kk, appreciation_allowance, updated_at
                         ) VALUES (
-                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,CURRENT_TIMESTAMP
+                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,CURRENT_TIMESTAMP
                         )
                         ON CONFLICT (user_id) DO UPDATE SET
                             nik = COALESCE(EXCLUDED.nik, employee_details.nik),
@@ -669,6 +673,7 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                             basic_salary = COALESCE(EXCLUDED.basic_salary, employee_details.basic_salary),
                             salary_type = COALESCE(EXCLUDED.salary_type, employee_details.salary_type),
                             no_kk = COALESCE(EXCLUDED.no_kk, employee_details.no_kk),
+                            appreciation_allowance = COALESCE(EXCLUDED.appreciation_allowance, employee_details.appreciation_allowance),
                             updated_at = CURRENT_TIMESTAMP
                     `, [
                         existing.id, details.nik, details.phone, details.address, details.birth_date, details.birth_place,
@@ -676,7 +681,7 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                         details.department, details.division, details.position, details.employment_status, details.join_date,
                         details.bank_name, details.bank_account, details.bank_holder,
                         details.npwp, details.bpjs_kesehatan_no, details.bpjs_ketenagakerjaan_no,
-                        details.basic_salary, details.salary_type, details.no_kk
+                        details.basic_salary, details.salary_type, details.no_kk, details.appreciation_allowance
                     ]);
 
                     updated++;
@@ -715,9 +720,9 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                             department, division, position, employment_status, join_date,
                             bank_name, bank_account, bank_holder,
                             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
-                            basic_salary, salary_type, no_kk, updated_at
+                            basic_salary, salary_type, no_kk, appreciation_allowance, updated_at
                         ) VALUES (
-                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,CURRENT_TIMESTAMP
+                            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,CURRENT_TIMESTAMP
                         )
                     `, [
                         newUser.id, details.nik, details.phone, details.address, details.birth_date, details.birth_place,
@@ -725,7 +730,7 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                         details.department, details.division, details.position, details.employment_status, details.join_date,
                         details.bank_name, details.bank_account, details.bank_holder,
                         details.npwp, details.bpjs_kesehatan_no, details.bpjs_ketenagakerjaan_no,
-                        details.basic_salary, details.salary_type || 'monthly', details.no_kk
+                        details.basic_salary, details.salary_type || 'monthly', details.no_kk, details.appreciation_allowance || 0
                     ]);
 
                     usersByEmpId.set(empKey, newUser);
@@ -805,7 +810,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             department, division, position, join_date, employment_status,
             bank_name, bank_account, bank_holder,
             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
-            basic_salary, salary_type, transport_allowance, meal_allowance, overtime_rate,
+            basic_salary, salary_type, transport_allowance, meal_allowance, appreciation_allowance, overtime_rate,
             tax_status, emergency_contact_name, emergency_contact_phone,
             is_driver, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
             bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
@@ -856,7 +861,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 department, position, join_date,
                 bank_name, bank_account, bank_holder,
                 npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
-                basic_salary, salary_type, transport_allowance, meal_allowance, overtime_rate,
+                basic_salary, salary_type, transport_allowance, meal_allowance, appreciation_allowance, overtime_rate,
                 tax_status, emergency_contact_name, emergency_contact_phone,
                 is_driver, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
                 bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
@@ -871,7 +876,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 $28, $29, $30, $31, $32, $33, $34, $35, $36,
                 $37, $38, $39, $40, $41, $42,
                 $43, $44, $45, $46, $47, $48, $49, $50,
-                $51, $52,
+                $51, $52, $53,
                 CURRENT_TIMESTAMP
             )
             ON CONFLICT (user_id) DO UPDATE SET
@@ -897,6 +902,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 salary_type = EXCLUDED.salary_type,
                 transport_allowance = EXCLUDED.transport_allowance,
                 meal_allowance = EXCLUDED.meal_allowance,
+                appreciation_allowance = EXCLUDED.appreciation_allowance,
                 overtime_rate = EXCLUDED.overtime_rate,
                 tax_status = EXCLUDED.tax_status,
                 emergency_contact_name = EXCLUDED.emergency_contact_name,
@@ -934,7 +940,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             department || null, position || null, join_date || null,
             bank_name || null, bank_account || null, bank_holder || null,
             npwp || null, bpjs_kesehatan_no || null, bpjs_ketenagakerjaan_no || null,
-            basic_salary || 0, salary_type || 'monthly', transport_allowance || 0, meal_allowance || 0, overtime_rate || 50000,
+            basic_salary || 0, salary_type || 'monthly', transport_allowance || 0, meal_allowance || 0, appreciation_allowance || 0, overtime_rate || 50000,
             tax_status || 'TK/0', emergency_contact_name || null, emergency_contact_phone || null,
             is_driver || false, is_collector || false, is_sales || false, trackingEnabled, driver_subuh_allowance || 0, driver_rit_allowance || 0, driver_inap_allowance || 0, driver_ritase_dekat_allowance || 0, driver_ritase_jauh_allowance || 0,
             bpjs_kes_enrolled !== false, bpjs_jht_enrolled !== false, bpjs_jp_enrolled !== false, bpjs_jkk_enrolled !== false, bpjs_jkm_enrolled !== false, pph21_enabled !== false,
