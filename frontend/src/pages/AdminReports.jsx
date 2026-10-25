@@ -12,6 +12,7 @@ export default function AdminReports() {
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [error, setError] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
     // History-specific state
@@ -47,6 +48,7 @@ export default function AdminReports() {
 
     async function fetchReport() {
         setLoading(true);
+        setError('');
         try {
             if (reportType === 'daily') {
                 const data = await reportsAPI.getDaily(date);
@@ -63,6 +65,8 @@ export default function AdminReports() {
             }
         } catch (error) {
             console.error('Failed to fetch report:', error);
+            setReport(null);
+            setError(error.message || 'Gagal memuat laporan');
         } finally {
             setLoading(false);
         }
@@ -342,7 +346,7 @@ export default function AdminReports() {
                             disabled={exporting || !report || report.records?.length === 0}
                             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                         >
-                            {exporting ? 'Hourglass' : 'FileText'} PDF
+                            {exporting ? <Icon name="Hourglass" size={16} inline /> : <Icon name="FileText" size={16} inline />} PDF
                         </button>
                         <button
                             className="btn btn-success"
@@ -350,7 +354,7 @@ export default function AdminReports() {
                             disabled={exporting || !report || report.records?.length === 0}
                             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                         >
-                            {exporting ? 'Hourglass' : 'BarChart3'} Excel
+                            {exporting ? <Icon name="Hourglass" size={16} inline /> : <Icon name="BarChart3" size={16} inline />} Excel
                         </button>
                     </div>
                 </div>
@@ -358,6 +362,11 @@ export default function AdminReports() {
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: '2rem' }}>
                         <div className="loading-spinner" style={{ margin: '0 auto' }} />
+                    </div>
+                ) : error ? (
+                    <div className="empty-state">
+                        <div className="empty-state-icon"><Icon name="BarChart3" size={16} inline /></div>
+                        <p className="empty-state-text">{error}</p>
                     </div>
                 ) : !report || report.records?.length === 0 ? (
                     <div className="empty-state">

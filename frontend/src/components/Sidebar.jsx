@@ -81,7 +81,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/payroll', icon: 'Banknote', label: 'Payroll', permissionKey: 'admin.payroll' },
         { path: '/admin/assessments', icon: 'ClipboardList', label: 'Penilaian', permissionKey: 'admin.assessments' },
         { path: '/admin/recruitment', icon: 'Briefcase', label: 'Recruitment', permissionKey: 'admin.recruitment' },
-        { path: '/admin/reports', icon: 'BarChart3', label: 'Laporan', permissionKey: 'admin.reports' },
+        { path: '/admin/reports', icon: 'BarChart3', label: 'Laporan', permissionKey: 'admin.reports', showIfManager: true },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor) || (item.showIfManager && (user?.role === 'manager' || user?.role === 'admin')));
 
     // Other admin items (flat)

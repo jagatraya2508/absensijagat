@@ -716,6 +716,12 @@ FROM roles r
 WHERE r.name = 'kiosk'
 ON CONFLICT (role_id, permission_key) DO NOTHING;
 
+INSERT INTO role_permissions (role_id, permission_key)
+SELECT r.id, 'admin.reports'
+FROM roles r
+WHERE r.name = 'manager'
+ON CONFLICT (role_id, permission_key) DO NOTHING;
+
 -- Tabel Manual Attendances
 CREATE TABLE IF NOT EXISTS manual_attendances (
     id SERIAL PRIMARY KEY,

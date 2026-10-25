@@ -278,7 +278,7 @@ function AppRoutes() {
             <Route
                 path="/admin/reports"
                 element={
-                    <ProtectedRoute permission="admin.reports">
+                    <ProtectedRoute permission="admin.reports" managerOrAdmin>
                         <AppLayout>
                             <AdminReports />
                         </AppLayout>

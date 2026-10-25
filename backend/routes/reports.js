@@ -2,7 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, hasPermission } = require('../middleware/auth');
-const canViewReports = hasPermission('admin.reports');
+const requireReportPermission = hasPermission('admin.reports');
+
+function canViewReports(req, res, next) {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'manager')) {
+        return next();
+    }
+    return requireReportPermission(req, res, next);
+}
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 
@@ -152,9 +159,17 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
         const { id } = req.params;
         const { start_date, end_date } = req.query;
 
-        // Only allow admin or the employee themselves
-        if (req.user.role !== 'admin' && req.user.id !== parseInt(id)) {
-            return res.status(403).json({ error: 'Akses ditolak' });
+        const isSelf = req.user.id === parseInt(id, 10);
+        if (!isSelf && req.user.role !== 'admin' && req.user.role !== 'manager') {
+            const access = await pool.query(
+                `SELECT 1 FROM role_permissions rp
+                 JOIN roles r ON rp.role_id = r.id
+                 WHERE r.name = $1 AND rp.permission_key = 'admin.reports'`,
+                [req.user.role]
+            );
+            if (access.rows.length === 0) {
+                return res.status(403).json({ error: 'Akses ditolak' });
+            }
         }
 
         const today = new Date().toISOString().split('T')[0];

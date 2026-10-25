@@ -496,7 +496,7 @@ export default function Dashboard() {
                                     <span className="menu-label">Recruitment</span>
                                 </Link>
                             )}
-                            {hasPermission('admin.reports') && (
+                            {(user?.role === 'manager' || hasPermission('admin.reports')) && (
                                 <Link to="/admin/reports" className="menu-item">
                                     <MenuIcon name="BarChart3" className="bg-orange-100 text-orange-600" />
                                     <span className="menu-label">Laporan</span>
