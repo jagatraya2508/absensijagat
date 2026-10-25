@@ -213,7 +213,7 @@ export default function AdminRoles() {
                     <h1 className="page-title">Kelola Role</h1>
                     <p className="page-subtitle">Atur role dan hak akses menu pengguna</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div className="page-actions">
                     <button
                         className="btn"
                         onClick={handleDownloadTemplate}
@@ -254,8 +254,8 @@ export default function AdminRoles() {
             {success && <div className="alert alert-success">{success}</div>}
 
             <div className="card">
-                <div className="table-responsive">
-                    <table className="table">
+                <div className="table-container">
+                    <table className="table stack-table">
                         <thead>
                             <tr>
                                 <th>Nama Role (ID)</th>
@@ -268,9 +268,9 @@ export default function AdminRoles() {
                         <tbody>
                             {roles.map((role) => (
                                 <tr key={role.id}>
-                                    <td><code style={{ background: 'var(--surface-300)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>{role.name}</code></td>
-                                    <td style={{ fontWeight: 600 }}>{role.label}</td>
-                                    <td>
+                                    <td data-label="Nama Role"><code style={{ background: 'var(--surface-300)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>{role.name}</code></td>
+                                    <td data-label="Label" style={{ fontWeight: 600 }}>{role.label}</td>
+                                    <td data-label="Hak Akses">
                                         {role.name === 'admin' ? (
                                             <span className="badge badge-primary">Akses Penuh</span>
                                         ) : role.name === 'kiosk' ? (
@@ -279,15 +279,15 @@ export default function AdminRoles() {
                                             <span className="badge badge-info">{role.permissions?.length || 0} Menu</span>
                                         )}
                                     </td>
-                                    <td>
+                                    <td data-label="Jenis">
                                         {role.is_system ? (
                                             <span className="badge" style={{ background: 'var(--surface-300)' }}>System</span>
                                         ) : (
                                             <span className="badge badge-success">Custom</span>
                                         )}
                                     </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <td className="stack-actions" data-label="Aksi">
+                                        <div className="row-actions">
                                             <button
                                                 className="btn btn-outline"
                                                 style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
@@ -396,7 +396,7 @@ export default function AdminRoles() {
                                 </div>
                             )}
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
+                            <div className="role-import-actions">
                                 <button
                                     type="button"
                                     className="btn btn-outline"
@@ -427,7 +427,7 @@ export default function AdminRoles() {
             {/* Modal Tambah/Edit */}
             {isModalOpen && (
                 <div className="modal-overlay" onClick={handleCloseModal}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '960px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div className="modal-content role-editor-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editingRole ? 'Edit Role' : 'Tambah Role Baru'}</h2>
                             <button className="modal-close" onClick={handleCloseModal}>&times;</button>
@@ -435,7 +435,7 @@ export default function AdminRoles() {
                         
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                             <div className="modal-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div className="role-form-grid">
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Nama Role (ID Unik)</label>
                                     <input
@@ -473,30 +473,20 @@ export default function AdminRoles() {
                                 </div>
                             ) : (
                                 <>
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '1rem',
-                                        flexWrap: 'wrap',
-                                        marginBottom: '1rem',
-                                        borderBottom: '1px solid var(--border-color)',
-                                        paddingBottom: '0.5rem'
-                                    }}>
+                                    <div className="role-perm-toolbar">
                                         <h3 style={{ fontSize: '1.1rem', margin: 0 }}>
                                             Hak Akses Menu
                                             <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--gray-500)', marginLeft: '0.5rem' }}>
                                                 {formData.permissions.length}/{permissions.length} dipilih
                                             </span>
                                         </h3>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                        <div className="role-perm-tools">
                                             <input
                                                 type="search"
                                                 className="form-input"
                                                 placeholder="Cari menu..."
                                                 value={permSearch}
                                                 onChange={(e) => setPermSearch(e.target.value)}
-                                                style={{ minWidth: '180px', maxWidth: '240px', padding: '0.4rem 0.7rem', fontSize: '0.85rem' }}
                                             />
                                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
                                             <input
@@ -518,12 +508,7 @@ export default function AdminRoles() {
                                     <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', margin: '0 0 0.75rem' }}>
                                         Daftar mengikuti menu aplikasi saat ini (Master, Pimpinan, HR, Operasional, Sistem, Managerial).
                                     </p>
-                                    <div style={{ 
-                                        display: 'grid', 
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
-                                        gap: '1rem',
-                                        padding: '0.25rem 0.35rem 0.5rem 0'
-                                    }}>
+                                    <div className="role-perm-grid">
                                         {Object.keys(groupedPermissions).length === 0 ? (
                                             <p style={{ gridColumn: '1 / -1', color: 'var(--gray-500)', fontSize: '0.9rem' }}>Tidak ada menu yang cocok dengan pencarian.</p>
                                         ) : Object.entries(groupedPermissions).map(([category, perms]) => {

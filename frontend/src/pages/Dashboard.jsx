@@ -365,10 +365,6 @@ export default function Dashboard() {
                         <MenuIcon name="History" className="bg-cyan-100 text-cyan-600" />
                         <span className="menu-label">Riwayat</span>
                     </Link>
-                    <Link to="/schedule" className="menu-item">
-                        <MenuIcon name="Calendar" className="bg-purple-100 text-purple-600" />
-                        <span className="menu-label">Kalender</span>
-                    </Link>
                     <Link to="/leaves" className="menu-item">
                         <MenuIcon name="FileText" className="bg-green-100 text-green-600" />
                         <span className="menu-label">Izin & Cuti</span>
@@ -376,6 +372,10 @@ export default function Dashboard() {
                     <Link to="/overtime" className="menu-item">
                         <MenuIcon name="Clock" className="bg-orange-100 text-orange-600" />
                         <span className="menu-label">Lembur</span>
+                    </Link>
+                    <Link to="/schedule" className="menu-item">
+                        <MenuIcon name="Calendar" className="bg-purple-100 text-purple-600" />
+                        <span className="menu-label">Kalender</span>
                     </Link>
                     {/* Tracking - sesuai tugas yang diaktifkan */}
                     {(user?.use_tracking || user?.role === 'admin') && (
@@ -409,7 +409,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ===== MENU MANAGER ===== */}
-                {(hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || hasPermission('manager.tuang') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.daily_work_report')) && (
+                {(user?.role === 'manager' || hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || hasPermission('manager.tuang') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.daily_work_report')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -418,7 +418,7 @@ export default function Dashboard() {
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
-                            {hasPermission('manager.approvals') && (
+                            {(user?.role === 'manager' || user?.role === 'admin' || hasPermission('manager.approvals')) && (
                                 <Link to="/approvals" className="menu-item">
                                     <MenuIcon name="CheckCircle2" className="bg-emerald-100 text-emerald-600" />
                                     <span className="menu-label">Persetujuan Lembur</span>

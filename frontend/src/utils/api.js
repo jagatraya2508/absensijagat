@@ -1089,6 +1089,12 @@ export const dailyWorkReportAPI = {
     }),
 };
 
+export const notificationsAPI = {
+    list: () => request('/notifications'),
+    markRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+    markAllRead: () => request('/notifications/read-all', { method: 'POST' }),
+};
+
 export default {
     authAPI,
     attendanceAPI,
@@ -1118,5 +1124,6 @@ export default {
     vehicleTypesAPI,
     manualAttendanceAPI,
     rolesAPI,
-    dailyWorkReportAPI
+    dailyWorkReportAPI,
+    notificationsAPI
 };

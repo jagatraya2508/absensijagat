@@ -33,6 +33,7 @@ export default function AdminTuang() {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [noteEditor, setNoteEditor] = useState(null);
 
     useEffect(() => {
         tuangAPI.getDepartments().then(setDepartments).catch(() => setDepartments([]));
@@ -396,13 +397,13 @@ export default function AdminTuang() {
                         </div>
                     </div>
 
-                    <div className="card" style={{ overflowX: 'auto' }}>
+                    <div className="card tuang-daily-card">
                         {loading ? (
                             <p style={{ padding: '1.5rem', color: 'var(--gray-600)' }}>Memuat...</p>
                         ) : employees.length === 0 ? (
                             <p style={{ padding: '1.5rem', color: 'var(--gray-600)' }}>Tidak ada karyawan.</p>
                         ) : (
-                            <table className="table" style={{ fontSize: '0.85rem' }}>
+                            <table className="table stack-table tuang-daily-table" style={{ fontSize: '0.85rem' }}>
                                 <thead>
                                     <tr>
                                         <th>Karyawan</th>
@@ -412,14 +413,16 @@ export default function AdminTuang() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {employees.map((emp) => (
+                                    {employees.map((emp) => {
+                                        const note = notes[emp.id] ?? '';
+                                        return (
                                         <tr key={emp.id}>
-                                            <td>
+                                            <td data-label="Karyawan">
                                                 <div style={{ fontWeight: 600 }}>{emp.name}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{emp.employee_id}</div>
                                             </td>
-                                            <td>{emp.department || '-'}</td>
-                                            <td>
+                                            <td data-label="Departemen">{emp.department || '-'}</td>
+                                            <td data-label="Nilai Tuang">
                                                 <input
                                                     type="number"
                                                     min="0"
@@ -430,16 +433,26 @@ export default function AdminTuang() {
                                                     onChange={(e) => setAmounts((prev) => ({ ...prev, [emp.id]: e.target.value }))}
                                                 />
                                             </td>
-                                            <td>
+                                            <td data-label="Catatan" className="tuang-note-cell">
                                                 <input
-                                                    className="form-input"
+                                                    className="form-input tuang-note-input"
                                                     placeholder="Opsional"
-                                                    value={notes[emp.id] ?? ''}
+                                                    value={note}
                                                     onChange={(e) => setNotes((prev) => ({ ...prev, [emp.id]: e.target.value }))}
                                                 />
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-outline tuang-note-btn${note ? ' is-filled' : ''}`}
+                                                    onClick={() => setNoteEditor(emp)}
+                                                >
+                                                    <Icon name="MessageSquare" size={16} inline />
+                                                    {note ? 'Ubah catatan' : 'Catatan'}
+                                                </button>
+                                                {note ? <span className="tuang-note-preview">{note}</span> : null}
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         )}
@@ -509,6 +522,45 @@ export default function AdminTuang() {
                         )}
                     </div>
                 </>
+            )}
+
+            {noteEditor && (
+                <div className="modal-overlay tuang-note-overlay" onClick={() => setNoteEditor(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="tuang-note-title">
+                        <div className="modal-header">
+                            <h3 className="modal-title" id="tuang-note-title">Catatan Tuang</h3>
+                            <button type="button" className="modal-close" onClick={() => setNoteEditor(null)} aria-label="Tutup">
+                                <Icon name="X" size={16} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ margin: '0 0 0.85rem', fontWeight: 600 }}>
+                                {noteEditor.name}
+                                <span style={{ display: 'block', fontWeight: 500, fontSize: '0.8rem', color: 'var(--gray-500)' }}>
+                                    {noteEditor.employee_id} · {noteEditor.department || '-'}
+                                </span>
+                            </p>
+                            <label className="form-label" htmlFor="tuang-note-field">Catatan</label>
+                            <textarea
+                                id="tuang-note-field"
+                                className="form-input"
+                                rows={4}
+                                placeholder="Isi catatan tuang, atau kosongkan jika tidak ada"
+                                value={notes[noteEditor.id] ?? ''}
+                                onChange={(e) => setNotes((prev) => ({ ...prev, [noteEditor.id]: e.target.value }))}
+                                autoFocus
+                            />
+                            <p style={{ margin: '0.6rem 0 0', fontSize: '0.78rem', color: 'var(--gray-500)' }}>
+                                Catatan ini ikut tersimpan saat tombol Simpan Tuang ditekan.
+                            </p>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-primary" onClick={() => setNoteEditor(null)}>
+                                Selesai
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

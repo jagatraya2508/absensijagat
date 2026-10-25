@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, hasPermission, isManagerOrAdmin } = require('../middleware/auth');
+const { notifyOvertimeSubmitted } = require('../utils/notifications');
 
 const canManage = [authenticateToken, hasPermission('admin.work_schedule')];
 
@@ -709,6 +710,16 @@ router.post('/overtime-requests', authenticateToken, async (req, res) => {
         }
 
         await client.query('COMMIT');
+
+        await notifyOvertimeSubmitted(pool, {
+            requestId: otRequest.id,
+            requesterId: req.user.id,
+            requesterName: req.user.name || 'Karyawan',
+            date,
+            startTime: overtime_start,
+            endTime: overtime_end,
+            hours: estimated_hours,
+        });
 
         // Fetch full record with employees
         const fullResult = await pool.query(`

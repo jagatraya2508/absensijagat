@@ -12,6 +12,7 @@ const {
     getApprovalAccess,
     userHasLeaveAdminAccess
 } = require('../utils/leaveApproval');
+const { notifyLeaveSubmitted } = require('../utils/notifications');
 
 router.use(async (req, res, next) => {
     try {
@@ -189,6 +190,14 @@ async function createLeaveRequestForUser({ userId, type, start_date, end_date, r
 
         await client.query('COMMIT');
         const [payload] = await attachApprovalSteps(pool, withSteps.rows);
+        await notifyLeaveSubmitted(pool, {
+            requestId: request.id,
+            requesterId: userId,
+            requesterName: userCheck.rows[0].name,
+            type,
+            startDate: start_date,
+            endDate: end_date,
+        });
         return {
             message: 'Pengajuan izin berhasil dibuat',
             data: payload,

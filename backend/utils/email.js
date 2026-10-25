@@ -121,4 +121,46 @@ const sendInterviewEmail = async (candidate, interview, position) => {
     }
 };
 
-module.exports = { sendInterviewEmail };
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+const sendRequestNotice = async (notices) => {
+    try {
+        const config = await getSmtpConfig();
+        if (!config.user || !config.pass || !notices?.length) {
+            return { success: false, message: 'Pengaturan SMTP belum dikonfigurasi.' };
+        }
+
+        const transporter = await createTransporter();
+        for (const notice of notices) {
+            await transporter.sendMail({
+                from: `"Absensi" <${config.user}>`,
+                to: notice.email,
+                subject: notice.title,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+                        <div style="background-color: #f8fafc; padding: 16px 20px; border-bottom: 3px solid #9f1239;">
+                            <h2 style="color: #9f1239; margin: 0; font-size: 18px;">${escapeHtml(notice.title)}</h2>
+                        </div>
+                        <div style="padding: 24px 20px;">
+                            <p>Halo ${escapeHtml(notice.name)},</p>
+                            <p>${escapeHtml(notice.message)}</p>
+                            <p>Silakan buka aplikasi absensi untuk meninjau pengajuan ini.</p>
+                        </div>
+                    </div>
+                `,
+            });
+        }
+        return { success: true };
+    } catch (error) {
+        console.warn('Email pengajuan tidak terkirim:', error.message);
+        return { success: false, error: error.message };
+    }
+};
+
+module.exports = { sendInterviewEmail, sendRequestNotice };

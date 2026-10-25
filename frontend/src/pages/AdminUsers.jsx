@@ -383,11 +383,11 @@ export default function AdminUsers() {
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
                     <h2 className="card-title">Daftar User</h2>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
+                    <div className="user-toolbar">
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Cari user..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} style={{ maxWidth: 220 }} /> <button className="btn" onClick={handleExportPDF} title="Ekspor ke PDF" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                            placeholder="Cari user..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} /> <button className="btn" onClick={handleExportPDF} title="Ekspor ke PDF" style={{ padding:'0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
                                 background: 'linear-gradient(135deg, #ef4444, #f87171)', color: '#fff',
                                 border: 'none', borderRadius: 'var(--radius-md)',
                                 display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -429,7 +429,7 @@ export default function AdminUsers() {
                     </div>
                 ) : filteredUsers.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon"><Icon name="Users" size={28} /></div> <p className="empty-state-text">Belum ada user terdaftar</p> </div> ) : ( <> <div className="table-container"> <table className="table"> <thead> <tr> <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                        <div className="empty-state-icon"><Icon name="Users" size={28} /></div> <p className="empty-state-text">Belum ada user terdaftar</p> </div> ) : ( <> <div className="table-container"> <table className="table stack-table"> <thead> <tr> <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Employee ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
                                     </th>
                                     <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
@@ -450,10 +450,10 @@ export default function AdminUsers() {
                             <tbody>
                                 {pagedUsers.map((user) => (
                                     <tr key={user.id}>
-                                        <td style={{ fontWeight: 500 }}>{user.employee_id}</td>
-                                        <td>{user.name}</td>
-                                        <td>{user.email || '-'}</td>
-                                        <td>
+                                        <td data-label="Employee ID" style={{ fontWeight: 500 }}>{user.employee_id}</td>
+                                        <td data-label="Nama">{user.name}</td>
+                                        <td data-label="Email">{user.email || '-'}</td>
+                                        <td data-label="Role">
                                             <select
                                                 className="form-input form-select"
                                                 value={user.role}
@@ -463,7 +463,9 @@ export default function AdminUsers() {
                                                     padding: '0.35rem 0.6rem',
                                                     fontSize: '0.8rem',
                                                     fontWeight: 600,
-                                                    minWidth: 155,
+                                                    width: '100%',
+                                                    maxWidth: '100%',
+                                                    minWidth: 0,
                                                     borderRadius: 'var(--radius-md)',
                                                     cursor: changingRole === user.id ? 'wait' : 'pointer',
                                                     opacity: changingRole === user.id ? 0.6 : 1,
@@ -492,9 +494,9 @@ export default function AdminUsers() {
                                                 ))}
                                             </select>
                                         </td>
-                                        <td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <td data-label="Tanggal Daftar">{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
+                                        <td className="stack-actions" data-label="Aksi">
+                                            <div className="row-actions">
                                                 <button
                                                     className="btn btn-outline"
                                                     style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}

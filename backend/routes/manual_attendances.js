@@ -4,7 +4,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canReviewManualAttendance = hasPermission('admin.manual_attendance');
+const { notifyManualAttendanceSubmitted } = require('../utils/notifications');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -62,6 +64,13 @@ router.post('/', authenticateToken, upload.single('attachment'), async (req, res
             [userId, date, time_in || null, time_out || null, reason.trim(), attachmentPath]
         );
 
+        await notifyManualAttendanceSubmitted(pool, {
+            requestId: result.rows[0].id,
+            requesterId: userId,
+            requesterName: req.user.name || 'Karyawan',
+            date,
+        });
+
         res.status(201).json({
             message: 'Pengajuan absen manual berhasil dibuat',
             data: result.rows[0]
@@ -102,7 +111,7 @@ router.get('/my', authenticateToken, async (req, res) => {
 });
 
 // Get all manual attendance requests (Admin only)
-router.get('/all', authenticateToken, isAdmin, async (req, res) => {
+router.get('/all', authenticateToken, canReviewManualAttendance, async (req, res) => {
     try {
         const { status, user_id } = req.query;
 
@@ -139,7 +148,7 @@ router.get('/all', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Approve/Reject/Cancel manual attendance request (Admin only)
-router.put('/:id/status', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id/status', authenticateToken, canReviewManualAttendance, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool, ensurePrerequisiteUniques, ensureWorkScheduleSchema } = require('./db');
 const { ensureOrgApprovalSchema } = require('./utils/leaveApproval');
+const { ensureNotificationSchema } = require('./utils/notifications');
 const { ensureSystemRoles } = require('./utils/systemRoles');
 
 // Import routes
@@ -70,6 +71,7 @@ app.use('/api/roles', require('./routes/roles'));
 app.use('/api/daily-work-reports', require('./routes/dailyWorkReports'));
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/organization', require('./routes/organization'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -84,6 +86,7 @@ async function initDatabase() {
         const schema = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schema);
         await ensureOrgApprovalSchema(pool);
+        await ensureNotificationSchema(pool);
         await ensureSystemRoles(pool);
         console.log('Database initialized successfully');
     } catch (error) {

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Sidebar from './components/Sidebar';
+import NotificationBell from './components/NotificationBell';
 import Icon from './components/Icon';
 import { useLiveLocationShare } from './hooks/useLiveLocationShare';
 import Login from './pages/Login';
@@ -74,15 +75,13 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
         return <Navigate to="/" replace />;
     }
 
-    if (managerOrAdmin && user.role !== 'admin' && user.role !== 'manager') {
-        return <Navigate to="/" replace />;
-    }
-
-    const gated = !!(permission || anyPermission || allowSupervisor);
+    const managerAccess = user.role === 'admin' || user.role === 'manager';
+    const gated = !!(permission || anyPermission || allowSupervisor || managerOrAdmin);
     const hasAccess =
         (permission && hasPermission(permission)) ||
         (anyPermission && anyPermission.some((p) => hasPermission(p))) ||
-        (allowSupervisor && !!user.is_supervisor);
+        (allowSupervisor && !!user.is_supervisor) ||
+        (managerOrAdmin && managerAccess);
 
     if (gated && !hasAccess) {
         return <Navigate to="/" replace />;
@@ -127,6 +126,7 @@ function AppLayout({ children }) {
             <Sidebar isOpen={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
             <main className="main-content" style={{ position: 'relative' }}>
                 <div className="global-logo-container">
+                    <NotificationBell />
                     {user?.photo ? (
                         <img 
                             src={user.photo} 
@@ -388,7 +388,7 @@ function AppRoutes() {
             <Route
                 path="/approvals"
                 element={
-                    <ProtectedRoute permission="manager.approvals">
+                    <ProtectedRoute managerOrAdmin anyPermission={['manager.approvals']}>
                         <AppLayout>
                             <ManagerApprovals />
                         </AppLayout>

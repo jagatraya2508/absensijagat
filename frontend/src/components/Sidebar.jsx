@@ -33,9 +33,9 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         ...(hasPermission('admin.kiosk') ? [{ path: '/kiosk', icon: 'Monitor', label: 'Mode Kiosk' }] : []),
         { path: '/manual-attendance', icon: 'ClipboardPen', label: 'Pengajuan Absen' },
         { path: '/history', icon: 'History', label: 'Riwayat' },
-        { path: '/schedule', icon: 'Calendar', label: 'Kalender' },
         { path: '/leaves', icon: 'FileText', label: 'Izin & Cuti' },
         { path: '/overtime', icon: 'Clock', label: 'Pengajuan Lembur' },
+        { path: '/schedule', icon: 'Calendar', label: 'Kalender' },
         ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: 'MapPin', label: 'Tracking' }] : []),
     ];
 
@@ -68,7 +68,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)));
 
     const pimpinanItems = [
-        { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals' },
+        { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals', showIfManager: true },
         { path: '/leave-approvals', icon: 'ClipboardCheck', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
         { path: '/admin/leaves', icon: 'FileText', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
         { path: '/admin/manual-attendance', icon: 'ClipboardList', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
@@ -82,7 +82,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/assessments', icon: 'ClipboardList', label: 'Penilaian', permissionKey: 'admin.assessments' },
         { path: '/admin/recruitment', icon: 'Briefcase', label: 'Recruitment', permissionKey: 'admin.recruitment' },
         { path: '/admin/reports', icon: 'BarChart3', label: 'Laporan', permissionKey: 'admin.reports' },
-    ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor));
+    ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor) || (item.showIfManager && (user?.role === 'manager' || user?.role === 'admin')));
 
     // Other admin items (flat)
     const adminItems = [

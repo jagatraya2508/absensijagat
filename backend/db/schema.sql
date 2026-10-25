@@ -853,6 +853,23 @@ CREATE INDEX IF NOT EXISTS idx_leave_steps_request ON leave_approval_steps(leave
 CREATE INDEX IF NOT EXISTS idx_leave_steps_approver ON leave_approval_steps(approver_id);
 CREATE INDEX IF NOT EXISTS idx_leave_steps_status ON leave_approval_steps(status);
 
+-- Notifikasi pengajuan untuk atasan dan admin
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category VARCHAR(40) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    link VARCHAR(200),
+    reference_type VARCHAR(40),
+    reference_id INTEGER,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications (user_id) WHERE is_read = FALSE;
+
 -- Aktivitas driver
 CREATE TABLE IF NOT EXISTS driver_activities (
     id SERIAL PRIMARY KEY,
