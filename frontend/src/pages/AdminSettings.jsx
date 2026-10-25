@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import Icon from '../components/Icon';
+import { FACE_MATCH_MAX, FACE_MATCH_MIN, normalizeFaceMatchPercent } from '../utils/faceMatch';
 
 const THEME_PRESETS = [
     { name: 'Merah Marun', icon: 'Circle', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
@@ -135,7 +136,7 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
 export default function AdminSettings() {
     const navigate = useNavigate();
     const { logout } = useAuth();
-    const { settings, updateLogo, updatePayslipShowLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
+    const { settings, fetchSettings, updateLogo, updatePayslipShowLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
 
     // Company Name state
     const [editCompanyName, setEditCompanyName] = useState(companyName || 'Absensi');
@@ -182,6 +183,9 @@ export default function AdminSettings() {
     const [showPayslipLogo, setShowPayslipLogo] = useState(settings.payslip_show_logo !== 'false');
     const [payslipLogoLoading, setPayslipLogoLoading] = useState(false);
     const [payslipLogoMessage, setPayslipLogoMessage] = useState({ type: '', text: '' });
+    const [faceMatchPercent, setFaceMatchPercent] = useState(() => normalizeFaceMatchPercent(settings.face_match_percent));
+    const [faceMatchLoading, setFaceMatchLoading] = useState(false);
+    const [faceMatchMessage, setFaceMatchMessage] = useState({ type: '', text: '' });
 
     // Backup & Restore state
     const [backupLoading, setBackupLoading] = useState(false);
@@ -429,6 +433,26 @@ export default function AdminSettings() {
         }
     };
 
+    useEffect(() => {
+        setFaceMatchPercent(normalizeFaceMatchPercent(settings.face_match_percent));
+    }, [settings.face_match_percent]);
+
+    const handleFaceMatchSave = async () => {
+        const percent = normalizeFaceMatchPercent(faceMatchPercent);
+        setFaceMatchLoading(true);
+        setFaceMatchMessage({ type: '', text: '' });
+        try {
+            const { settingsAPI } = await import('../utils/api');
+            await settingsAPI.updateFaceMatch(percent);
+            await fetchSettings();
+            setFaceMatchMessage({ type: 'success', text: `Batas kemiripan wajah disimpan: ${percent}%` });
+        } catch (error) {
+            setFaceMatchMessage({ type: 'danger', text: error.message || 'Gagal menyimpan batas kemiripan' });
+        } finally {
+            setFaceMatchLoading(false);
+        }
+    };
+
     const handleCompanyNameSave = async () => {
         if (!editCompanyName.trim()) return;
         setCompanyLoading(true);
@@ -501,6 +525,61 @@ export default function AdminSettings() {
                                 )}
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                {/* ============ FACE MATCH SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="ScanFace" size={16} inline /> Kemiripan Wajah</h2>
+                    </div>
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {faceMatchMessage.text && (
+                            <div className={`alert alert-${faceMatchMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                <span className="alert-icon">{faceMatchMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {faceMatchMessage.text}
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1rem' }}>
+                            Absensi dan kiosk menerima wajah jika kemiripannya mencapai angka ini. Menaikkan angka membuat pencocokan lebih ketat. Bawaan 60%.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <div style={{ flex: '1 1 220px' }}>
+                                <label className="form-label" htmlFor="face-match-percent">Minimal kemiripan (%)</label>
+                                <input
+                                    id="face-match-percent"
+                                    className="form-input"
+                                    type="number"
+                                    min={FACE_MATCH_MIN}
+                                    max={FACE_MATCH_MAX}
+                                    step="1"
+                                    value={faceMatchPercent}
+                                    onChange={(e) => setFaceMatchPercent(e.target.value)}
+                                />
+                                <input
+                                    type="range"
+                                    min={FACE_MATCH_MIN}
+                                    max={FACE_MATCH_MAX}
+                                    step="1"
+                                    value={normalizeFaceMatchPercent(faceMatchPercent)}
+                                    onChange={(e) => setFaceMatchPercent(Number(e.target.value))}
+                                    style={{ width: '100%', marginTop: '0.75rem' }}
+                                    aria-label="Geser batas kemiripan wajah"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleFaceMatchSave}
+                                disabled={faceMatchLoading}
+                                style={{ minWidth: '120px', height: '42px' }}
+                            >
+                                {faceMatchLoading ? 'Menyimpan...' : 'Simpan'}
+                            </button>
+                        </div>
+                        <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--gray-500)' }}>
+                            Rentang {FACE_MATCH_MIN}% sampai {FACE_MATCH_MAX}%. Layar kiosk yang sudah terbuka perlu dimuat ulang agar angka baru dipakai.
+                        </p>
                     </div>
                 </div>
 

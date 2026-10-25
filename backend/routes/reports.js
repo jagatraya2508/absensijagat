@@ -1,12 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canViewReports = hasPermission('admin.reports');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 
+router.get('/employees', authenticateToken, canViewReports, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, employee_id, name, role
+             FROM users
+             WHERE COALESCE(role, '') <> 'kiosk'
+             ORDER BY name`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get report employees error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 // Get daily report (Admin only)
-router.get('/daily', authenticateToken, isAdmin, async (req, res) => {
+router.get('/daily', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { date } = req.query;
         const targetDate = date || new Date().toISOString().split('T')[0];
@@ -83,7 +99,7 @@ router.get('/daily', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get monthly report (Admin only)
-router.get('/monthly', authenticateToken, isAdmin, async (req, res) => {
+router.get('/monthly', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { year, month } = req.query;
         const targetYear = parseInt(year) || new Date().getFullYear();
@@ -168,7 +184,7 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
 // ============================================
 
 // Export Daily Report as PDF
-router.get('/export/daily/pdf', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { date } = req.query;
         const targetDate = date || new Date().toISOString().split('T')[0];
@@ -267,7 +283,7 @@ router.get('/export/daily/pdf', authenticateToken, isAdmin, async (req, res) => 
 });
 
 // Export Daily Report as Excel
-router.get('/export/daily/excel', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/daily/excel', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { date } = req.query;
         const targetDate = date || new Date().toISOString().split('T')[0];
@@ -362,7 +378,7 @@ router.get('/export/daily/excel', authenticateToken, isAdmin, async (req, res) =
 });
 
 // Export Monthly Report as PDF
-router.get('/export/monthly/pdf', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/monthly/pdf', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { year, month } = req.query;
         const targetYear = parseInt(year) || new Date().getFullYear();
@@ -459,7 +475,7 @@ router.get('/export/monthly/pdf', authenticateToken, isAdmin, async (req, res) =
 });
 
 // Export Monthly Report as Excel
-router.get('/export/monthly/excel', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/monthly/excel', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { year, month } = req.query;
         const targetYear = parseInt(year) || new Date().getFullYear();
@@ -590,7 +606,7 @@ function formatTimeID(dateStr) {
 }
 
 // Get Off/Leave report (Admin only)
-router.get('/off', authenticateToken, isAdmin, async (req, res) => {
+router.get('/off', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
         // Default to current month if not specified
@@ -643,7 +659,7 @@ router.get('/off', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Export Off Report as PDF
-router.get('/export/off/pdf', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/off/pdf', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
         const now = new Date();
@@ -739,7 +755,7 @@ router.get('/export/off/pdf', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Export Off Report as Excel
-router.get('/export/off/excel', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/off/excel', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
         const now = new Date();
@@ -839,7 +855,7 @@ router.get('/export/off/excel', authenticateToken, isAdmin, async (req, res) => 
 // ============================================
 
 // Get history report (Admin only) — detailed per-record data
-router.get('/history', authenticateToken, isAdmin, async (req, res) => {
+router.get('/history', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { start_date, end_date, user_id } = req.query;
         const now = new Date();
@@ -908,7 +924,7 @@ router.get('/history', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Export History Report as PDF
-router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/history/pdf', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { start_date, end_date, user_id } = req.query;
         const now = new Date();
@@ -1045,7 +1061,7 @@ router.get('/export/history/pdf', authenticateToken, isAdmin, async (req, res) =
 });
 
 // Export History Report as Excel
-router.get('/export/history/excel', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/history/excel', authenticateToken, canViewReports, async (req, res) => {
     try {
         const { start_date, end_date, user_id } = req.query;
         const now = new Date();

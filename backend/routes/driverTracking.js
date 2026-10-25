@@ -4,7 +4,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canReviewTracking = hasPermission('admin.driver_tracking');
 const { generateCustomerCode } = require('../utils/customerCode');
 const { classifyMotion } = require('../utils/motionMode');
 
@@ -271,7 +272,7 @@ router.put('/:id/checkout', authenticateToken, isTrackingUser, upload.single('ph
 // ============================================
 
 // GET / — Get all tracking records (admin, with filters)
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, canReviewTracking, async (req, res) => {
     try {
         const { user_id, start_date, end_date, status, tracking_type } = req.query;
         let query = `
@@ -319,7 +320,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // GET /drivers — Get all drivers (for dropdown)
-router.get('/drivers', authenticateToken, isAdmin, async (req, res) => {
+router.get('/drivers', authenticateToken, canReviewTracking, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT u.id, u.name, u.employee_id, ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking
@@ -538,7 +539,7 @@ router.get('/live', authenticateToken, hasPermission('admin.driver_tracking'), a
 });
 
 // GET /:id — Get single tracking record detail (admin)
-router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, canReviewTracking, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
@@ -560,7 +561,7 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // DELETE /:id — Delete tracking record (admin)
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canReviewTracking, async (req, res) => {
     try {
         const { id } = req.params;
 

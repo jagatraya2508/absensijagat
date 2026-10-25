@@ -6,8 +6,8 @@ import Icon from '../components/Icon';
 const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export default function AdminDriverActivities() {
-    const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('admin.driver_activities');
     const now = new Date();
     const [month, setMonth] = useState(now.getMonth() + 1);
     const [year, setYear] = useState(now.getFullYear());
@@ -72,7 +72,7 @@ export default function AdminDriverActivities() {
     }
 
     function openAddModal(date) {
-        if (!isAdmin) return alert('Hanya admin yang dapat menambah data.');
+        if (!canManage) return alert('Anda tidak memiliki akses untuk menambah data.');
         setEditData(null);
         setFormData({
             user_id: selectedDriver || (drivers[0]?.id || ''),
@@ -86,7 +86,7 @@ export default function AdminDriverActivities() {
     }
 
     function openEditModal(act) {
-        if (!isAdmin) return alert('Hanya admin yang dapat mengedit data.');
+        if (!canManage) return alert('Anda tidak memiliki akses untuk mengedit data.');
         setEditData(act);
         setFormData({
             user_id: act.user_id,
@@ -127,7 +127,7 @@ export default function AdminDriverActivities() {
     }
 
     async function handleDelete(id) {
-        if (!isAdmin) return alert('Hanya admin yang dapat menghapus data.');
+        if (!canManage) return alert('Anda tidak memiliki akses untuk menghapus data.');
         if (!window.confirm('Yakin hapus data ini?')) return;
         try {
             await driverActivitiesAPI.delete(id);
@@ -262,7 +262,7 @@ export default function AdminDriverActivities() {
                                 background: activeView === 'summary' ? 'linear-gradient(135deg, #10b981, #34d399)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
                             }}><Icon name="BarChart3" size={16} inline /> Rekap</button>
-                        {isAdmin && (
+                        {canManage && (
                             <button onClick={() => openAddModal('')}
                                 style={{
                                     padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
@@ -274,19 +274,19 @@ export default function AdminDriverActivities() {
             </div>
 
             {/* Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="driver-stat-grid">
                 {[
                     { label: 'Total Subuh', value: totalStats.subuh + ' hari', amount: totalStats.subuhAmount, color: '#6366f1' },
                     { label: 'Total RIT', value: totalStats.rit + ' trip', amount: totalStats.ritAmount, color: '#f59e0b' },
                     { label: 'Ritase Dekat', value: totalStats.extraRitDekat + ' trip', amount: totalStats.ritaseDekatAmount, color: '#8b5cf6' },
                     { label: 'Ritase Jauh', value: totalStats.extraRitJauh + ' trip', amount: totalStats.ritaseJauhAmount, color: '#a855f7' },
                     { label: 'Menginap', value: totalStats.overnight + ' hari', amount: totalStats.overnightAmount, color: '#ef4444' },
-                    { label: 'Grand Total', value: '', amount: totalStats.grandTotal, color: '#10b981' },
-                ].map((stat, i) => (
-                    <div key={i} className="card" style={{ padding: '1.25rem', borderLeft: `4px solid ${stat.color}` }}>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-400)', marginBottom: '0.25rem' }}>{stat.label}</div>
-                        {stat.value && <div style={{ fontSize: '1.5rem', fontWeight: 700, color: stat.color }}>{stat.value}</div>}
-                        <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(stat.amount)}</div>
+                    { label: 'Grand Total', value: '', amount: totalStats.grandTotal, color: '#10b981', total: true },
+                ].map((stat) => (
+                    <div key={stat.label} className={`card driver-stat-card${stat.total ? ' is-total' : ''}`} style={{ borderLeft: `4px solid ${stat.color}` }}>
+                        <div className="driver-stat-label">{stat.label}</div>
+                        {stat.value && <div className="driver-stat-value" style={{ color: stat.color }}>{stat.value}</div>}
+                        <div className="driver-stat-amount">{formatCurrency(stat.amount)}</div>
                     </div>
                 ))}
             </div>
@@ -483,7 +483,7 @@ export default function AdminDriverActivities() {
                                         <th style={{ textAlign: 'center' }}>Ritase Jauh</th>
                                         <th style={{ textAlign: 'center' }}>Menginap</th>
                                         <th>Catatan Rute</th>
-                                        {isAdmin && <th style={{ textAlign: 'right' }}>Aksi</th>}
+                                        {canManage && <th style={{ textAlign: 'right' }}>Aksi</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -510,7 +510,7 @@ export default function AdminDriverActivities() {
                                                 {act.is_overnight ? <span style={{ color: '#ef4444' }}><Icon name="Building2" size={16} inline /> Ya</span> : '-'}
                                             </td>
                                             <td>{act.rit_notes || '-'}</td>
-                                            {isAdmin && (
+                                            {canManage && (
                                                 <td style={{ textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                                         <button onClick={() => openEditModal(act)} className="btn btn-sm btn-outline" style={{ padding: '0.25rem 0.5rem' }}><Icon name="Pencil" size={16} inline /> Edit</button>
@@ -709,7 +709,7 @@ export default function AdminDriverActivities() {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                {editData && isAdmin && (
+                                {editData && canManage && (
                                     <button type="button" className="btn" onClick={() => { setShowModal(false); handleDelete(editData.id); }}
                                         style={{ marginRight: 'auto', background: 'rgba(239,68,68,0.2)', color: '#f87171', border: 'none', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
                                         <Icon name="Trash2" size={16} inline /> Hapus

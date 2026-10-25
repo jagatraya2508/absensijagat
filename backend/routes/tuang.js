@@ -32,13 +32,17 @@ router.get('/employees', async (req, res) => {
 router.get('/departments', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT DISTINCT ed.department
-            FROM employee_details ed
-            JOIN users u ON u.id = ed.user_id
-            WHERE u.role = 'employee'
-              AND COALESCE(ed.receives_tuang, true) = true
-              AND ed.department IS NOT NULL AND ed.department != ''
-            ORDER BY ed.department
+            SELECT d.name AS department
+            FROM departments d
+            WHERE EXISTS (
+                SELECT 1
+                FROM employee_details ed
+                JOIN users u ON u.id = ed.user_id
+                WHERE u.role = 'employee'
+                  AND COALESCE(ed.receives_tuang, true) = true
+                  AND ed.department = d.name
+            )
+            ORDER BY d.name
         `);
         res.json(result.rows.map(r => r.department));
     } catch (error) {

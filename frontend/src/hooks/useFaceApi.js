@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as faceapi from '@vladmandic/face-api';
+import { useSettings } from '../context/SettingsContext';
+import { normalizeFaceMatchPercent } from '../utils/faceMatch';
 
 const MODEL_URL = '/models';
 
 export default function useFaceApi() {
+    const { settings } = useSettings();
+    const minPercent = normalizeFaceMatchPercent(settings?.face_match_percent);
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -73,16 +77,15 @@ export default function useFaceApi() {
         const d2 = descriptor2 instanceof Float32Array ? descriptor2 : new Float32Array(descriptor2);
 
         const distance = faceapi.euclideanDistance(d1, d2);
-
-        // Threshold for face match (lower is better)
-        const MATCH_THRESHOLD = 0.4; // Minimal kemiripan 60%
+        const similarity = Math.max(0, Math.round((1 - distance) * 100));
 
         return {
-            match: distance < MATCH_THRESHOLD,
-            distance: distance,
-            similarity: Math.max(0, Math.round((1 - distance) * 100))
+            match: similarity >= minPercent,
+            distance,
+            similarity,
+            minPercent,
         };
-    }, []);
+    }, [minPercent]);
 
     // Detect face from video element (for live camera)
     const detectFaceFromVideo = useCallback(async (videoElement) => {

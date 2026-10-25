@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canAssess = hasPermission('admin.assessments');
 
 // Get all assessments (with filters)
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, canAssess, async (req, res) => {
     try {
         const { month, year, user_id } = req.query;
         let query = `
@@ -47,7 +48,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Calculate discipline score automatically from attendance data
-router.get('/calculate/:userId', authenticateToken, isAdmin, async (req, res) => {
+router.get('/calculate/:userId', authenticateToken, canAssess, async (req, res) => {
     try {
         const { userId } = req.params;
         const { month, year } = req.query;
@@ -164,7 +165,7 @@ router.get('/calculate/:userId', authenticateToken, isAdmin, async (req, res) =>
 });
 
 // Create or update assessment
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', authenticateToken, canAssess, async (req, res) => {
     try {
         const {
             user_id, period_month, period_year,
@@ -229,7 +230,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update assessment
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, canAssess, async (req, res) => {
     try {
         const { id } = req.params;
         const {
@@ -268,7 +269,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete assessment
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canAssess, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM discipline_assessments WHERE id = $1 RETURNING *', [id]);
@@ -285,7 +286,7 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get employees list for assessment dropdown
-router.get('/employees', authenticateToken, isAdmin, async (req, res) => {
+router.get('/employees', authenticateToken, canAssess, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT u.id, u.name, u.employee_id, ed.department, ed.position

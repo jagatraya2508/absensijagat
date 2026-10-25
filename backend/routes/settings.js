@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
 
 // Configure multer for logo uploads
 const storage = multer.diskStorage({
@@ -337,6 +337,27 @@ router.put('/smtp', authenticateToken, isAdmin, async (req, res) => {
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     } finally {
         client.release();
+    }
+});
+
+// Minimum face-match percentage used by attendance and kiosk
+router.put('/face-match', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const percent = parseInt(req.body.percent, 10);
+        if (!Number.isInteger(percent) || percent < 50 || percent > 95) {
+            return res.status(400).json({ error: 'Kemiripan wajah harus bilangan bulat antara 50 dan 95' });
+        }
+
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('face_match_percent', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [String(percent)]
+        );
+
+        res.json({ message: 'Batas kemiripan wajah berhasil disimpan', face_match_percent: percent });
+    } catch (error) {
+        console.error('Update face match setting error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
 

@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManageVehicles = hasPermission('admin.vehicle_types');
 
 // Get all vehicle types
 router.get('/', authenticateToken, async (req, res) => {
@@ -15,7 +16,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Create new vehicle type
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', authenticateToken, canManageVehicles, async (req, res) => {
     const { name, description } = req.body;
     if (!name) {
         return res.status(400).json({ error: 'Name is required' });
@@ -36,7 +37,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update vehicle type
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, canManageVehicles, async (req, res) => {
     const { id } = req.params;
     const { name, description } = req.body;
     if (!name) {
@@ -61,7 +62,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete vehicle type
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageVehicles, async (req, res) => {
     const { id } = req.params;
     try {
         // Cek apakah jenis kendaraan ini digunakan oleh karyawan

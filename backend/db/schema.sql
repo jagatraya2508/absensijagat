@@ -673,6 +673,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 INSERT INTO settings (key, value) VALUES ('app_logo', '/logo.png') ON CONFLICT DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('payslip_show_logo', 'true') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('face_match_percent', '60') ON CONFLICT DO NOTHING;
 
 -- Tabel License Info
 CREATE TABLE IF NOT EXISTS license_info (

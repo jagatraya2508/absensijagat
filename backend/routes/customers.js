@@ -4,7 +4,8 @@ const path = require('path');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManageCustomers = hasPermission('admin.customers');
 const { generateCustomerCode, advanceCounterIfNeeded } = require('../utils/customerCode');
 
 const excelUpload = multer({
@@ -135,7 +136,7 @@ router.get('/directory', authenticateToken, async (req, res) => {
 });
 
 // GET /code-settings — Get customer code settings (admin)
-router.get('/code-settings', authenticateToken, isAdmin, async (req, res) => {
+router.get('/code-settings', authenticateToken, canManageCustomers, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT key, value FROM app_settings WHERE key IN ('customer_code_prefix', 'customer_code_next', 'customer_code_digits')`
@@ -150,7 +151,7 @@ router.get('/code-settings', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // PUT /code-settings — Update customer code settings (admin)
-router.put('/code-settings', authenticateToken, isAdmin, async (req, res) => {
+router.put('/code-settings', authenticateToken, canManageCustomers, async (req, res) => {
     try {
         const { prefix, next_number, digits } = req.body;
         
@@ -172,7 +173,7 @@ router.put('/code-settings', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // GET / — Get all customers (admin)
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, canManageCustomers, async (req, res) => {
     try {
         const result = await pool.query(
             'SELECT * FROM customers ORDER BY created_at DESC'
@@ -185,7 +186,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // GET /template — Download Excel template (admin)
-router.get('/template', authenticateToken, isAdmin, async (req, res) => {
+router.get('/template', authenticateToken, canManageCustomers, async (req, res) => {
     try {
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Absensi Jagat';
@@ -304,7 +305,7 @@ router.get('/template', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // POST /import — Import customers from Excel (admin)
-router.post('/import', authenticateToken, isAdmin, (req, res, next) => {
+router.post('/import', authenticateToken, canManageCustomers, (req, res, next) => {
     excelUpload.single('file')(req, res, (err) => {
         if (err) {
             return res.status(400).json({ error: err.message || 'Gagal mengunggah file' });
@@ -496,7 +497,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /:id — Update customer (admin)
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, canManageCustomers, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, address, phone, notes, is_active } = req.body;
@@ -527,7 +528,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // DELETE /:id — Delete customer (admin)
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageCustomers, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(

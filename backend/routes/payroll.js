@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManagePayroll = hasPermission('admin.payroll');
 
 async function getPayslipLogoFile() {
     const result = await pool.query(
@@ -107,7 +108,7 @@ async function sumEmployeeOvertime(client, userId, year, month, hourlyRate) {
 }
 
 // Get all payroll runs
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, canManagePayroll, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT pr.*, u.name as created_by_name,
@@ -125,7 +126,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get payroll run detail with items
-router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, canManagePayroll, async (req, res) => {
     try {
         const { id } = req.params;
         const runResult = await pool.query('SELECT * FROM payroll_runs WHERE id = $1', [id]);
@@ -152,7 +153,7 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Generate payroll for a month
-router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
+router.post('/generate', authenticateToken, canManagePayroll, async (req, res) => {
     const client = await pool.connect();
     try {
         const { month, year, notes } = req.body;
@@ -435,7 +436,7 @@ router.post('/generate', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Finalize payroll (also process loan deductions)
-router.put('/:id/finalize', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id/finalize', authenticateToken, canManagePayroll, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -538,7 +539,7 @@ router.get('/:id/slip/:userId', authenticateToken, async (req, res) => {
 });
 
 // Delete payroll run (draft or finalized). Reverse loan deductions tied to this run.
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManagePayroll, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -606,7 +607,7 @@ function fmtCurrency(val) {
 }
 
 // Export Payroll Report as PDF
-router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, res) => {
     try {
         const { id } = req.params;
         const runResult = await pool.query('SELECT * FROM payroll_runs WHERE id = $1', [id]);
@@ -716,7 +717,7 @@ router.get('/:id/export/pdf', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Export Payroll Report as Excel
-router.get('/:id/export/excel', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req, res) => {
     try {
         const { id } = req.params;
         const runResult = await pool.query('SELECT * FROM payroll_runs WHERE id = $1', [id]);

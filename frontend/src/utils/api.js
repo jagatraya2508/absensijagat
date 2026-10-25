@@ -263,6 +263,7 @@ export const locationsAPI = {
 
 // Reports API
 export const reportsAPI = {
+    getEmployees: () => request('/reports/employees'),
     getDaily: (date) => {
         const query = date ? `?date=${date}` : '';
         return request(`/reports/daily${query}`);
@@ -529,6 +530,10 @@ export const settingsAPI = {
         method: 'PUT',
         body: JSON.stringify({ show_logo: showLogo }),
     }),
+    updateFaceMatch: (percent) => request('/settings/face-match', {
+        method: 'PUT',
+        body: JSON.stringify({ percent }),
+    }),
 };
 
 // Database backup & restore (admin only)
@@ -581,6 +586,7 @@ export const scheduleAPI = {
 
 // Off Days API (Admin per user)
 export const offDaysAPI = {
+    getEmployees: () => request('/off-days/employees'),
     getByUser: (userId) => request(`/off-days/${userId}`),
 
     add: (userId, date) => request('/off-days', {
@@ -673,6 +679,7 @@ export const overtimeAPI = {
 
 // Loans API
 export const loansAPI = {
+    getEmployees: () => request('/loans/employees'),
     getAll: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return request(`/loans?${query}`);

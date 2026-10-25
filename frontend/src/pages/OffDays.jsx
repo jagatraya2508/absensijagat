@@ -1,6 +1,6 @@
 import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
-import { authAPI, offDaysAPI } from '../utils/api';
+import { offDaysAPI } from '../utils/api';
 
 export default function OffDays() {
     const [users, setUsers] = useState([]);
@@ -25,11 +25,8 @@ export default function OffDays() {
 
     async function fetchUsers() {
         try {
-            const data = await authAPI.getUsers();
-            // Filter only employees, or show all? usually for employees.
-            // But getUsers returns all. Let's filter if needed, but role is in data.
-            const employees = data.filter(u => u.role === 'employee');
-            setUsers(employees);
+            const data = await offDaysAPI.getEmployees();
+            setUsers(data);
         } catch (error) {
             console.error('Failed to fetch users:', error);
             setError('Gagal memuat data karyawan');

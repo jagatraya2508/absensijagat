@@ -153,7 +153,7 @@ export default function Attendance() {
                     setStep(3);
                     setError('');
                 } else {
-                    setError(`Wajah tidak cocok. Kemiripan: ${comparison.similarity}%. Minimal 60% untuk diterima.`);
+                    setError(`Wajah tidak cocok. Kemiripan: ${comparison.similarity}%. Minimal ${comparison.minPercent}% untuk diterima.`);
                     setFaceVerified(false);
                     setStep(1);
                 }

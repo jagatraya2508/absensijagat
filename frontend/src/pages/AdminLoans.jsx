@@ -1,6 +1,6 @@
 import Icon from '../components/Icon';
 import { useState, useEffect } from 'react';
-import { loansAPI, authAPI } from '../utils/api';
+import { loansAPI } from '../utils/api';
 
 export default function AdminLoans() {
     const [loans, setLoans] = useState([]);
@@ -27,8 +27,8 @@ export default function AdminLoans() {
 
     async function fetchUsers() {
         try {
-            const data = await authAPI.getUsers();
-            setUsers(data.filter(u => u.role === 'employee'));
+            const data = await loansAPI.getEmployees();
+            setUsers(data);
         } catch (e) { console.error(e); }
     }
 

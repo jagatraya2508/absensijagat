@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { reportsAPI, authAPI } from '../utils/api';
+import { reportsAPI } from '../utils/api';
 import Icon from '../components/Icon';
 
 export default function AdminReports() {
@@ -38,7 +38,7 @@ export default function AdminReports() {
 
     async function fetchHistoryUsers() {
         try {
-            const data = await authAPI.getUsers();
+            const data = await reportsAPI.getEmployees();
             setHistoryUsers(data || []);
         } catch (error) {
             console.error('Failed to fetch users:', error);

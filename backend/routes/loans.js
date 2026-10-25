@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManageLoans = hasPermission('admin.loans');
 
 // Get all loans (with optional filters)
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, canManageLoans, async (req, res) => {
     try {
         const { user_id, status } = req.query;
         let query = `
@@ -34,8 +35,23 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+router.get('/employees', authenticateToken, canManageLoans, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, employee_id, name, role
+             FROM users
+             WHERE role = 'employee'
+             ORDER BY name`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get loan employees error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 // Get loan detail with payments
-router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, canManageLoans, async (req, res) => {
     try {
         const { id } = req.params;
         const loanResult = await pool.query(`
@@ -65,7 +81,7 @@ router.get('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Create new loan
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', authenticateToken, canManageLoans, async (req, res) => {
     try {
         const { user_id, loan_date, amount, installment_amount, total_installments, description } = req.body;
 
@@ -87,7 +103,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update loan
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, canManageLoans, async (req, res) => {
     try {
         const { id } = req.params;
         const { description, status } = req.body;
@@ -123,7 +139,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Record manual payment
-router.post('/:id/payment', authenticateToken, isAdmin, async (req, res) => {
+router.post('/:id/payment', authenticateToken, canManageLoans, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -191,7 +207,7 @@ router.post('/:id/payment', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete/cancel loan (hard delete)
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageLoans, async (req, res) => {
     try {
         const { id } = req.params;
         // Delete payments first due to foreign key constraint

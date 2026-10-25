@@ -67,6 +67,10 @@ router.delete('/:id', async (req, res) => {
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Department not found' });
         }
+        await pool.query(
+            'UPDATE employee_details SET department = NULL WHERE department = $1',
+            [result.rows[0].name]
+        );
         res.json({ message: 'Department deleted successfully' });
     } catch (err) {
         console.error('Error deleting department:', err);

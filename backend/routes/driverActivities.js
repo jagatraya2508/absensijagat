@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManageDriverActivities = hasPermission('admin.driver_activities');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 
 // Get driver activities (with filters)
-router.get('/', authenticateToken, isAdmin, async (req, res) => {
+router.get('/', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { month, year, user_id } = req.query;
         let query = `
@@ -42,7 +43,7 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get summary for payroll (per driver per month)
-router.get('/summary', authenticateToken, isAdmin, async (req, res) => {
+router.get('/summary', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { month, year } = req.query;
         if (!month || !year) {
@@ -100,7 +101,7 @@ router.get('/summary', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Get all drivers (for dropdown)
-router.get('/drivers', authenticateToken, isAdmin, async (req, res) => {
+router.get('/drivers', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT u.id, u.name, u.employee_id
@@ -117,7 +118,7 @@ router.get('/drivers', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Create driver activity
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh } = req.body;
 
@@ -169,7 +170,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update driver activity
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { id } = req.params;
         const { is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh } = req.body;
@@ -197,7 +198,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete driver activity
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM driver_activities WHERE id = $1 RETURNING id', [id]);
@@ -212,7 +213,7 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Bulk create/update (for quick entry of multiple days)
-router.post('/bulk', authenticateToken, isAdmin, async (req, res) => {
+router.post('/bulk', authenticateToken, canManageDriverActivities, async (req, res) => {
     const client = await pool.connect();
     try {
         const { activities } = req.body; // Array of { user_id, activity_date, is_subuh, rit_count, is_overnight, ... }
@@ -270,7 +271,7 @@ function formatCurrency(val) {
 }
 
 // Export Summary as PDF
-router.get('/export/summary/pdf', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/summary/pdf', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { month, year } = req.query;
         if (!month || !year) {
@@ -396,7 +397,7 @@ router.get('/export/summary/pdf', authenticateToken, isAdmin, async (req, res) =
 });
 
 // Export Summary as Excel
-router.get('/export/summary/excel', authenticateToken, isAdmin, async (req, res) => {
+router.get('/export/summary/excel', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { month, year } = req.query;
         if (!month || !year) {

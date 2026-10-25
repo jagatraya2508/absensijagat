@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManageLocations = hasPermission('admin.locations');
 
 // Get all locations
 router.get('/', authenticateToken, async (req, res) => {
@@ -64,7 +65,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create location (Admin only)
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', authenticateToken, canManageLocations, async (req, res) => {
     try {
         const { name, latitude, longitude, radius_meters, is_active } = req.body;
 
@@ -87,7 +88,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update location (Admin only)
-router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, canManageLocations, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, latitude, longitude, radius_meters, is_active } = req.body;
@@ -116,7 +117,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete location (Admin only)
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageLocations, async (req, res) => {
     try {
         const { id } = req.params;
 

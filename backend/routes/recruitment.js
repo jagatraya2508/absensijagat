@@ -4,7 +4,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canRecruit = hasPermission('admin.recruitment');
 const { sendInterviewEmail } = require('../utils/email');
 
 // Configure multer for candidate uploads
@@ -95,7 +96,7 @@ router.post('/public/candidates', upload.fields([
 // ==========================================
 
 // Get all job positions
-router.get('/positions', authenticateToken, isAdmin, async (req, res) => {
+router.get('/positions', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { status } = req.query;
         let query = `
@@ -122,7 +123,7 @@ router.get('/positions', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Create job position
-router.post('/positions', authenticateToken, isAdmin, async (req, res) => {
+router.post('/positions', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { title, department, description, requirements, salary_range_min, salary_range_max, employment_type } = req.body;
 
@@ -145,7 +146,7 @@ router.post('/positions', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update job position
-router.put('/positions/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/positions/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const { title, department, description, requirements, salary_range_min, salary_range_max, employment_type, status } = req.body;
@@ -172,7 +173,7 @@ router.put('/positions/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete job position
-router.delete('/positions/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/positions/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM job_positions WHERE id = $1 RETURNING *', [id]);
@@ -193,7 +194,7 @@ router.delete('/positions/:id', authenticateToken, isAdmin, async (req, res) => 
 // ==========================================
 
 // Get all candidates
-router.get('/candidates', authenticateToken, isAdmin, async (req, res) => {
+router.get('/candidates', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { position_id, status } = req.query;
         let query = `
@@ -228,7 +229,7 @@ router.get('/candidates', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Create candidate
-router.post('/candidates', authenticateToken, isAdmin, upload.fields([
+router.post('/candidates', authenticateToken, canRecruit, upload.fields([
     { name: 'resume', maxCount: 5 },
     { name: 'photo', maxCount: 1 }
 ]), async (req, res) => {
@@ -261,7 +262,7 @@ router.post('/candidates', authenticateToken, isAdmin, upload.fields([
 });
 
 // Update candidate
-router.put('/candidates/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/candidates/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const { full_name, email, phone, address, education, experience_years, applied_position_id, status, source, notes } = req.body;
@@ -288,7 +289,7 @@ router.put('/candidates/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete candidate
-router.delete('/candidates/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/candidates/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM candidates WHERE id = $1 RETURNING *', [id]);
@@ -305,7 +306,7 @@ router.delete('/candidates/:id', authenticateToken, isAdmin, async (req, res) =>
 });
 
 // Update candidate status (quick status change)
-router.patch('/candidates/:id/status', authenticateToken, isAdmin, async (req, res) => {
+router.patch('/candidates/:id/status', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
@@ -336,7 +337,7 @@ router.patch('/candidates/:id/status', authenticateToken, isAdmin, async (req, r
 // ==========================================
 
 // Get stages for a candidate
-router.get('/candidates/:id/stages', authenticateToken, isAdmin, async (req, res) => {
+router.get('/candidates/:id/stages', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
@@ -355,7 +356,7 @@ router.get('/candidates/:id/stages', authenticateToken, isAdmin, async (req, res
 });
 
 // Create stage
-router.post('/candidates/:id/stages', authenticateToken, isAdmin, async (req, res) => {
+router.post('/candidates/:id/stages', authenticateToken, canRecruit, async (req, res) => {
     try {
         const candidateId = req.params.id;
         const { stage_name, stage_order, scheduled_date, interviewer_id, notes } = req.body;
@@ -378,7 +379,7 @@ router.post('/candidates/:id/stages', authenticateToken, isAdmin, async (req, re
 });
 
 // Update stage
-router.put('/stages/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/stages/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const { status, score, notes, completed_date } = req.body;
@@ -408,7 +409,7 @@ router.put('/stages/:id', authenticateToken, isAdmin, async (req, res) => {
 // ==========================================
 
 // Get all interviews
-router.get('/interviews', authenticateToken, isAdmin, async (req, res) => {
+router.get('/interviews', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { start_date, end_date, status } = req.query;
         let query = `
@@ -451,7 +452,7 @@ router.get('/interviews', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Create interview
-router.post('/interviews', authenticateToken, isAdmin, async (req, res) => {
+router.post('/interviews', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { candidate_id, stage_id, interviewer_id, interview_date, interview_time, location, type, meeting_link, notes } = req.body;
 
@@ -475,7 +476,7 @@ router.post('/interviews', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update interview
-router.put('/interviews/:id', authenticateToken, isAdmin, async (req, res) => {
+router.put('/interviews/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const { interviewer_id, interview_date, interview_time, location, type, meeting_link, status, result: interviewResult, notes } = req.body;
@@ -501,7 +502,7 @@ router.put('/interviews/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete interview
-router.delete('/interviews/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/interviews/:id', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM interviews WHERE id = $1 RETURNING *', [id]);
@@ -518,7 +519,7 @@ router.delete('/interviews/:id', authenticateToken, isAdmin, async (req, res) =>
 });
 
 // Send interview email
-router.post('/interviews/:id/send-email', authenticateToken, isAdmin, async (req, res) => {
+router.post('/interviews/:id/send-email', authenticateToken, canRecruit, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -557,7 +558,7 @@ router.post('/interviews/:id/send-email', authenticateToken, isAdmin, async (req
 // RECRUITMENT STATS
 // ==========================================
 
-router.get('/stats', authenticateToken, isAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, canRecruit, async (req, res) => {
     try {
         const positionsResult = await pool.query(
             `SELECT status, COUNT(*) as count FROM job_positions GROUP BY status`

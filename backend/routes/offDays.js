@@ -1,10 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateToken, hasPermission } = require('../middleware/auth');
+const canManageOffDays = hasPermission('admin.off_days');
 
-// Get off days for a specific user (Admin only)
-router.get('/:userId', authenticateToken, isAdmin, async (req, res) => {
+router.get('/employees', authenticateToken, canManageOffDays, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, employee_id, name, role
+             FROM users
+             WHERE role = 'employee'
+             ORDER BY name`
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get off-day employees error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Get off days for a specific user
+router.get('/:userId', authenticateToken, canManageOffDays, async (req, res) => {
     try {
         const { userId } = req.params;
         const result = await pool.query(
@@ -19,7 +35,7 @@ router.get('/:userId', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Add off day for a user (Admin only)
-router.post('/', authenticateToken, isAdmin, async (req, res) => {
+router.post('/', authenticateToken, canManageOffDays, async (req, res) => {
     try {
         const { user_id, date } = req.body;
 
@@ -45,7 +61,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Delete off day (Admin only)
-router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageOffDays, async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query('DELETE FROM user_off_days WHERE id = $1', [id]);
