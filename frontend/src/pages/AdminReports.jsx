@@ -17,6 +17,47 @@ function formatIsoDate(iso) {
     });
 }
 
+function isoFromDate(date) {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function parseIsoDate(iso) {
+    const [year, month, day] = String(iso).slice(0, 10).split('-').map(Number);
+    return new Date(year, (month || 1) - 1, day || 1);
+}
+
+function calendarIso(value) {
+    if (!value) return localToday();
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return isoFromDate(value);
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const parsed = new Date(text);
+    if (!Number.isNaN(parsed.getTime())) return isoFromDate(parsed);
+    return text.slice(0, 10);
+}
+
+function weekBounds(iso) {
+    const date = parseIsoDate(iso);
+    const diffToMonday = date.getDay() === 0 ? -6 : 1 - date.getDay();
+    const start = new Date(date);
+    start.setDate(date.getDate() + diffToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { start: isoFromDate(start), end: isoFromDate(end) };
+}
+
+function monthBounds(year, month) {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    return { start: isoFromDate(start), end: isoFromDate(end) };
+}
+
+function yearBounds(year) {
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
+}
+
 export default function AdminReports() {
     const [reportType, setReportType] = useState('daily');
     const [dailyStart, setDailyStart] = useState(localToday());
@@ -43,6 +84,18 @@ export default function AdminReports() {
     const [page, setPage] = useState(1);
     const [departmentOptions, setDepartmentOptions] = useState([]);
     const [divisionOptions, setDivisionOptions] = useState([]);
+    const [detailEmployee, setDetailEmployee] = useState(null);
+    const [detailMode, setDetailMode] = useState('weekly');
+    const [detailWeekDate, setDetailWeekDate] = useState(localToday());
+    const [detailMonth, setDetailMonth] = useState(new Date().getMonth() + 1);
+    const [detailYear, setDetailYear] = useState(new Date().getFullYear());
+    const [detailYearOnly, setDetailYearOnly] = useState(new Date().getFullYear());
+    const [detailStart, setDetailStart] = useState(localToday());
+    const [detailEnd, setDetailEnd] = useState(localToday());
+    const [detailReport, setDetailReport] = useState(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState('');
+    const [detailPage, setDetailPage] = useState(1);
 
     const requestSort = (key) => {
         let direction = 'ascending';
@@ -219,6 +272,75 @@ export default function AdminReports() {
     }, [visibleRecords, sortConfig]);
 
     const pagedRecords = slicePage(sortedRecords, page);
+
+    const detailRange = useMemo(() => {
+        if (detailMode === 'weekly') return weekBounds(detailWeekDate);
+        if (detailMode === 'monthly') return monthBounds(detailYear, detailMonth);
+        if (detailMode === 'yearly') return yearBounds(detailYearOnly);
+        return detailStart > detailEnd
+            ? { start: detailEnd, end: detailStart }
+            : { start: detailStart, end: detailEnd };
+    }, [detailMode, detailWeekDate, detailMonth, detailYear, detailYearOnly, detailStart, detailEnd]);
+
+    const detailRows = useMemo(() => {
+        const rows = detailReport?.records || [];
+        return [...rows].sort((a, b) => String(b.report_date).localeCompare(String(a.report_date)));
+    }, [detailReport]);
+
+    const pagedDetail = slicePage(detailRows, detailPage);
+
+    useEffect(() => {
+        if (!detailEmployee) return undefined;
+        let cancelled = false;
+        setDetailLoading(true);
+        setDetailError('');
+        reportsAPI.getEmployeeDays(detailEmployee.id, detailRange.start, detailRange.end)
+            .then((data) => {
+                if (!cancelled) setDetailReport(data);
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setDetailReport(null);
+                    setDetailError(err.message || 'Gagal memuat absensi karyawan');
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setDetailLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [detailEmployee, detailRange]);
+
+    useEffect(() => {
+        if (!detailEmployee || detailRows.length === 0) return;
+        const index = detailRows.findIndex((row) => row.report_date === detailEmployee.anchor);
+        setDetailPage(index >= 0 ? Math.floor(index / 10) + 1 : 1);
+    }, [detailEmployee, detailReport]);
+
+    function openEmployeeDetail(record) {
+        const matched = historyUsers.find((employee) => String(employee.employee_id) === String(record.employee_id));
+        const userId = record.user_id || matched?.id;
+        if (!userId) return;
+        const anchor = calendarIso(record.report_date || record.attendance_date || record.off_date || localToday());
+        const date = parseIsoDate(anchor);
+        const week = weekBounds(anchor);
+        setDetailEmployee({
+            id: userId,
+            name: record.name,
+            employee_id: record.employee_id,
+            department: record.department,
+            division: record.division,
+            anchor
+        });
+        setDetailWeekDate(anchor);
+        setDetailMonth(reportType === 'monthly' ? month : date.getMonth() + 1);
+        setDetailYear(reportType === 'monthly' ? year : date.getFullYear());
+        setDetailYearOnly(date.getFullYear());
+        setDetailStart(reportType === 'daily' ? dailyStart : week.start);
+        setDetailEnd(reportType === 'daily' ? dailyEnd : week.end);
+        setDetailMode(reportType === 'monthly' ? 'monthly' : 'weekly');
+        setDetailReport(null);
+        setDetailPage(1);
+    }
 
     function chooseEmployee(employee) {
         setSelectedEmployeeId(String(employee.id));
@@ -660,7 +782,7 @@ export default function AdminReports() {
                                             </thead>
                                             <tbody>
                                                 {sortedRecords.map((record) => (
-                                                    <tr key={`${record.user_id}-${record.report_date}`}>
+                                                    <tr key={`${record.user_id}-${record.report_date}`} className="report-row-link" title="Lihat absensi karyawan" onClick={() => openEmployeeDetail(record)}>
                                                         <td data-label="Tanggal">{record.report_date || '-'}</td>
                                                         <td data-label="Employee ID" style={{ fontWeight: 500 }}>{record.employee_id}</td>
                                                         <td data-label="Nama">{record.name}</td>
@@ -741,7 +863,7 @@ export default function AdminReports() {
                                             </thead>
                                             <tbody>
                                                 {sortedRecords.map((record) => (
-                                                    <tr key={record.user_id}>
+                                                    <tr key={record.user_id} className="report-row-link" title="Lihat absensi karyawan" onClick={() => openEmployeeDetail(record)}>
                                                         <td data-label="Employee ID" style={{ fontWeight: 500 }}>{record.employee_id}</td>
                                                         <td data-label="Nama">{record.name}</td>
                                                         <td data-label="Departemen">{record.department || '-'}</td>
@@ -807,7 +929,7 @@ export default function AdminReports() {
                                             </thead>
                                             <tbody>
                                                 {sortedRecords.map((record, index) => (
-                                                    <tr key={`${record.user_id}-${record.attendance_date}-${index}`}>
+                                                    <tr key={`${record.user_id}-${record.attendance_date}-${index}`} className="report-row-link" title="Lihat absensi karyawan" onClick={() => openEmployeeDetail(record)}>
                                                         <td data-label="Tanggal">{formatDateShort(record.attendance_date)}</td>
                                                         <td data-label="ID Karyawan" style={{ fontWeight: 500 }}>{record.employee_id}</td>
                                                         <td data-label="Nama">{record.name}</td>
@@ -898,7 +1020,7 @@ export default function AdminReports() {
                                         </thead>
                                         <tbody>
                                             {sortedRecords.map((record, index) => (
-                                                <tr key={index}>
+                                                <tr key={index} className="report-row-link" title="Lihat absensi karyawan" onClick={() => openEmployeeDetail(record)}>
                                                     <td data-label="Tanggal">{new Date(record.off_date).toLocaleDateString('id-ID', {
                                                         weekday: 'long',
                                                         year: 'numeric',
@@ -937,6 +1059,150 @@ export default function AdminReports() {
                     </>
                 )}
             </div>
+
+            {detailEmployee && (
+                <div className="modal-overlay" onClick={() => setDetailEmployee(null)}>
+                    <div className="modal report-detail-modal" onClick={(event) => event.stopPropagation()}>
+                        <div className="modal-header">
+                            <div>
+                                <h3 className="modal-title">{detailEmployee.name}</h3>
+                                <p className="report-detail-subtitle">
+                                    {detailEmployee.employee_id}
+                                    {detailEmployee.department ? ` · ${detailEmployee.department}` : ''}
+                                    {detailEmployee.division ? ` · ${detailEmployee.division}` : ''}
+                                </p>
+                            </div>
+                            <button type="button" className="modal-close" onClick={() => setDetailEmployee(null)} aria-label="Tutup">
+                                <Icon name="X" size={16} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="report-period-options">
+                                {[
+                                    ['range', 'Dari–Sampai'],
+                                    ['weekly', 'Mingguan'],
+                                    ['monthly', 'Bulanan'],
+                                    ['yearly', 'Tahunan']
+                                ].map(([value, label]) => (
+                                    <label key={value} className="report-period-option">
+                                        <input
+                                            type="radio"
+                                            name="employee-attendance-period"
+                                            checked={detailMode === value}
+                                            onChange={() => { setDetailMode(value); setDetailPage(1); }}
+                                        />
+                                        {label}
+                                    </label>
+                                ))}
+                            </div>
+
+                            {detailMode === 'range' && (
+                                <div className="report-detail-controls">
+                                    <div className="form-group">
+                                        <label className="form-label">Dari tanggal</label>
+                                        <input type="date" className="form-input" value={detailStart} onChange={(event) => setDetailStart(event.target.value)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Sampai tanggal</label>
+                                        <input type="date" className="form-input" value={detailEnd} onChange={(event) => setDetailEnd(event.target.value)} />
+                                    </div>
+                                </div>
+                            )}
+                            {detailMode === 'weekly' && (
+                                <div className="form-group">
+                                    <label className="form-label">Tanggal dalam minggu</label>
+                                    <input type="date" className="form-input" value={detailWeekDate} onChange={(event) => setDetailWeekDate(event.target.value)} />
+                                </div>
+                            )}
+                            {detailMode === 'monthly' && (
+                                <div className="report-detail-controls">
+                                    <div className="form-group">
+                                        <label className="form-label">Bulan</label>
+                                        <select className="form-input form-select" value={detailMonth} onChange={(event) => setDetailMonth(parseInt(event.target.value, 10))}>
+                                            {months.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Tahun</label>
+                                        <select className="form-input form-select" value={detailYear} onChange={(event) => setDetailYear(parseInt(event.target.value, 10))}>
+                                            {[2024, 2025, 2026].map((value) => <option key={value} value={value}>{value}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+                            {detailMode === 'yearly' && (
+                                <div className="form-group">
+                                    <label className="form-label">Tahun</label>
+                                    <select className="form-input form-select" value={detailYearOnly} onChange={(event) => setDetailYearOnly(parseInt(event.target.value, 10))}>
+                                        {[2024, 2025, 2026].map((value) => <option key={value} value={value}>{value}</option>)}
+                                    </select>
+                                </div>
+                            )}
+
+                            <p className="report-detail-period">{formatIsoDate(detailRange.start)} – {formatIsoDate(detailRange.end)}</p>
+
+                            {detailReport?.summary && !detailLoading && (
+                                <div className="report-detail-summary">
+                                    <span>Hadir {detailReport.summary.present}</span>
+                                    <span>Tidak Hadir {detailReport.summary.absent}</span>
+                                    <span>Lengkap {detailReport.summary.completed}</span>
+                                    <span>Izin Terlambat {detailReport.summary.on_late}</span>
+                                    <span>Cuti {detailReport.summary.on_leave}</span>
+                                    <span>Sakit {detailReport.summary.on_sick}</span>
+                                    <span>OFF {detailReport.summary.on_off}</span>
+                                </div>
+                            )}
+
+                            {detailLoading ? (
+                                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                    <div className="loading-spinner" style={{ margin: '0 auto' }} />
+                                </div>
+                            ) : detailError ? (
+                                <div className="empty-state"><p className="empty-state-text">{detailError}</p></div>
+                            ) : detailRows.length === 0 ? (
+                                <div className="empty-state"><p className="empty-state-text">Tidak ada data untuk periode ini</p></div>
+                            ) : (
+                                <>
+                                    <div className="table-container">
+                                        <table className="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Tanggal</th>
+                                                    <th>Check-in</th>
+                                                    <th>Check-out</th>
+                                                    <th>Lokasi</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pagedDetail.items.map((record) => (
+                                                    <tr key={record.report_date} className={record.report_date === detailEmployee.anchor ? 'report-row-anchor' : ''}>
+                                                        <td>{record.report_date}</td>
+                                                        <td>{record.check_in_time ? formatTime(record.check_in_time) : '-'}</td>
+                                                        <td>{record.check_out_time ? formatTime(record.check_out_time) : '-'}</td>
+                                                        <td>{record.location_name || '-'}</td>
+                                                        <td>
+                                                            <span className={`badge ${statusText(record) === 'Lengkap' ? 'badge-success' : statusText(record) === 'Tidak Hadir' ? 'badge-danger' : statusText(record) === 'Cuti' || statusText(record) === 'OFF' ? 'badge-primary' : 'badge-warning'}`}>
+                                                                {statusText(record)}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <ListPagination
+                                        page={pagedDetail.pageSafe}
+                                        total={detailRows.length}
+                                        onPageChange={setDetailPage}
+                                        itemLabel="hari"
+                                    />
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1368,6 +1368,16 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   white-space: nowrap;
 }
 
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th.sortable svg {
+  vertical-align: middle;
+  opacity: 0.55;
+}
+
 .table td {
   font-size: 0.875rem;
   color: var(--gray-700);
@@ -1377,6 +1387,69 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
 
 .table tbody tr {
   transition: all var(--transition-fast);
+}
+
+.table tbody tr.report-row-link {
+  cursor: pointer;
+}
+
+.table tbody tr.report-row-anchor td {
+  background: rgba(109, 0, 0, 0.08);
+}
+
+.modal.report-detail-modal {
+  max-width: 920px;
+  width: 100%;
+}
+
+.report-detail-subtitle {
+  margin: 0.2rem 0 0;
+  color: var(--gray-500);
+  font-size: 0.85rem;
+}
+
+.report-period-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.report-period-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.report-detail-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.report-detail-period {
+  margin: 0.75rem 0;
+  color: var(--gray-600);
+  font-size: 0.9rem;
+}
+
+.report-detail-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.report-detail-summary span {
+  background: rgba(109, 0, 0, 0.06);
+  color: var(--gray-800);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .table tbody tr:hover {
@@ -1882,6 +1955,86 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   overflow-y: auto;
 }
 
+.payslip-field-settings {
+  background: rgba(109, 0, 0, 0.04);
+  border: 1px solid rgba(109, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 0.9rem 1rem 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.payslip-field-note {
+  margin: 0 0 0.75rem;
+  color: var(--gray-500);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.payslip-scope-options {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+@media print {
+  .payslip-layout-scope,
+  .modal-footer,
+  .modal-header {
+    display: none !important;
+  }
+}
+
+.payslip-field-tools {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.payslip-field-tools .btn {
+  width: auto;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.payslip-field-group h4 {
+  margin: 0.85rem 0 0.4rem;
+  font-size: 0.82rem;
+}
+
+.payslip-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 1rem;
+}
+
+.payslip-field-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.payslip-field-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.payslip-slip-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 768px) {
+  .payslip-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .modal.payroll-detail-modal {
   width: 100%;
   height: 100%;
@@ -2369,6 +2522,12 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
   position: relative;
 }
 
+.assessment-employee-lookup .report-lookup-list {
+  position: static;
+  max-height: none;
+  margin-top: 0.4rem;
+}
+
 .card.report-filter-card {
   overflow: visible;
   z-index: 30;
@@ -2548,6 +2707,10 @@ input[type="time"].form-input::-webkit-calendar-picker-indicator {
 
   .report-export-actions {
     width: 100%;
+  }
+
+  .report-detail-controls {
+    grid-template-columns: 1fr;
   }
 
   .card-header .report-export-actions .btn {

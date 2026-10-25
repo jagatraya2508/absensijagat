@@ -155,6 +155,14 @@ export function SettingsProvider({ children }) {
         setSettings(prev => ({ ...prev, payslip_show_logo: value }));
     };
 
+    const updatePayslipFields = async (config) => {
+        const data = await settingsAPI.updatePayslipFields(config);
+        if (data.payslip_fields) {
+            setSettings(prev => ({ ...prev, payslip_fields: data.payslip_fields }));
+        }
+        return data;
+    };
+
     const updateCompanyName = async (name) => {
         try {
             const token = localStorage.getItem('token');
@@ -185,7 +193,7 @@ export function SettingsProvider({ children }) {
 
     return (
         <SettingsContext.Provider value={{
-            settings, loading, fetchSettings, updateLogo, updatePayslipShowLogo,
+            settings, loading, fetchSettings, updateLogo, updatePayslipShowLogo, updatePayslipFields,
             themeColors, updateTheme, previewTheme, resetPreview,
             companyName, updateCompanyName,
             DEFAULT_THEME

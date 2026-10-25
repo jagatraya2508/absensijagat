@@ -46,7 +46,7 @@ function dateOnly(value) {
     return `${d.getFullYear()}-${month}-${day}`;
 }
 
-function resolveReportRange(query) {
+function resolveReportRange(query, maxDays = 62) {
     const today = new Date();
     const fallback = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     let start = query.start_date || query.date || fallback;
@@ -62,8 +62,8 @@ function resolveReportRange(query) {
         return { error: 'Tanggal tidak valid' };
     }
     const days = Math.round((endMs - startMs) / 86400000) + 1;
-    if (days > 62) {
-        return { error: 'Rentang tanggal maksimal 62 hari' };
+    if (days > maxDays) {
+        return { error: maxDays > 62 ? 'Rentang tanggal maksimal 1 tahun' : 'Rentang tanggal maksimal 62 hari' };
     }
     return { start, end };
 }
@@ -81,7 +81,13 @@ function attendanceStatusLabel(row) {
     return 'Tidak Hadir';
 }
 
-async function fetchAttendanceRows(start, end) {
+async function fetchAttendanceRows(start, end, userId = null) {
+    const params = [start, end];
+    let userFilter = '';
+    if (userId) {
+        params.push(userId);
+        userFilter = `AND u.id = $${params.length}`;
+    }
     const result = await pool.query(
         `SELECT
             u.id AS user_id,
@@ -142,9 +148,9 @@ async function fetchAttendanceRows(start, end) {
             ORDER BY id DESC
             LIMIT 1
         ) ma ON true
-        WHERE u.role IN ('employee', 'manager')
+        WHERE u.role IN ('employee', 'manager') ${userFilter}
         ORDER BY d.day, u.name`,
-        [start, end]
+        params
     );
 
     return result.rows.map((row) => ({
@@ -281,6 +287,43 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('Get employee report error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.get('/employee/:id/days', authenticateToken, canViewReports, async (req, res) => {
+    try {
+        const range = resolveReportRange(req.query, 366);
+        if (range.error) {
+            return res.status(400).json({ error: range.error });
+        }
+
+        const userResult = await pool.query(
+            `SELECT u.id, u.employee_id, u.name,
+                    COALESCE(ed.department, '') AS department,
+                    COALESCE(ed.division, '') AS division
+             FROM users u
+             LEFT JOIN LATERAL (
+                SELECT department, division FROM employee_details
+                WHERE user_id = u.id ORDER BY id DESC LIMIT 1
+             ) ed ON true
+             WHERE u.id = $1 AND u.role IN ('employee', 'manager')`,
+            [req.params.id]
+        );
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+        }
+
+        const records = await fetchAttendanceRows(range.start, range.end, req.params.id);
+        res.json({
+            user: userResult.rows[0],
+            start_date: range.start,
+            end_date: range.end,
+            summary: summarizeAttendance(records, range.start, range.end),
+            records
+        });
+    } catch (error) {
+        console.error('Get employee attendance days error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
@@ -669,6 +712,7 @@ router.get('/off', authenticateToken, canViewReports, async (req, res) => {
 
         const result = await pool.query(
             `SELECT 
+                u.id as user_id,
                 u.employee_id,
                 u.name,
                 COALESCE(ed.department, '') AS department,
@@ -688,6 +732,7 @@ router.get('/off', authenticateToken, canViewReports, async (req, res) => {
             UNION ALL
 
             SELECT 
+                u.id as user_id,
                 u.employee_id,
                 u.name,
                 COALESCE(ed.department, '') AS department,

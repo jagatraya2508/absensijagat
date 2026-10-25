@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import Icon from '../components/Icon';
+import PayslipFieldSettings from '../components/PayslipFieldSettings';
+import { parsePayslipFields } from '../utils/payslipFields';
 import { FACE_MATCH_MAX, FACE_MATCH_MIN, normalizeFaceMatchPercent } from '../utils/faceMatch';
+import { settingsAPI } from '../utils/api';
 
 const THEME_PRESETS = [
     { name: 'Merah Marun', icon: 'Circle', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
@@ -135,8 +138,9 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
 
 export default function AdminSettings() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
-    const { settings, fetchSettings, updateLogo, updatePayslipShowLogo, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
+    const { logout, hasPermission } = useAuth();
+    const canEditPayslipLayout = hasPermission('admin.payslip_layout');
+    const { settings, fetchSettings, updateLogo, updatePayslipShowLogo, updatePayslipFields, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
 
     // Company Name state
     const [editCompanyName, setEditCompanyName] = useState(companyName || 'Absensi');
@@ -183,6 +187,10 @@ export default function AdminSettings() {
     const [showPayslipLogo, setShowPayslipLogo] = useState(settings.payslip_show_logo !== 'false');
     const [payslipLogoLoading, setPayslipLogoLoading] = useState(false);
     const [payslipLogoMessage, setPayslipLogoMessage] = useState({ type: '', text: '' });
+    const [payslipFields, setPayslipFields] = useState(() => parsePayslipFields(settings.payslip_fields));
+    const [payslipFieldsLoading, setPayslipFieldsLoading] = useState(false);
+    const [payslipFieldsMessage, setPayslipFieldsMessage] = useState({ type: '', text: '' });
+    const [payslipLayouts, setPayslipLayouts] = useState([]);
     const [faceMatchPercent, setFaceMatchPercent] = useState(() => normalizeFaceMatchPercent(settings.face_match_percent));
     const [faceMatchLoading, setFaceMatchLoading] = useState(false);
     const [faceMatchMessage, setFaceMatchMessage] = useState({ type: '', text: '' });
@@ -216,6 +224,15 @@ export default function AdminSettings() {
     useEffect(() => {
         setShowPayslipLogo(settings.payslip_show_logo !== 'false');
     }, [settings.payslip_show_logo]);
+
+    useEffect(() => {
+        setPayslipFields(parsePayslipFields(settings.payslip_fields));
+    }, [settings.payslip_fields]);
+
+    useEffect(() => {
+        if (!canEditPayslipLayout) return;
+        settingsAPI.getPayslipLayouts().then(setPayslipLayouts).catch(() => setPayslipLayouts([]));
+    }, [canEditPayslipLayout, settings.payslip_fields]);
 
     useEffect(() => {
         fetchLeaveSettings();
@@ -1069,6 +1086,65 @@ export default function AdminSettings() {
                         </div>
                     </div>
                 </div>
+
+                {canEditPayslipLayout && <div className="card">
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="FileText" size={16} inline /> Isi Slip Gaji</h2>
+                    </div>
+                    <p className="payslip-field-note">
+                        Ini aturan untuk semua karyawan. Aturan departemen atau satu karyawan diatur dari tombol Atur tampilan di slip, dan mengalahkan aturan ini.
+                    </p>
+                    <PayslipFieldSettings value={payslipFields} onChange={setPayslipFields} />
+                    {payslipFieldsMessage.text && (
+                        <div className={`alert alert-${payslipFieldsMessage.type}`} style={{ marginBottom: '0.75rem' }}>
+                            {payslipFieldsMessage.text}
+                        </div>
+                    )}
+                    <button
+                        className="btn btn-primary"
+                        type="button"
+                        disabled={payslipFieldsLoading}
+                        onClick={async () => {
+                            setPayslipFieldsLoading(true);
+                            setPayslipFieldsMessage({ type: '', text: '' });
+                            try {
+                                await updatePayslipFields(payslipFields);
+                                setPayslipFieldsMessage({ type: 'success', text: 'Tampilan slip gaji berhasil disimpan' });
+                            } catch (error) {
+                                setPayslipFieldsMessage({ type: 'danger', text: error.message || 'Gagal menyimpan tampilan slip' });
+                            } finally {
+                                setPayslipFieldsLoading(false);
+                            }
+                        }}
+                    >
+                        {payslipFieldsLoading ? 'Menyimpan...' : 'Simpan tampilan slip'}
+                    </button>
+                    {payslipLayouts.length > 0 && (
+                        <div style={{ marginTop: '1rem' }}>
+                            <h4 style={{ marginBottom: '0.5rem' }}>Aturan khusus</h4>
+                            {payslipLayouts.map((rule) => (
+                                <div key={`${rule.scope_type}-${rule.scope_key}`} className="payslip-slip-line">
+                                    <span>
+                                        {rule.scope_type === 'department'
+                                            ? `Departemen ${rule.scope_key}`
+                                            : `${rule.user_name || 'Karyawan'} (${rule.employee_id || rule.scope_key})`}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        style={{ width: 'auto', padding: '0.3rem 0.7rem' }}
+                                        onClick={async () => {
+                                            await settingsAPI.deletePayslipLayoutByKey(rule.scope_type, rule.scope_key);
+                                            setPayslipLayouts((rows) => rows.filter((item) => item.scope_key !== rule.scope_key || item.scope_type !== rule.scope_type));
+                                        }}
+                                    >
+                                        Hapus
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>}
 
                 {/* ============ SMTP SETTINGS SECTION ============ */}
                 <div className="card">

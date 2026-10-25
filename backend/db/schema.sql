@@ -261,6 +261,7 @@ CREATE TABLE IF NOT EXISTS employee_loans (
     loan_date DATE NOT NULL DEFAULT CURRENT_DATE,
     amount DECIMAL(15,2) NOT NULL,
     installment_amount DECIMAL(15,2) NOT NULL,
+    installment_period VARCHAR(10) NOT NULL DEFAULT 'monthly',
     total_installments INTEGER NOT NULL,
     paid_installments INTEGER DEFAULT 0,
     remaining_balance DECIMAL(15,2) NOT NULL,
@@ -293,6 +294,9 @@ CREATE TABLE IF NOT EXISTS payroll_runs (
     id SERIAL PRIMARY KEY,
     period_month INTEGER NOT NULL CHECK (period_month BETWEEN 1 AND 12),
     period_year INTEGER NOT NULL,
+    period_type VARCHAR(10) NOT NULL DEFAULT 'monthly',
+    week_start DATE,
+    week_end DATE,
     run_date DATE NOT NULL DEFAULT CURRENT_DATE,
     status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'finalized')),
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -673,6 +677,17 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 INSERT INTO settings (key, value) VALUES ('app_logo', '/logo.png') ON CONFLICT DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('payslip_show_logo', 'true') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('payslip_fields', '{"hide_zero":false,"fields":{}}') ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS payslip_layouts (
+    id SERIAL PRIMARY KEY,
+    scope_type VARCHAR(20) NOT NULL,
+    scope_key VARCHAR(200) NOT NULL,
+    hide_zero BOOLEAN NOT NULL DEFAULT FALSE,
+    fields TEXT NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (scope_type, scope_key)
+);
 INSERT INTO settings (key, value) VALUES ('face_match_percent', '60') ON CONFLICT DO NOTHING;
 
 -- Tabel License Info

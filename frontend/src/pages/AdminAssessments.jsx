@@ -1,6 +1,7 @@
 import Icon from '../components/Icon';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import ListPagination, { slicePage } from '../components/ListPagination';
 
 const API = import.meta.env.VITE_API || '';
 
@@ -48,6 +49,9 @@ export default function AdminAssessments() {
     });
 
     const [editId, setEditId] = useState(null);
+    const [lookupQuery, setLookupQuery] = useState('');
+    const [lookupOpen, setLookupOpen] = useState(false);
+    const [lookupPage, setLookupPage] = useState(1);
 
     const token = localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -112,8 +116,26 @@ export default function AdminAssessments() {
         }
     }
 
+    const selectedEmployee = employees.find((emp) => String(emp.id) === String(form.user_id));
+    const selectedLabel = selectedEmployee ? `${selectedEmployee.name} (${selectedEmployee.employee_id})` : '';
+    const employeeMatches = useMemo(() => {
+        const query = lookupQuery.trim().toLowerCase();
+        const filtering = query && query !== selectedLabel.toLowerCase();
+        if (!filtering) return employees;
+        return employees.filter((emp) => `${emp.name || ''} ${emp.employee_id || ''} ${emp.department || ''}`.toLowerCase().includes(query));
+    }, [employees, lookupQuery, selectedLabel]);
+    const pagedEmployees = slicePage(employeeMatches, lookupPage, 6);
+
+    useEffect(() => {
+        setLookupPage(1);
+    }, [lookupQuery]);
+
     async function handleSubmit(e) {
         e.preventDefault();
+        if (!form.user_id) {
+            alert('Pilih karyawan terlebih dahulu');
+            return;
+        }
         try {
             const url = editId ? `${API}/api/assessments/${editId}` : `${API}/api/assessments`;
             const method = editId ? 'PUT' : 'POST';
@@ -162,6 +184,15 @@ export default function AdminAssessments() {
             notes: ''
         });
         setEditId(null);
+        setLookupQuery('');
+        setLookupOpen(false);
+        setLookupPage(1);
+    }
+
+    function chooseEmployee(emp) {
+        setForm((current) => ({ ...current, user_id: emp.id }));
+        setLookupQuery(`${emp.name} (${emp.employee_id})`);
+        setLookupOpen(false);
     }
 
     function openEdit(a) {
@@ -181,11 +212,14 @@ export default function AdminAssessments() {
             notes: a.notes || ''
         });
         setEditId(a.id);
+        setLookupQuery(a.employee_name ? `${a.employee_name} (${a.emp_id})` : '');
+        setLookupOpen(false);
         setShowModal(true);
     }
 
     function openNew() {
         resetForm();
+        setLookupOpen(true);
         setShowModal(true);
     }
 
@@ -367,18 +401,55 @@ export default function AdminAssessments() {
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                             <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(140px, 1fr) minmax(110px, 0.8fr)', gap: '1rem' }}>
-                                <div className="form-group">
+                                <div className="form-group assessment-employee-lookup">
                                     <label className="form-label">Karyawan *</label>
-                                    <select className="form-input form-select" value={form.user_id}
-                                        onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))}
-                                        disabled={!!editId} required>
-                                        <option value="">Pilih Karyawan</option>
-                                        {employees.map(emp => (
-                                            <option key={emp.id} value={emp.id}>
-                                                {emp.name} ({emp.employee_id})
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <input
+                                        type="search"
+                                        className="form-input"
+                                        placeholder="Cari nama atau ID karyawan"
+                                        value={lookupQuery}
+                                        disabled={!!editId}
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            setLookupQuery(value);
+                                            setLookupOpen(true);
+                                            if (selectedLabel && value !== selectedLabel) {
+                                                setForm((current) => ({ ...current, user_id: '' }));
+                                            }
+                                        }}
+                                        onClick={() => { if (!editId) setLookupOpen(true); }}
+                                        onFocus={() => { if (!editId) setLookupOpen(true); }}
+                                        onBlur={() => setTimeout(() => setLookupOpen(false), 150)}
+                                    />
+                                    {lookupOpen && !editId && (
+                                        <div className="report-lookup-list" onMouseDown={(event) => event.preventDefault()}>
+                                            {employeeMatches.length === 0 ? (
+                                                <div className="report-lookup-empty">Karyawan tidak ditemukan</div>
+                                            ) : pagedEmployees.items.map((emp) => (
+                                                <button
+                                                    type="button"
+                                                    key={emp.id}
+                                                    className="report-lookup-item"
+                                                    onMouseDown={(event) => {
+                                                        event.preventDefault();
+                                                        chooseEmployee(emp);
+                                                    }}
+                                                >
+                                                    <span>{emp.name}</span>
+                                                    <small>{emp.employee_id}{emp.department ? ` · ${emp.department}` : ''}</small>
+                                                </button>
+                                            ))}
+                                            <div className="report-lookup-pages">
+                                                <ListPagination
+                                                    page={pagedEmployees.pageSafe}
+                                                    total={employeeMatches.length}
+                                                    pageSize={6}
+                                                    onPageChange={setLookupPage}
+                                                    itemLabel="karyawan"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Bulan *</label>

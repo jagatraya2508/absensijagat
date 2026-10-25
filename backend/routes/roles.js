@@ -32,6 +32,7 @@ const AVAILABLE_PERMISSIONS = [
 
     { key: 'admin.loans', label: 'Pinjaman', category: 'HR & Keuangan' },
     { key: 'admin.payroll', label: 'Payroll', category: 'HR & Keuangan' },
+    { key: 'admin.payslip_layout', label: 'Atur Tampilan Slip Gaji', category: 'HR & Keuangan' },
     { key: 'admin.assessments', label: 'Penilaian', category: 'HR & Keuangan' },
     { key: 'admin.recruitment', label: 'Recruitment', category: 'HR & Keuangan' },
 

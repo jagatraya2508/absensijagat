@@ -286,6 +286,13 @@ export const reportsAPI = {
         return request(`/reports/employee/${id}?${params}`);
     },
 
+    getEmployeeDays: (id, startDate, endDate) => {
+        const params = new URLSearchParams();
+        if (startDate) params.set('start_date', startDate);
+        if (endDate) params.set('end_date', endDate);
+        return request(`/reports/employee/${id}/days?${params}`);
+    },
+
     getOff: (startDate, endDate) => {
         const params = new URLSearchParams();
         if (startDate) params.set('start_date', startDate);
@@ -538,6 +545,23 @@ export const settingsAPI = {
     updatePayslipLogo: (showLogo) => request('/settings/payslip-logo', {
         method: 'PUT',
         body: JSON.stringify({ show_logo: showLogo }),
+    }),
+    getPayslipLayoutOptions: (userId) => request(`/settings/payslip-fields?user_id=${userId}`),
+    getPayslipLayouts: () => request('/settings/payslip-layouts'),
+    updatePayslipFields: (config) => request('/settings/payslip-fields', {
+        method: 'PUT',
+        body: JSON.stringify({
+            hide_zero: !!config.hideZero,
+            fields: config.fields,
+            scope: config.scope || 'global',
+            user_id: config.userId || null,
+        }),
+    }),
+    deletePayslipLayout: (scope, userId) => request(`/settings/payslip-fields?scope=${scope}&user_id=${userId}`, {
+        method: 'DELETE',
+    }),
+    deletePayslipLayoutByKey: (scope, scopeKey) => request(`/settings/payslip-fields?scope=${scope}&scope_key=${encodeURIComponent(scopeKey)}`, {
+        method: 'DELETE',
     }),
     updateFaceMatch: (percent) => request('/settings/face-match', {
         method: 'PUT',

@@ -16,7 +16,8 @@ export default function AdminLoans() {
     const [filterStatus, setFilterStatus] = useState('');
     const [formData, setFormData] = useState({
         user_id: '', loan_date: new Date().toISOString().split('T')[0],
-        amount: '', installment_amount: '', total_installments: '', description: ''
+        amount: '', installment_amount: '', total_installments: '', description: '',
+        installment_period: 'monthly'
     });
     const [paymentForm, setPaymentForm] = useState({
         amount: '', payment_date: new Date().toISOString().split('T')[0], notes: ''
@@ -46,7 +47,8 @@ export default function AdminLoans() {
     function openAddModal() {
         setFormData({
             user_id: '', loan_date: new Date().toISOString().split('T')[0],
-            amount: '', installment_amount: '', total_installments: '', description: ''
+            amount: '', installment_amount: '', total_installments: '', description: '',
+            installment_period: 'monthly'
         });
         setShowModal(true);
         setError('');
@@ -126,6 +128,23 @@ export default function AdminLoans() {
     }
 
     const totalActive = loans.filter(l => l.status === 'active').reduce((s, l) => s + parseFloat(l.remaining_balance), 0);
+    const selectedEmployee = users.find((user) => String(user.id) === String(formData.user_id));
+    const weeklyInstallment = formData.installment_period === 'weekly';
+
+    function onEmployeeChange(userId) {
+        const employee = users.find((user) => String(user.id) === String(userId));
+        setFormData({
+            ...formData,
+            user_id: userId,
+            installment_period: employee?.salary_type === 'weekly' ? 'weekly' : 'monthly'
+        });
+    }
+    const installmentNoun = weeklyInstallment ? 'minggu' : 'bulan';
+
+    function installmentText(loan) {
+        const weekly = loan?.installment_period === 'weekly';
+        return `${formatCurrency(loan?.installment_amount)}/${weekly ? 'mgg' : 'bln'}`;
+    }
 
     return (
         <div>
@@ -185,7 +204,7 @@ export default function AdminLoans() {
                                     <th>Karyawan</th>
                                     <th>Tgl Pinjaman</th>
                                     <th>Jumlah</th>
-                                    <th>Cicilan/Bln</th>
+                                    <th>Cicilan</th>
                                     <th>Progress</th>
                                     <th>Sisa</th>
                                     <th>Status</th>
@@ -198,7 +217,7 @@ export default function AdminLoans() {
                                         <td style={{ fontWeight: 500 }}>{loan.user_name}</td>
                                         <td>{new Date(loan.loan_date).toLocaleDateString('id-ID')}</td>
                                         <td>{formatCurrency(loan.amount)}</td>
-                                        <td>{formatCurrency(loan.installment_amount)}</td>
+                                        <td>{installmentText(loan)}</td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
@@ -250,9 +269,13 @@ export default function AdminLoans() {
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div className="form-group">
                                     <label className="form-label">Karyawan *</label>
-                                    <select className="form-input form-select" value={formData.user_id} onChange={e => setFormData({ ...formData, user_id: e.target.value })} required>
+                                    <select className="form-input form-select" value={formData.user_id} onChange={e => onEmployeeChange(e.target.value)} required>
                                         <option value="">Pilih karyawan...</option>
-                                        {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.employee_id})</option>)}
+                                        {users.map(u => (
+                                            <option key={u.id} value={u.id}>
+                                                {u.name} ({u.employee_id}){u.salary_type === 'weekly' ? ' · Mingguan' : ''}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -264,11 +287,29 @@ export default function AdminLoans() {
                                     <input className="form-input" type="number" value={formData.amount} onChange={e => onAmountChange(e.target.value)} required placeholder="1000000" />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Jumlah Cicilan (bulan) *</label>
-                                    <input className="form-input" type="number" min="1" value={formData.total_installments} onChange={e => onInstallmentsChange(e.target.value)} required placeholder="12" />
+                                    <label className="form-label">Periode cicilan *</label>
+                                    <div className="report-period-options">
+                                        <label className="report-period-option">
+                                            <input type="radio" name="installment-period" checked={!weeklyInstallment} onChange={() => setFormData({ ...formData, installment_period: 'monthly' })} />
+                                            Bulanan
+                                        </label>
+                                        <label className="report-period-option">
+                                            <input type="radio" name="installment-period" checked={weeklyInstallment} onChange={() => setFormData({ ...formData, installment_period: 'weekly' })} />
+                                            Mingguan
+                                        </label>
+                                    </div>
+                                    <p className="payslip-field-note">
+                                        {weeklyInstallment
+                                            ? 'Ini cicilan per minggu. Payroll mingguan memotong satu kali; payroll bulanan memotong sebanyak minggu yang masuk.'
+                                            : 'Cicilan dipotong satu kali setiap payroll bulanan.'}
+                                    </p>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Jumlah Cicilan ({installmentNoun}) *</label>
+                                    <input className="form-input" type="number" min="1" value={formData.total_installments} onChange={e => onInstallmentsChange(e.target.value)} required placeholder={weeklyInstallment ? '8' : '12'} />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                                    <label className="form-label">Cicilan per Bulan (Rp)</label>
+                                    <label className="form-label">Cicilan per {weeklyInstallment ? 'Minggu' : 'Bulan'} (Rp)</label>
                                     <input className="form-input" type="number" value={formData.installment_amount} onChange={e => setFormData({ ...formData, installment_amount: e.target.value })} readOnly style={{ opacity: 0.7 }} />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
@@ -333,7 +374,7 @@ export default function AdminLoans() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
                                 <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>Jumlah Pinjaman</span><p style={{ fontWeight: 600 }}>{formatCurrency(selectedLoan.amount)}</p></div>
                                 <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>Sisa</span><p style={{ fontWeight: 600, color: 'var(--warning-500)' }}>{formatCurrency(selectedLoan.remaining_balance)}</p></div>
-                                <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>Cicilan/Bulan</span><p>{formatCurrency(selectedLoan.installment_amount)}</p></div>
+                                <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>{selectedLoan.installment_period === 'weekly' ? 'Cicilan/Minggu' : 'Cicilan/Bulan'}</span><p>{formatCurrency(selectedLoan.installment_amount)}</p></div>
                                 <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>Progress</span><p>{selectedLoan.paid_installments}/{selectedLoan.total_installments} cicilan</p></div>
                             </div>
 

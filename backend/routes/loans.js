@@ -38,10 +38,16 @@ router.get('/', authenticateToken, canManageLoans, async (req, res) => {
 router.get('/employees', authenticateToken, canManageLoans, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, employee_id, name, role
-             FROM users
-             WHERE role = 'employee'
-             ORDER BY name`
+            `SELECT u.id, u.employee_id, u.name, u.role,
+                    COALESCE(ed.salary_type, 'monthly') AS salary_type
+             FROM users u
+             LEFT JOIN LATERAL (
+                SELECT salary_type FROM employee_details
+                WHERE user_id = u.id
+                ORDER BY id DESC LIMIT 1
+             ) ed ON TRUE
+             WHERE u.role = 'employee'
+             ORDER BY u.name`
         );
         res.json(result.rows);
     } catch (error) {
@@ -89,11 +95,27 @@ router.post('/', authenticateToken, canManageLoans, async (req, res) => {
             return res.status(400).json({ error: 'Data pinjaman harus lengkap' });
         }
 
+        const employee = await pool.query(
+            `SELECT COALESCE(ed.salary_type, 'monthly') AS salary_type
+             FROM users u
+             LEFT JOIN LATERAL (
+                SELECT salary_type FROM employee_details
+                WHERE user_id = u.id
+                ORDER BY id DESC LIMIT 1
+             ) ed ON TRUE
+             WHERE u.id = $1`,
+            [user_id]
+        );
+        const requestedPeriod = req.body.installment_period;
+        const installmentPeriod = requestedPeriod === 'weekly' || requestedPeriod === 'monthly'
+            ? requestedPeriod
+            : (employee.rows[0]?.salary_type === 'weekly' ? 'weekly' : 'monthly');
+
         const result = await pool.query(`
-            INSERT INTO employee_loans (user_id, loan_date, amount, installment_amount, total_installments, remaining_balance, description, created_by)
-            VALUES ($1, $2, $3, $4, $5, $3, $6, $7)
+            INSERT INTO employee_loans (user_id, loan_date, amount, installment_amount, installment_period, total_installments, remaining_balance, description, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $3, $7, $8)
             RETURNING *
-        `, [user_id, loan_date || new Date(), amount, installment_amount, total_installments, description || null, req.user.id]);
+        `, [user_id, loan_date || new Date(), amount, installment_amount, installmentPeriod, total_installments, description || null, req.user.id]);
 
         res.status(201).json(result.rows[0]);
     } catch (error) {

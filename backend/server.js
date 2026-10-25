@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { pool, ensurePrerequisiteUniques, ensureWorkScheduleSchema } = require('./db');
+const { pool, ensurePrerequisiteUniques, ensureWorkScheduleSchema, ensurePayrollPeriodSchema } = require('./db');
 const { ensureOrgApprovalSchema } = require('./utils/leaveApproval');
 const { ensureNotificationSchema } = require('./utils/notifications');
 const { ensureSystemRoles } = require('./utils/systemRoles');
@@ -94,6 +94,7 @@ async function initDatabase() {
     }
     try {
         await ensureWorkScheduleSchema();
+        await ensurePayrollPeriodSchema();
         console.log('Work schedule schema ready');
     } catch (error) {
         console.error('Error patching work schedule schema:', error);

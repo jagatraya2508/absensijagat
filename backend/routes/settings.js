@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
+const { PAYSLIP_FIELD_KEYS, resolvePayslipLayout } = require('../utils/payslipFields');
+const canEditPayslipLayout = hasPermission('admin.payslip_layout');
 
 // Configure multer for logo uploads
 const storage = multer.diskStorage({
@@ -171,6 +173,164 @@ router.put('/payslip-logo', authenticateToken, isAdmin, async (req, res) => {
     } catch (error) {
         console.error('Update payslip logo setting error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+function compactPayslipFields(incoming) {
+    const fields = {};
+    const source = incoming && typeof incoming === 'object' ? incoming : {};
+    PAYSLIP_FIELD_KEYS.forEach((key) => {
+        if (source[key] === false) fields[key] = false;
+    });
+    return fields;
+}
+
+async function payslipScopeTarget(scope, userId) {
+    if (scope === 'global') return { scopeType: 'global', scopeKey: '' };
+    const user = await pool.query(
+        `SELECT u.id, u.name, u.employee_id, ed.department
+         FROM users u
+         LEFT JOIN LATERAL (
+            SELECT department FROM employee_details
+            WHERE user_id = u.id AND COALESCE(department, '') <> ''
+            ORDER BY id DESC LIMIT 1
+         ) ed ON TRUE
+         WHERE u.id = $1`,
+        [userId]
+    );
+    if (user.rows.length === 0) {
+        const error = new Error('Karyawan tidak ditemukan');
+        error.status = 404;
+        throw error;
+    }
+    if (scope === 'employee') {
+        return { scopeType: 'employee', scopeKey: String(user.rows[0].id), user: user.rows[0] };
+    }
+    const department = (user.rows[0].department || '').trim();
+    if (!department) {
+        const error = new Error('Karyawan ini belum punya departemen');
+        error.status = 400;
+        throw error;
+    }
+    return { scopeType: 'department', scopeKey: department, user: user.rows[0] };
+}
+
+router.get('/payslip-fields', authenticateToken, canEditPayslipLayout, async (req, res) => {
+    try {
+        const userId = parseInt(req.query.user_id, 10);
+        if (!userId) return res.status(400).json({ error: 'Karyawan wajib dipilih' });
+        const user = await pool.query('SELECT id, name, employee_id FROM users WHERE id = $1', [userId]);
+        if (user.rows.length === 0) return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+        const layout = await resolvePayslipLayout(pool, userId);
+        res.json({
+            employee_name: user.rows[0].name,
+            employee_id: user.rows[0].employee_id,
+            department: layout.department,
+            source: layout.source,
+            global: layout.global,
+            department_rule: layout.department_rule,
+            employee_rule: layout.employee_rule,
+        });
+    } catch (error) {
+        console.error('Get payslip fields error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.get('/payslip-layouts', authenticateToken, canEditPayslipLayout, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT pl.scope_type, pl.scope_key, pl.hide_zero, pl.fields,
+                   u.name AS user_name, u.employee_id
+            FROM payslip_layouts pl
+            LEFT JOIN users u ON pl.scope_type = 'employee' AND u.id::text = pl.scope_key
+            ORDER BY pl.scope_type, COALESCE(u.name, pl.scope_key)
+        `);
+        res.json(result.rows.map((row) => ({
+            scope_type: row.scope_type,
+            scope_key: row.scope_key,
+            hide_zero: row.hide_zero,
+            user_name: row.user_name,
+            employee_id: row.employee_id,
+        })));
+    } catch (error) {
+        console.error('List payslip layouts error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.put('/payslip-fields', authenticateToken, canEditPayslipLayout, async (req, res) => {
+    try {
+        const scope = ['department', 'employee'].includes(req.body.scope) ? req.body.scope : 'global';
+        const fields = compactPayslipFields(req.body.fields);
+        const hideZero = req.body.hide_zero === true;
+        const value = JSON.stringify({ hide_zero: hideZero, fields });
+        const target = await payslipScopeTarget(scope, req.body.user_id);
+
+        if (target.scopeType === 'global') {
+            await pool.query(
+                `INSERT INTO settings (key, value) VALUES ('payslip_fields', $1)
+                 ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+                [value]
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO payslip_layouts (scope_type, scope_key, hide_zero, fields)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (scope_type, scope_key)
+                 DO UPDATE SET hide_zero = EXCLUDED.hide_zero, fields = EXCLUDED.fields, updated_at = CURRENT_TIMESTAMP`,
+                [target.scopeType, target.scopeKey, hideZero, JSON.stringify(fields)]
+            );
+        }
+
+        const layout = req.body.user_id
+            ? await resolvePayslipLayout(pool, req.body.user_id)
+            : null;
+        const globalRow = await pool.query(`SELECT value FROM settings WHERE key = 'payslip_fields'`);
+        res.json({
+            message: 'Tampilan slip gaji berhasil disimpan',
+            payslip_fields: globalRow.rows[0]?.value || value,
+            layout: layout ? {
+                hide_zero: layout.hide_zero,
+                fields: layout.fields,
+                source: layout.source,
+                department: layout.department,
+            } : null,
+        });
+    } catch (error) {
+        console.error('Update payslip fields error:', error);
+        res.status(error.status || 500).json({ error: error.status ? error.message : 'Terjadi kesalahan server' });
+    }
+});
+
+router.delete('/payslip-fields', authenticateToken, canEditPayslipLayout, async (req, res) => {
+    try {
+        const scope = req.query.scope === 'employee' ? 'employee' : 'department';
+        if (req.query.scope_key) {
+            await pool.query(
+                'DELETE FROM payslip_layouts WHERE scope_type = $1 AND scope_key = $2',
+                [scope, req.query.scope_key]
+            );
+            return res.json({ message: 'Aturan tampilan slip dihapus' });
+        }
+        const target = await payslipScopeTarget(scope, req.query.user_id);
+        await pool.query(
+            'DELETE FROM payslip_layouts WHERE scope_type = $1 AND scope_key = $2',
+            [target.scopeType, target.scopeKey]
+        );
+        const layout = await resolvePayslipLayout(pool, req.query.user_id);
+        res.json({
+            message: 'Aturan tampilan slip dihapus',
+            layout: {
+                hide_zero: layout.hide_zero,
+                fields: layout.fields,
+                source: layout.source,
+                department: layout.department,
+            },
+        });
+    } catch (error) {
+        console.error('Delete payslip layout error:', error);
+        res.status(error.status || 500).json({ error: error.status ? error.message : 'Terjadi kesalahan server' });
     }
 });
 

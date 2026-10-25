@@ -37,6 +37,8 @@ pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS appreciation_a
   .catch((err) => console.warn('DB patch appreciation_allowance:', err.message));
 pool.query('ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS appreciation_allowance DECIMAL(15,2) DEFAULT 0')
   .catch((err) => console.warn('DB patch payroll appreciation_allowance:', err.message));
+pool.query(`ALTER TABLE employee_loans ADD COLUMN IF NOT EXISTS installment_period VARCHAR(10) NOT NULL DEFAULT 'monthly'`)
+  .catch((err) => console.warn('DB patch installment_period:', err.message));
 pool.query(`
   ALTER TABLE employee_details 
     ADD COLUMN IF NOT EXISTS driver_subuh_allowance DECIMAL(15,2) DEFAULT 0,
@@ -238,4 +240,21 @@ async function ensureWorkScheduleSchema() {
   } catch (_) { /* already exists as table constraint */ }
 }
 
-module.exports = { pool, ensurePrerequisiteUniques, ensureWorkScheduleSchema };
+async function ensurePayrollPeriodSchema() {
+  await pool.query(`ALTER TABLE payroll_runs ADD COLUMN IF NOT EXISTS period_type VARCHAR(10) NOT NULL DEFAULT 'monthly'`);
+  await pool.query(`ALTER TABLE payroll_runs ADD COLUMN IF NOT EXISTS week_start DATE`);
+  await pool.query(`ALTER TABLE payroll_runs ADD COLUMN IF NOT EXISTS week_end DATE`);
+  await pool.query(`ALTER TABLE payroll_runs DROP CONSTRAINT IF EXISTS payroll_runs_period_month_period_year_key`);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS payroll_runs_monthly_period
+    ON payroll_runs (period_month, period_year)
+    WHERE period_type = 'monthly'
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS payroll_runs_weekly_start
+    ON payroll_runs (week_start)
+    WHERE period_type = 'weekly'
+  `);
+}
+
+module.exports = { pool, ensurePrerequisiteUniques, ensureWorkScheduleSchema, ensurePayrollPeriodSchema };

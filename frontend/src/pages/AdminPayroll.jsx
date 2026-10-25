@@ -1,10 +1,27 @@
 import Icon from '../components/Icon';
+import PayslipFieldSettings from '../components/PayslipFieldSettings';
 import { useState, useEffect } from 'react';
-import { payrollAPI } from '../utils/api';
+import { payrollAPI, settingsAPI } from '../utils/api';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { parsePayslipFields, payslipShows } from '../utils/payslipFields';
+
+function calendarDate(value) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return new Date(value);
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function localIsoDate(date = new Date()) {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
+}
 
 export default function AdminPayroll() {
-    const { settings } = useSettings();
+    const { settings, updatePayslipFields } = useSettings();
+    const { hasPermission } = useAuth();
+    const canEditPayslipLayout = hasPermission('admin.payslip_layout');
     const showPayslipLogo = settings.payslip_show_logo !== 'false' && !!settings.app_logo;
     const [runs, setRuns] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,10 +35,19 @@ export default function AdminPayroll() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [genForm, setGenForm] = useState({
+        period_type: 'monthly',
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
+        week_date: localIsoDate(),
         notes: ''
     });
+    const [detailSort, setDetailSort] = useState({ key: null, direction: 'ascending' });
+    const [slipEditor, setSlipEditor] = useState(false);
+    const [slipDraft, setSlipDraft] = useState(null);
+    const [slipScope, setSlipScope] = useState('global');
+    const [slipChoices, setSlipChoices] = useState(null);
+    const [slipSaving, setSlipSaving] = useState(false);
+    const [slipSaveError, setSlipSaveError] = useState('');
 
     useEffect(() => { fetchRuns(); }, []);
 
@@ -52,6 +78,7 @@ export default function AdminPayroll() {
         try {
             const data = await payrollAPI.getById(run.id);
             setSelectedRun(data);
+            setDetailSort({ key: null, direction: 'ascending' });
             setIsMaximized(true);
             setShowDetailModal(true);
         } catch (err) { 
@@ -71,7 +98,7 @@ export default function AdminPayroll() {
     }
 
     async function handleDelete(run) {
-        const period = `${monthNames[run.period_month - 1]} ${run.period_year}`;
+        const period = periodLabel(run);
         const isFinal = run.status === 'finalized';
         const message = isFinal
             ? `Payroll ${period} sudah Final. Menghapusnya juga membatalkan potongan pinjaman dari payroll ini. Lanjutkan?`
@@ -125,7 +152,183 @@ export default function AdminPayroll() {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
     }
 
+    function requestDetailSort(key) {
+        setDetailSort((prev) => ({
+            key,
+            direction: prev.key === key && prev.direction === 'ascending' ? 'descending' : 'ascending'
+        }));
+    }
+
+    function detailSortValue(item, key) {
+        if (key === 'user_name') return (item.user_name || '').toLocaleLowerCase('id');
+        if (key === 'tunjangan') {
+            return parseFloat(item.transport_allowance || 0) + parseFloat(item.meal_allowance || 0) + parseFloat(item.appreciation_allowance || 0);
+        }
+        if (key === 'bpjs') {
+            return parseFloat(item.bpjs_kes_employee || 0) + parseFloat(item.bpjs_jht_employee || 0) + parseFloat(item.bpjs_jp_employee || 0);
+        }
+        return parseFloat(item[key] || 0);
+    }
+
+    const detailItems = [...(selectedRun?.items || [])].sort((a, b) => {
+        if (!detailSort.key) return 0;
+        const av = detailSortValue(a, detailSort.key);
+        const bv = detailSortValue(b, detailSort.key);
+        const cmp = typeof av === 'string' ? av.localeCompare(bv, 'id') : av - bv;
+        return detailSort.direction === 'ascending' ? cmp : -cmp;
+    });
+
+    function sortMark(key) {
+        if (detailSort.key !== key) return <Icon name="ArrowUpDown" size={12} />;
+        return detailSort.direction === 'ascending'
+            ? <Icon name="ChevronUp" size={12} />
+            : <Icon name="ChevronDown" size={12} />;
+    }
+
     const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    function periodLabel(run) {
+        if (run?.period_type === 'weekly' && run.week_start) {
+            const start = calendarDate(run.week_start);
+            const end = calendarDate(run.week_end);
+            const fmt = (date) => date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            return `${fmt(start)} – ${fmt(end)}`;
+        }
+        return `${monthNames[(run?.period_month || 1) - 1]} ${run?.period_year || ''}`;
+    }
+
+    function weekRangeLabel(isoDate) {
+        if (!isoDate) return '';
+        const date = new Date(`${isoDate}T00:00:00`);
+        const diffToMonday = date.getDay() === 0 ? -6 : 1 - date.getDay();
+        const start = new Date(date);
+        start.setDate(date.getDate() + diffToMonday);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        const fmt = (value) => value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+        return `${fmt(start)} – ${fmt(end)}`;
+    }
+    const savedSlipConfig = parsePayslipFields(selectedSlip?.payslip_layout || settings.payslip_fields);
+    const slipConfig = slipDraft || savedSlipConfig;
+
+    function configForScope(choices, scope) {
+        if (!choices) return savedSlipConfig;
+        if (scope === 'employee') return parsePayslipFields(choices.employee_rule || choices.department_rule || choices.global);
+        if (scope === 'department') return parsePayslipFields(choices.department_rule || choices.global);
+        return parsePayslipFields(choices.global);
+    }
+
+    async function openSlipEditor() {
+        setSlipSaveError('');
+        try {
+            const choices = await settingsAPI.getPayslipLayoutOptions(selectedSlip.user_id);
+            const scope = choices.source || 'global';
+            setSlipChoices(choices);
+            setSlipScope(scope);
+            setSlipDraft(configForScope(choices, scope));
+            setSlipEditor(true);
+        } catch (err) {
+            setSlipSaveError(err.message || 'Gagal memuat pengaturan tampilan');
+            setSlipEditor(true);
+        }
+    }
+
+    function changeSlipScope(scope) {
+        setSlipScope(scope);
+        setSlipDraft(configForScope(slipChoices, scope));
+    }
+
+    function closeSlipEditor() {
+        setSlipDraft(null);
+        setSlipChoices(null);
+        setSlipSaveError('');
+        setSlipEditor(false);
+    }
+
+    async function saveSlipFields() {
+        setSlipSaving(true);
+        setSlipSaveError('');
+        try {
+            const data = await updatePayslipFields({
+                ...(slipDraft || savedSlipConfig),
+                scope: slipScope,
+                userId: selectedSlip.user_id,
+            });
+            if (data.layout) {
+                setSelectedSlip((prev) => prev ? { ...prev, payslip_layout: data.layout } : prev);
+            }
+            setSlipDraft(null);
+            setSlipChoices(null);
+            setSlipEditor(false);
+        } catch (err) {
+            setSlipSaveError(err.message || 'Gagal menyimpan tampilan slip');
+        } finally {
+            setSlipSaving(false);
+        }
+    }
+
+    async function removeSlipRule() {
+        if (!selectedSlip || slipScope === 'global') return;
+        setSlipSaving(true);
+        setSlipSaveError('');
+        try {
+            const data = await settingsAPI.deletePayslipLayout(slipScope, selectedSlip.user_id);
+            if (data.layout) {
+                setSelectedSlip((prev) => prev ? { ...prev, payslip_layout: data.layout } : prev);
+            }
+            setSlipDraft(null);
+            setSlipChoices(null);
+            setSlipEditor(false);
+        } catch (err) {
+            setSlipSaveError(err.message || 'Gagal menghapus aturan tampilan');
+        } finally {
+            setSlipSaving(false);
+        }
+    }
+
+    function slipLines(slip) {
+        if (!slip) return { identity: [], income: [], deductions: [], company: [] };
+        const income = [
+            ['basic_salary', 'Gaji Pokok', slip.basic_salary],
+            ['transport_allowance', 'Tunjangan Transport', slip.transport_allowance],
+            ['meal_allowance', 'Tunjangan Makan', slip.meal_allowance],
+            ['appreciation_allowance', 'Tunjangan Apresiasi', slip.appreciation_allowance],
+            ['overtime', `Lembur (${slip.overtime_hours} jam)`, slip.overtime_amount],
+            ['driver_subuh', `Uang Jalan Subuh (${slip.driver_subuh_days || 0} hari)`, slip.driver_subuh_amount],
+            ['driver_rit', `Uang Mel/RIT (${slip.driver_rit_total || 0} trip)`, slip.driver_rit_amount],
+            ['driver_overnight', `Uang Menginap (${slip.driver_overnight_days || 0} hari)`, slip.driver_overnight_amount],
+            ['driver_ritase_dekat', `Uang Ritase Dekat (${slip.driver_extra_rit_dekat || 0} trip)`, slip.driver_ritase_dekat_amount],
+            ['driver_ritase_jauh', `Uang Ritase Jauh (${slip.driver_extra_rit_jauh || 0} trip)`, slip.driver_ritase_jauh_amount],
+            ['tuang', `Insentif Tuang (${slip.tuang_days || 0} hari)`, slip.tuang_amount],
+        ].filter(([key, , amount]) => payslipShows(slipConfig, key, amount));
+        const base = parseFloat(slip.basic_salary) || 1;
+        const fmtPct = (val) => {
+            const pct = (parseFloat(val) || 0) / base * 100;
+            return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2);
+        };
+        const deductions = [
+            ['bpjs_kes_employee', `BPJS Kesehatan (${fmtPct(slip.bpjs_kes_employee)}%)`, slip.bpjs_kes_employee],
+            ['bpjs_jht_employee', `BPJS JHT (${fmtPct(slip.bpjs_jht_employee)}%)`, slip.bpjs_jht_employee],
+            ['bpjs_jp_employee', `BPJS JP (${fmtPct(slip.bpjs_jp_employee)}%)`, slip.bpjs_jp_employee],
+            ['pph21', 'PPh 21', slip.pph21_amount],
+            ['loan', 'Potongan Pinjaman', slip.loan_deduction],
+        ].filter(([key, , amount]) => payslipShows(slipConfig, key, amount));
+        const company = [
+            ['bpjs_kes_company', `BPJS Kesehatan (${fmtPct(slip.bpjs_kes_company)}%)`, slip.bpjs_kes_company],
+            ['bpjs_jht_company', `BPJS JHT (${fmtPct(slip.bpjs_jht_company)}%)`, slip.bpjs_jht_company],
+            ['bpjs_jp_company', `BPJS JP (${fmtPct(slip.bpjs_jp_company)}%)`, slip.bpjs_jp_company],
+            ['bpjs_jkk', `BPJS JKK (${fmtPct(slip.bpjs_jkk)}%)`, slip.bpjs_jkk],
+            ['bpjs_jkm', `BPJS JKM (${fmtPct(slip.bpjs_jkm)}%)`, slip.bpjs_jkm],
+        ].filter(([key, , amount]) => payslipShows(slipConfig, key, amount));
+        const identity = [
+            payslipShows(slipConfig, 'name') ? ['Nama', slip.user_name] : null,
+            payslipShows(slipConfig, 'employee_id') ? ['ID', slip.employee_id] : null,
+            payslipShows(slipConfig, 'department') ? ['Departemen', slip.department || '-'] : null,
+            payslipShows(slipConfig, 'position') ? ['Jabatan', slip.position || '-'] : null,
+            payslipShows(slipConfig, 'npwp') && slip.npwp ? ['NPWP', slip.npwp] : null,
+        ].filter(Boolean);
+        return { identity, income, deductions, company };
+    }
 
     return (
         <div>
@@ -170,7 +373,7 @@ export default function AdminPayroll() {
                             <tbody>
                                 {runs.map(run => (
                                     <tr key={run.id}>
-                                        <td style={{ fontWeight: 600 }}>{monthNames[run.period_month - 1]} {run.period_year}</td>
+                                        <td style={{ fontWeight: 600 }}>{periodLabel(run)}</td>
                                         <td>{run.employee_count} orang</td>
                                         <td style={{ fontWeight: 600 }}>{formatCurrency(run.total_net_salary)}</td>
                                         <td>
@@ -207,8 +410,27 @@ export default function AdminPayroll() {
                             <div className="modal-body">
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
-                                    <Icon name="Info" size={16} inline /> Payroll akan dihitung otomatis berdasarkan: gaji pokok, tunjangan, lembur (approved), BPJS, PPh 21, dan potongan pinjaman aktif.
+                                    <Icon name="Info" size={16} inline /> {genForm.period_type === 'weekly'
+                                        ? 'Payroll mingguan hanya untuk karyawan gaji mingguan. Gaji pokok dihitung satu minggu, tunjangan bulanan dibagi 4, dan cicilan mingguan dipotong satu kali.'
+                                        : 'Payroll bulanan menghitung gaji pokok, tunjangan, lembur, BPJS, PPh 21, dan potongan pinjaman. Karyawan gaji mingguan tidak ikut di sini.'}
                                 </div>
+                                <div className="payslip-scope-options" style={{ marginBottom: '1rem' }}>
+                                    <label className="payslip-field-check">
+                                        <input type="radio" name="payroll-period" checked={genForm.period_type !== 'weekly'} onChange={() => setGenForm({ ...genForm, period_type: 'monthly' })} />
+                                        Bulanan
+                                    </label>
+                                    <label className="payslip-field-check">
+                                        <input type="radio" name="payroll-period" checked={genForm.period_type === 'weekly'} onChange={() => setGenForm({ ...genForm, period_type: 'weekly' })} />
+                                        Mingguan
+                                    </label>
+                                </div>
+                                {genForm.period_type === 'weekly' ? (
+                                    <div className="form-group">
+                                        <label className="form-label">Tanggal dalam minggu *</label>
+                                        <input className="form-input" type="date" value={genForm.week_date} onChange={e => setGenForm({ ...genForm, week_date: e.target.value })} required />
+                                        <p className="payslip-field-note" style={{ marginTop: '0.45rem' }}>{weekRangeLabel(genForm.week_date)}</p>
+                                    </div>
+                                ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div className="form-group">
                                         <label className="form-label">Bulan *</label>
@@ -221,6 +443,7 @@ export default function AdminPayroll() {
                                         <input className="form-input" type="number" value={genForm.year} onChange={e => setGenForm({ ...genForm, year: parseInt(e.target.value) })} />
                                     </div>
                                 </div>
+                                )}
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Catatan</label>
                                     <input className="form-input" value={genForm.notes} onChange={e => setGenForm({ ...genForm, notes: e.target.value })} placeholder="Catatan opsional" />
@@ -241,7 +464,7 @@ export default function AdminPayroll() {
                     <div className={`modal payroll-detail-modal${isMaximized ? ' is-full' : ''}`} onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">
-                                Payroll {monthNames[selectedRun.period_month - 1]} {selectedRun.period_year}
+                                Payroll {periodLabel(selectedRun)}
                                 <span className={`badge ${selectedRun.status === 'finalized' ? 'badge-success' : 'badge-warning'}`} style={{ marginLeft: '0.75rem' }}>
                                     {selectedRun.status === 'finalized' ? 'Final' : 'Draft'}
                                 </span>
@@ -259,22 +482,22 @@ export default function AdminPayroll() {
                                 <table className="table payroll-detail-table">
                                     <thead>
                                         <tr>
-                                            <th>Karyawan</th>
-                                            <th style={{ textAlign: 'right' }}>Gaji Pokok</th>
-                                            <th style={{ textAlign: 'right' }}>Tunjangan</th>
-                                            <th style={{ textAlign: 'center' }}>Jam Lembur</th>
-                                            <th style={{ textAlign: 'right' }}>Nilai Lembur</th>
-                                            <th style={{ textAlign: 'right' }}>Tuang</th>
-                                            <th style={{ textAlign: 'right' }}>Gross</th>
-                                            <th style={{ textAlign: 'right' }}>BPJS</th>
-                                            <th style={{ textAlign: 'right' }}>PPh 21</th>
-                                            <th style={{ textAlign: 'right' }}>Pot. Pinjaman</th>
-                                            <th style={{ textAlign: 'right', fontWeight: 700 }}>Gaji Bersih</th>
+                                            <th className="sortable" onClick={() => requestDetailSort('user_name')}>Karyawan {sortMark('user_name')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('basic_salary')}>Gaji Pokok {sortMark('basic_salary')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('tunjangan')}>Tunjangan {sortMark('tunjangan')}</th>
+                                            <th className="sortable" style={{ textAlign: 'center' }} onClick={() => requestDetailSort('overtime_hours')}>Jam Lembur {sortMark('overtime_hours')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('overtime_amount')}>Nilai Lembur {sortMark('overtime_amount')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('tuang_amount')}>Tuang {sortMark('tuang_amount')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('gross_income')}>Gross {sortMark('gross_income')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('bpjs')}>BPJS {sortMark('bpjs')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('pph21_amount')}>PPh 21 {sortMark('pph21_amount')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('loan_deduction')}>Pot. Pinjaman {sortMark('loan_deduction')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right', fontWeight: 700 }} onClick={() => requestDetailSort('net_salary')}>Gaji Bersih {sortMark('net_salary')}</th>
                                             <th>Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {selectedRun.items.map(item => {
+                                        {detailItems.map(item => {
                                             const bpjsTotal = parseFloat(item.bpjs_kes_employee) + parseFloat(item.bpjs_jht_employee) + parseFloat(item.bpjs_jp_employee);
                                             const tunjangan = parseFloat(item.transport_allowance) + parseFloat(item.meal_allowance) + parseFloat(item.appreciation_allowance || 0);
                                             return (
@@ -347,9 +570,41 @@ export default function AdminPayroll() {
                     <div className="modal payroll-slip-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title"><Icon name="FileText" size={16} inline /> Slip Gaji</h3>
-                            <button className="modal-close" onClick={() => setShowSlipModal(false)}><Icon name="X" size={16} /></button>
+                            <button className="modal-close" onClick={() => { setShowSlipModal(false); closeSlipEditor(); }}><Icon name="X" size={16} /></button>
                         </div>
                         <div className="modal-body">
+                            {slipEditor && canEditPayslipLayout && (
+                                <div className="payslip-layout-scope">
+                                    <p className="payslip-field-note">
+                                        Aturan satu karyawan dipakai lebih dulu. Jika tidak ada, slip mengikuti departemen. Jika departemen juga tidak diatur, slip mengikuti aturan semua karyawan.
+                                    </p>
+                                    <div className="payslip-scope-options">
+                                        <label className="payslip-field-check">
+                                            <input type="radio" name="payslip-scope" checked={slipScope === 'global'} onChange={() => changeSlipScope('global')} />
+                                            Semua karyawan
+                                        </label>
+                                        <label className="payslip-field-check">
+                                            <input type="radio" name="payslip-scope" checked={slipScope === 'department'} disabled={!slipChoices?.department} onChange={() => changeSlipScope('department')} />
+                                            Departemen {slipChoices?.department || 'belum diisi'}
+                                        </label>
+                                        <label className="payslip-field-check">
+                                            <input type="radio" name="payslip-scope" checked={slipScope === 'employee'} onChange={() => changeSlipScope('employee')} />
+                                            Karyawan ini ({selectedSlip.user_name})
+                                        </label>
+                                    </div>
+                                    <PayslipFieldSettings value={slipConfig} onChange={setSlipDraft} />
+                                    {slipSaveError && <div className="alert alert-danger" style={{ marginBottom: '0.75rem' }}>{slipSaveError}</div>}
+                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                                        <button className="btn btn-primary" type="button" disabled={slipSaving} onClick={saveSlipFields}>
+                                            {slipSaving ? 'Menyimpan...' : 'Simpan tampilan'}
+                                        </button>
+                                        {slipScope !== 'global' && ((slipScope === 'department' && slipChoices?.department_rule) || (slipScope === 'employee' && slipChoices?.employee_rule)) && (
+                                            <button className="btn btn-outline" type="button" disabled={slipSaving} onClick={removeSlipRule}>Hapus aturan ini</button>
+                                        )}
+                                        <button className="btn btn-outline" type="button" onClick={closeSlipEditor}>Batal</button>
+                                    </div>
+                                </div>
+                            )}
                             {/* Header */}
                             <div style={{ textAlign: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                                 {showPayslipLogo && (
@@ -361,107 +616,106 @@ export default function AdminPayroll() {
                                     />
                                 )}
                                 <h3 style={{ marginBottom: '0.25rem' }}>SLIP GAJI</h3>
-                                <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>Periode: {monthNames[selectedSlip.period_month - 1]} {selectedSlip.period_year}</p>
+                                <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>Periode: {periodLabel(selectedSlip)}</p>
                             </div>
 
-                            {/* Employee Info */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
-                                <div><span style={{ color: 'var(--gray-400)' }}>Nama:</span> <strong>{selectedSlip.user_name}</strong></div>
-                                <div><span style={{ color: 'var(--gray-400)' }}>ID:</span> {selectedSlip.employee_id}</div>
-                                <div><span style={{ color: 'var(--gray-400)' }}>Departemen:</span> {selectedSlip.department || '-'}</div>
-                                <div><span style={{ color: 'var(--gray-400)' }}>Jabatan:</span> {selectedSlip.position || '-'}</div>
-                            </div>
+                            {(() => {
+                                const lines = slipLines(selectedSlip);
+                                const companyEnabled = ['bpjs_kes_company', 'bpjs_jht_company', 'bpjs_jp_company', 'bpjs_jkk', 'bpjs_jkm']
+                                    .some((key) => slipConfig.fields[key] !== false);
+                                return (
+                                    <>
+                                        {lines.identity.length > 0 && (
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                                                {lines.identity.map(([label, text]) => (
+                                                    <div key={label}><span style={{ color: 'var(--gray-400)' }}>{label}:</span> {label === 'Nama' ? <strong>{text}</strong> : text}</div>
+                                                ))}
+                                            </div>
+                                        )}
 
-                            {/* Pendapatan */}
-                            <h4 style={{ color: 'var(--success-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="TrendingUp" size={16} inline /> Pendapatan</h4>
-                            <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
-                                {[
-                                    ['Gaji Pokok', selectedSlip.basic_salary],
-                                    ['Tunjangan Transport', selectedSlip.transport_allowance],
-                                    ['Tunjangan Makan', selectedSlip.meal_allowance],
-                                    ['Tunjangan Apresiasi', selectedSlip.appreciation_allowance],
-                                    ['Lembur (' + selectedSlip.overtime_hours + ' jam)', selectedSlip.overtime_amount],
-                                    ...(parseFloat(selectedSlip.tuang_amount) > 0 ? [['Insentif Tuang (' + (selectedSlip.tuang_days || 0) + ' hari)', selectedSlip.tuang_amount]] : []),
-                                ].map(([label, val]) => (
-                                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <span>{label}</span>
-                                        <span style={{ fontWeight: 500 }}>{formatCurrency(val)}</span>
-                                    </div>
-                                ))}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontWeight: 700, borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: '0.25rem' }}>
-                                    <span>Total Pendapatan</span>
-                                    <span style={{ color: 'var(--success-500)' }}>{formatCurrency(selectedSlip.gross_income)}</span>
-                                </div>
-                            </div>
+                                        {(lines.income.length > 0 || payslipShows(slipConfig, 'gross_income')) && (
+                                            <>
+                                                <h4 style={{ color: 'var(--success-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="TrendingUp" size={16} inline /> Pendapatan</h4>
+                                                <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                                                    {lines.income.map(([key, label, val]) => (
+                                                        <div key={key} className="payslip-slip-line">
+                                                            <span>{label}</span>
+                                                            <span style={{ fontWeight: 500 }}>{formatCurrency(val)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {payslipShows(slipConfig, 'gross_income') && (
+                                                        <div className="payslip-slip-line" style={{ fontWeight: 700, borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: '0.25rem' }}>
+                                                            <span>Total Pendapatan</span>
+                                                            <span style={{ color: 'var(--success-500)' }}>{formatCurrency(selectedSlip.gross_income)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
 
-                            {/* Potongan */}
-                            <h4 style={{ color: 'var(--danger-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="TrendingDown" size={16} inline /> Potongan</h4>
-                            <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
-                                {(() => {
-                                    const base = parseFloat(selectedSlip.basic_salary) || 1;
-                                    const fmtPct = (val) => { const pct = (parseFloat(val) / base * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); };
-                                    const items = [
-                                        [parseFloat(selectedSlip.bpjs_kes_employee) > 0 ? `BPJS Kesehatan (${fmtPct(selectedSlip.bpjs_kes_employee)}%)` : null, selectedSlip.bpjs_kes_employee],
-                                        [parseFloat(selectedSlip.bpjs_jht_employee) > 0 ? `BPJS JHT (${fmtPct(selectedSlip.bpjs_jht_employee)}%)` : null, selectedSlip.bpjs_jht_employee],
-                                        [parseFloat(selectedSlip.bpjs_jp_employee) > 0 ? `BPJS JP (${fmtPct(selectedSlip.bpjs_jp_employee)}%)` : null, selectedSlip.bpjs_jp_employee],
-                                        ['PPh 21', selectedSlip.pph21_amount],
-                                        ['Potongan Pinjaman', selectedSlip.loan_deduction],
-                                    ].filter(([label]) => label !== null);
-                                    return items.map(([label, val]) => (
-                                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <span>{label}</span>
-                                            <span style={{ fontWeight: 500, color: 'var(--danger-500)' }}>-{formatCurrency(val)}</span>
-                                        </div>
-                                    ));
-                                })()}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontWeight: 700, borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: '0.25rem' }}>
-                                    <span>Total Potongan</span>
-                                    <span style={{ color: 'var(--danger-500)' }}>-{formatCurrency(selectedSlip.total_deductions)}</span>
-                                </div>
-                            </div>
+                                        {(lines.deductions.length > 0 || payslipShows(slipConfig, 'total_deductions')) && (
+                                            <>
+                                                <h4 style={{ color: 'var(--danger-500)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="TrendingDown" size={16} inline /> Potongan</h4>
+                                                <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                                                    {lines.deductions.map(([key, label, val]) => (
+                                                        <div key={key} className="payslip-slip-line">
+                                                            <span>{label}</span>
+                                                            <span style={{ fontWeight: 500, color: 'var(--danger-500)' }}>-{formatCurrency(val)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {payslipShows(slipConfig, 'total_deductions') && (
+                                                        <div className="payslip-slip-line" style={{ fontWeight: 700, borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: '0.25rem' }}>
+                                                            <span>Total Potongan</span>
+                                                            <span style={{ color: 'var(--danger-500)' }}>-{formatCurrency(selectedSlip.total_deductions)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
 
-                            {/* BPJS Company (info) */}
-                            <h4 style={{ color: 'var(--primary-400)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="Building2" size={16} inline /> Kontribusi Perusahaan (Info)</h4>
-                            <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
-                                {(() => {
-                                    const base = parseFloat(selectedSlip.basic_salary) || 1;
-                                    const fmtPct = (val) => { const pct = (parseFloat(val) / base * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); };
-                                    const items = [
-                                        [parseFloat(selectedSlip.bpjs_kes_company) > 0 ? `BPJS Kesehatan (${fmtPct(selectedSlip.bpjs_kes_company)}%)` : null, selectedSlip.bpjs_kes_company],
-                                        [parseFloat(selectedSlip.bpjs_jht_company) > 0 ? `BPJS JHT (${fmtPct(selectedSlip.bpjs_jht_company)}%)` : null, selectedSlip.bpjs_jht_company],
-                                        [parseFloat(selectedSlip.bpjs_jp_company) > 0 ? `BPJS JP (${fmtPct(selectedSlip.bpjs_jp_company)}%)` : null, selectedSlip.bpjs_jp_company],
-                                        [parseFloat(selectedSlip.bpjs_jkk) > 0 ? `BPJS JKK (${fmtPct(selectedSlip.bpjs_jkk)}%)` : null, selectedSlip.bpjs_jkk],
-                                        [parseFloat(selectedSlip.bpjs_jkm) > 0 ? `BPJS JKM (${fmtPct(selectedSlip.bpjs_jkm)}%)` : null, selectedSlip.bpjs_jkm],
-                                    ].filter(([label]) => label !== null);
-                                    return items.length > 0 ? items.map(([label, val]) => (
-                                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0' }}>
-                                            <span>{label}</span>
-                                            <span>{formatCurrency(val)}</span>
-                                        </div>
-                                    )) : (
-                                        <div style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Tidak ada kontribusi BPJS</div>
-                                    );
-                                })()}
-                            </div>
+                                        {companyEnabled && (
+                                            <>
+                                                <h4 style={{ color: 'var(--primary-400)', marginBottom: '0.75rem', fontSize: '0.9rem' }}><Icon name="Building2" size={16} inline /> Kontribusi Perusahaan (Info)</h4>
+                                                <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
+                                                    {lines.company.length > 0 ? lines.company.map(([key, label, val]) => (
+                                                        <div key={key} className="payslip-slip-line">
+                                                            <span>{label}</span>
+                                                            <span>{formatCurrency(val)}</span>
+                                                        </div>
+                                                    )) : (
+                                                        <div style={{ color: 'var(--gray-500)', fontStyle: 'italic' }}>Tidak ada kontribusi BPJS</div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
 
-                            {/* Net Salary */}
-                            <div style={{ background: 'rgba(16,185,129,0.15)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                                <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>GAJI BERSIH (Take Home Pay)</p>
-                                <p style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success-500)' }}>{formatCurrency(selectedSlip.net_salary)}</p>
-                                {selectedSlip.bank_name && (
-                                    <p style={{ color: 'var(--gray-400)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                                        Transfer ke: {selectedSlip.bank_name} - {selectedSlip.bank_account}
-                                    </p>
-                                )}
-                            </div>
+                                        {payslipShows(slipConfig, 'net_salary') && (
+                                            <div style={{ background: 'rgba(16,185,129,0.15)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                                <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>GAJI BERSIH (Take Home Pay)</p>
+                                                <p style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success-500)' }}>{formatCurrency(selectedSlip.net_salary)}</p>
+                                                {payslipShows(slipConfig, 'bank') && selectedSlip.bank_name && (
+                                                    <p style={{ color: 'var(--gray-400)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                                                        Transfer ke: {selectedSlip.bank_name} - {selectedSlip.bank_account}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                         <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportSlip('pdf')}><Icon name="FileText" size={16} inline /> PDF</button>
                                 <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => exportSlip('excel')}><Icon name="BarChart3" size={16} inline /> Excel</button>
                                 <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => window.print()}><Icon name="Printer" size={16} inline /> Print</button>
+                                {canEditPayslipLayout && (
+                                    <button className="btn btn-outline" style={{ fontSize: '0.8rem' }} onClick={slipEditor ? closeSlipEditor : openSlipEditor}>
+                                        <Icon name="Settings" size={16} inline /> Atur tampilan
+                                    </button>
+                                )}
                             </div>
-                            <button className="btn btn-outline" style={{ marginLeft: 'auto' }} onClick={() => setShowSlipModal(false)}>Tutup</button>
+                            <button className="btn btn-outline" style={{ marginLeft: 'auto' }} onClick={() => { setShowSlipModal(false); closeSlipEditor(); }}>Tutup</button>
                         </div>
                     </div>
                 </div>

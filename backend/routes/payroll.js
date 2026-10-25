@@ -4,7 +4,81 @@ const fs = require('fs');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, hasPermission } = require('../middleware/auth');
+const { buildSlipSections, resolvePayslipLayout } = require('../utils/payslipFields');
 const canManagePayroll = hasPermission('admin.payroll');
+
+async function weeksWorkedInMonth(client, userId, year, month) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const weeksInMonth = Math.ceil(daysInMonth / 7);
+    const weeksResult = await client.query(`
+        SELECT COUNT(DISTINCT EXTRACT(WEEK FROM recorded_at)) as weeks_worked
+        FROM attendance_records
+        WHERE user_id = $1
+          AND type = 'check_in'
+          AND EXTRACT(MONTH FROM recorded_at) = $2
+          AND EXTRACT(YEAR FROM recorded_at) = $3
+    `, [userId, month, year]);
+    return parseInt(weeksResult.rows[0].weeks_worked, 10) || weeksInMonth;
+}
+
+function weekBounds(isoDate) {
+    const date = new Date(`${isoDate}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+    const day = date.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const start = new Date(date);
+    start.setDate(date.getDate() + diffToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const next = new Date(end);
+    next.setDate(end.getDate() + 1);
+    const fmt = (value) => {
+        const y = value.getFullYear();
+        const m = String(value.getMonth() + 1).padStart(2, '0');
+        const d = String(value.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+    return {
+        start: fmt(start),
+        end: fmt(end),
+        endExclusive: fmt(next),
+        month: start.getMonth() + 1,
+        year: start.getFullYear(),
+    };
+}
+
+function monthBounds(year, month) {
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    return {
+        start,
+        endExclusive: `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`,
+    };
+}
+
+function formatIsoDate(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatPayrollPeriod(run) {
+    if (run.period_type === 'weekly' && run.week_start) {
+        return `${formatIsoDate(run.week_start)} – ${formatIsoDate(run.week_end)}`;
+    }
+    return `${monthNamesID[run.period_month]} ${run.period_year}`;
+}
+
+function loanChargeForPeriod(loan, weeklyPeriods) {
+    const installment = parseFloat(loan.installment_amount) || 0;
+    const periods = loan.installment_period === 'weekly' ? Math.max(1, weeklyPeriods || 1) : 1;
+    const remaining = parseFloat(loan.remaining_balance) || 0;
+    return {
+        periods,
+        amount: Math.min(remaining, installment * periods),
+    };
+}
 
 async function getPayslipLogoFile() {
     const result = await pool.query(
@@ -30,6 +104,11 @@ async function getPayslipLogoFile() {
 
     if (!filePath || !fs.existsSync(filePath)) return null;
     return filePath;
+}
+
+async function payslipSectionsFor(slip) {
+    const layout = await resolvePayslipLayout(pool, slip.user_id, slip.department);
+    return buildSlipSections(slip, layout.vis);
 }
 
 // PPh 21 progressive tax calculation (annual)
@@ -73,16 +152,16 @@ function getPTKP(taxStatus) {
 // Approved manual records plus approved pengajuan lembur (SPL).
 // SPL hours use actual hours when filled, otherwise the requested estimate.
 // Amount = hours × tarif lembur karyawan × pengali rate shift (default 1,5).
-async function sumEmployeeOvertime(client, userId, year, month, hourlyRate) {
+async function sumEmployeeOvertime(client, userId, rangeStart, rangeEnd, hourlyRate) {
     const records = await client.query(`
         SELECT COALESCE(SUM(hours), 0) AS hours,
                COALESCE(SUM(total_amount), 0) AS amount
         FROM overtime_records
         WHERE user_id = $1
           AND status = 'approved'
-          AND date >= make_date($2, $3, 1)
-          AND date < (make_date($2, $3, 1) + INTERVAL '1 month')
-    `, [userId, year, month]);
+          AND date >= $2::date
+          AND date < $3::date
+    `, [userId, rangeStart, rangeEnd]);
 
     const requests = await client.query(`
         SELECT COALESCE(SUM(COALESCE(ore.actual_hours, otr.estimated_hours)), 0) AS hours,
@@ -97,9 +176,9 @@ async function sumEmployeeOvertime(client, userId, year, month, hourlyRate) {
         LEFT JOIN overtime_rules rl ON rl.schedule_type_id = ws.schedule_type_id
         WHERE ore.user_id = $1
           AND otr.status IN ('approved', 'completed')
-          AND otr.date >= make_date($2, $3, 1)
-          AND otr.date < (make_date($2, $3, 1) + INTERVAL '1 month')
-    `, [userId, year, month, hourlyRate]);
+          AND otr.date >= $2::date
+          AND otr.date < $3::date
+    `, [userId, rangeStart, rangeEnd, hourlyRate]);
 
     return {
         hours: parseFloat(records.rows[0].hours) + parseFloat(requests.rows[0].hours),
@@ -111,12 +190,15 @@ async function sumEmployeeOvertime(client, userId, year, month, hourlyRate) {
 router.get('/', authenticateToken, canManagePayroll, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT pr.*, u.name as created_by_name,
+            SELECT pr.*,
+                   to_char(pr.week_start, 'YYYY-MM-DD') AS week_start,
+                   to_char(pr.week_end, 'YYYY-MM-DD') AS week_end,
+                   u.name as created_by_name,
                    (SELECT COUNT(*) FROM payroll_items WHERE payroll_run_id = pr.id) as employee_count,
                    (SELECT COALESCE(SUM(net_salary), 0) FROM payroll_items WHERE payroll_run_id = pr.id) as total_net_salary
             FROM payroll_runs pr
             LEFT JOIN users u ON pr.created_by = u.id
-            ORDER BY pr.period_year DESC, pr.period_month DESC
+            ORDER BY pr.period_year DESC, pr.period_month DESC, pr.week_start DESC NULLS LAST
         `);
         res.json(result.rows);
     } catch (error) {
@@ -129,7 +211,11 @@ router.get('/', authenticateToken, canManagePayroll, async (req, res) => {
 router.get('/:id', authenticateToken, canManagePayroll, async (req, res) => {
     try {
         const { id } = req.params;
-        const runResult = await pool.query('SELECT * FROM payroll_runs WHERE id = $1', [id]);
+        const runResult = await pool.query(`
+            SELECT *, to_char(week_start, 'YYYY-MM-DD') AS week_start,
+                   to_char(week_end, 'YYYY-MM-DD') AS week_end
+            FROM payroll_runs WHERE id = $1
+        `, [id]);
         if (runResult.rows.length === 0) {
             return res.status(404).json({ error: 'Payroll tidak ditemukan' });
         }
@@ -156,28 +242,54 @@ router.get('/:id', authenticateToken, canManagePayroll, async (req, res) => {
 router.post('/generate', authenticateToken, canManagePayroll, async (req, res) => {
     const client = await pool.connect();
     try {
-        const { month, year, notes } = req.body;
-        if (!month || !year) {
+        const periodType = req.body.period_type === 'weekly' ? 'weekly' : 'monthly';
+        const notes = req.body.notes;
+        let month = parseInt(req.body.month, 10);
+        let year = parseInt(req.body.year, 10);
+        let weekStart = null;
+        let weekEnd = null;
+        let rangeStart;
+        let rangeEnd;
+        if (periodType === 'weekly') {
+            const bounds = weekBounds(req.body.week_date);
+            if (!bounds) {
+                return res.status(400).json({ error: 'Tanggal minggu payroll harus diisi' });
+            }
+            weekStart = bounds.start;
+            weekEnd = bounds.end;
+            rangeStart = bounds.start;
+            rangeEnd = bounds.endExclusive;
+            month = bounds.month;
+            year = bounds.year;
+        } else if (!month || !year) {
             return res.status(400).json({ error: 'Bulan dan tahun harus diisi' });
+        } else {
+            const bounds = monthBounds(year, month);
+            rangeStart = bounds.start;
+            rangeEnd = bounds.endExclusive;
         }
 
         await client.query('BEGIN');
 
-        // Check if payroll already exists
-        const existing = await client.query(
-            'SELECT id FROM payroll_runs WHERE period_month = $1 AND period_year = $2',
-            [month, year]
-        );
+        const existing = periodType === 'weekly'
+            ? await client.query('SELECT id FROM payroll_runs WHERE period_type = $1 AND week_start = $2::date', ['weekly', weekStart])
+            : await client.query(
+                `SELECT id FROM payroll_runs WHERE period_month = $1 AND period_year = $2 AND period_type = 'monthly'`,
+                [month, year]
+            );
         if (existing.rows.length > 0) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Payroll untuk bulan ini sudah ada. Hapus dulu jika ingin generate ulang.' });
+            return res.status(400).json({
+                error: periodType === 'weekly'
+                    ? 'Payroll untuk minggu ini sudah ada. Hapus dulu jika ingin generate ulang.'
+                    : 'Payroll untuk bulan ini sudah ada. Hapus dulu jika ingin generate ulang.'
+            });
         }
 
-        // Create payroll run
         const runResult = await client.query(`
-            INSERT INTO payroll_runs (period_month, period_year, created_by, notes)
-            VALUES ($1, $2, $3, $4) RETURNING *
-        `, [month, year, req.user.id, notes || null]);
+            INSERT INTO payroll_runs (period_month, period_year, period_type, week_start, week_end, created_by, notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+        `, [month, year, periodType, weekStart, weekEnd, req.user.id, notes || null]);
         const payrollRunId = runResult.rows[0].id;
 
         // Get default BPJS rates from bpjs_settings table
@@ -217,6 +329,17 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             WHERE u.role = 'employee'
         `);
+        const payrollEmployees = employees.rows.filter((emp) => (
+            periodType === 'weekly' ? emp.salary_type === 'weekly' : emp.salary_type !== 'weekly'
+        ));
+        if (payrollEmployees.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                error: periodType === 'weekly'
+                    ? 'Tidak ada karyawan dengan gaji mingguan.'
+                    : 'Tidak ada karyawan untuk payroll bulanan.'
+            });
+        }
 
         // Calculate working days in the month (Mon-Fri)
         const daysInMonth = new Date(year, month, 0).getDate();
@@ -225,52 +348,43 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             const dow = new Date(year, month - 1, d).getDay();
             if (dow !== 0 && dow !== 6) totalWorkingDays++;
         }
-        const weeksInMonth = Math.ceil(daysInMonth / 7);
-
-        for (const emp of employees.rows) {
+        const allowanceFactor = periodType === 'weekly' ? 0.25 : 1;
+        for (const emp of payrollEmployees) {
             const salaryType = emp.salary_type || 'monthly';
             const baseSalaryRate = parseFloat(emp.basic_salary);
-            const transportAllowance = parseFloat(emp.transport_allowance);
-            const mealAllowance = parseFloat(emp.meal_allowance);
-            const appreciationAllowance = parseFloat(emp.appreciation_allowance) || 0;
+            const transportAllowance = parseFloat(emp.transport_allowance) * allowanceFactor;
+            const mealAllowance = parseFloat(emp.meal_allowance) * allowanceFactor;
+            const appreciationAllowance = (parseFloat(emp.appreciation_allowance) || 0) * allowanceFactor;
 
-            // Count actual attendance (check-in days) for this employee in this month
             const attendanceResult = await client.query(`
                 SELECT COUNT(DISTINCT DATE(recorded_at)) as days_worked
                 FROM attendance_records
                 WHERE user_id = $1
                   AND type = 'check_in'
-                  AND EXTRACT(MONTH FROM recorded_at) = $2
-                  AND EXTRACT(YEAR FROM recorded_at) = $3
-            `, [emp.id, month, year]);
-            const daysWorked = parseInt(attendanceResult.rows[0].days_worked) || totalWorkingDays;
+                  AND recorded_at >= $2::date
+                  AND recorded_at < $3::date
+            `, [emp.id, rangeStart, rangeEnd]);
+            const attendedDays = parseInt(attendanceResult.rows[0].days_worked, 10) || 0;
+            const daysWorked = periodType === 'weekly' ? attendedDays : (attendedDays || totalWorkingDays);
 
-            // Calculate working days for this employee based on salary type
             let workingDays = 0;
             let basicSalary = 0;
             if (salaryType === 'daily') {
                 workingDays = daysWorked;
                 basicSalary = baseSalaryRate * daysWorked;
             } else if (salaryType === 'weekly') {
-                // Count weeks the employee actually worked in
-                const weeksResult = await client.query(`
-                    SELECT COUNT(DISTINCT EXTRACT(WEEK FROM recorded_at)) as weeks_worked
-                    FROM attendance_records
-                    WHERE user_id = $1
-                      AND type = 'check_in'
-                      AND EXTRACT(MONTH FROM recorded_at) = $2
-                      AND EXTRACT(YEAR FROM recorded_at) = $3
-                `, [emp.id, month, year]);
-                const weeksWorked = parseInt(weeksResult.rows[0].weeks_worked) || weeksInMonth;
+                const weeksWorked = periodType === 'weekly'
+                    ? (attendedDays > 0 ? 1 : 0)
+                    : await weeksWorkedInMonth(client, emp.id, year, month);
                 workingDays = daysWorked;
                 basicSalary = baseSalaryRate * weeksWorked;
+                emp._weeksWorked = weeksWorked;
             } else {
-                // monthly
                 workingDays = totalWorkingDays;
                 basicSalary = baseSalaryRate;
             }
 
-            const overtime = await sumEmployeeOvertime(client, emp.id, year, month, parseFloat(emp.overtime_rate) || 50000);
+            const overtime = await sumEmployeeOvertime(client, emp.id, rangeStart, rangeEnd, parseFloat(emp.overtime_rate) || 50000);
             const overtimeHours = overtime.hours;
             const overtimeAmount = overtime.amount;
 
@@ -295,9 +409,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                         COALESCE(SUM(ritase_jauh), 0) as extra_rit_jauh
                     FROM driver_activities
                     WHERE user_id = $1
-                      AND EXTRACT(MONTH FROM activity_date) = $2
-                      AND EXTRACT(YEAR FROM activity_date) = $3
-                `, [emp.id, month, year]);
+                      AND activity_date >= $2::date
+                      AND activity_date < $3::date
+                `, [emp.id, rangeStart, rangeEnd]);
 
                 driverSubuhDays = parseInt(driverResult.rows[0].total_subuh);
                 driverRitTotal = parseInt(driverResult.rows[0].total_rit);
@@ -319,9 +433,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                        COUNT(*) FILTER (WHERE amount > 0) as total_days
                 FROM production_tuang
                 WHERE user_id = $1
-                  AND EXTRACT(MONTH FROM tuang_date) = $2
-                  AND EXTRACT(YEAR FROM tuang_date) = $3
-            `, [emp.id, month, year]);
+                  AND tuang_date >= $2::date
+                  AND tuang_date < $3::date
+            `, [emp.id, rangeStart, rangeEnd]);
             tuangAmount = parseFloat(tuangResult.rows[0].total_amount) || 0;
             tuangDays = parseInt(tuangResult.rows[0].total_days, 10) || 0;
 
@@ -365,21 +479,29 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             // Calculate PPh 21 (monthly) - only if enabled for this employee
             let monthlyPPh = 0;
             if (emp.pph21_enabled) {
-                const annualGross = grossIncome * 12;
-                const annualBpjsDeduction = (bpjsJhtEmployee + bpjsJpEmployee) * 12;
+                const periodsInYear = periodType === 'weekly' ? 52 : 12;
+                const annualGross = grossIncome * periodsInYear;
+                const annualBpjsDeduction = (bpjsJhtEmployee + bpjsJpEmployee) * periodsInYear;
                 const ptkp = getPTKP(emp.tax_status);
                 const annualTaxableIncome = annualGross - annualBpjsDeduction - ptkp;
                 const annualPPh = calculatePPh21(annualTaxableIncome);
-                monthlyPPh = Math.round(annualPPh / 12);
+                monthlyPPh = Math.round(annualPPh / periodsInYear);
             }
 
-            // Get active loan deduction
-            const loanResult = await client.query(`
-                SELECT COALESCE(SUM(installment_amount), 0) as total_deduction
+            // Weekly loans are charged once per week worked in this payroll month.
+            const activeLoans = await client.query(`
+                SELECT installment_amount, installment_period, remaining_balance
                 FROM employee_loans
                 WHERE user_id = $1 AND status = 'active'
+                ORDER BY created_at ASC
             `, [emp.id]);
-            const loanDeduction = parseFloat(loanResult.rows[0].total_deduction);
+            const hasWeeklyLoan = activeLoans.rows.some((loan) => loan.installment_period === 'weekly');
+            const weeklyPeriods = periodType === 'weekly'
+                ? 1
+                : (hasWeeklyLoan ? (emp._weeksWorked || await weeksWorkedInMonth(client, emp.id, year, month)) : 1);
+            const loanDeduction = activeLoans.rows.reduce((sum, loan) => {
+                return sum + loanChargeForPeriod(loan, weeklyPeriods).amount;
+            }, 0);
 
             // Total deductions
             const totalDeductions = bpjsKesEmployee + bpjsJhtEmployee + bpjsJpEmployee + monthlyPPh + loanDeduction;
@@ -420,6 +542,8 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
         // Return the created payroll
         const result = await pool.query(`
             SELECT pr.*,
+                   to_char(pr.week_start, 'YYYY-MM-DD') AS week_start,
+                   to_char(pr.week_end, 'YYYY-MM-DD') AS week_end,
                    (SELECT COUNT(*) FROM payroll_items WHERE payroll_run_id = pr.id) as employee_count,
                    (SELECT COALESCE(SUM(net_salary), 0) FROM payroll_items WHERE payroll_run_id = pr.id) as total_net_salary
             FROM payroll_runs pr WHERE pr.id = $1
@@ -458,17 +582,27 @@ router.put('/:id/finalize', authenticateToken, canManagePayroll, async (req, res
             [id]
         );
 
+        const run = runResult.rows[0];
         for (const item of items.rows) {
             // Get active loans for this employee
             const loans = await client.query(
                 "SELECT * FROM employee_loans WHERE user_id = $1 AND status = 'active' ORDER BY created_at ASC",
                 [item.user_id]
             );
+            const weeklyPeriods = run.period_type === 'weekly'
+                ? 1
+                : await weeksWorkedInMonth(client, item.user_id, run.period_year, run.period_month);
 
             let remainingDeduction = parseFloat(item.loan_deduction);
             for (const loan of loans.rows) {
                 if (remainingDeduction <= 0) break;
-                const payAmount = Math.min(remainingDeduction, parseFloat(loan.remaining_balance), parseFloat(loan.installment_amount));
+                const due = loanChargeForPeriod(loan, weeklyPeriods);
+                const payAmount = Math.min(remainingDeduction, due.amount);
+                if (payAmount <= 0) continue;
+                const installment = parseFloat(loan.installment_amount) || 0;
+                const periodsCovered = installment > 0
+                    ? Math.min(due.periods, Math.max(1, Math.round(payAmount / installment)))
+                    : 1;
 
                 // Record payment
                 await client.query(`
@@ -478,7 +612,9 @@ router.put('/:id/finalize', authenticateToken, canManagePayroll, async (req, res
 
                 // Update loan balance
                 const newBalance = parseFloat(loan.remaining_balance) - payAmount;
-                const newPaid = parseInt(loan.paid_installments) + 1;
+                const newPaid = newBalance <= 0
+                    ? parseInt(loan.total_installments, 10)
+                    : Math.min(parseInt(loan.total_installments, 10), parseInt(loan.paid_installments, 10) + periodsCovered);
                 const newStatus = newBalance <= 0 ? 'paid_off' : 'active';
                 await client.query(
                     'UPDATE employee_loans SET remaining_balance=$1, paid_installments=$2, status=$3, updated_at=CURRENT_TIMESTAMP WHERE id=$4',
@@ -518,7 +654,9 @@ router.get('/:id/slip/:userId', authenticateToken, async (req, res) => {
 
         const result = await pool.query(`
             SELECT pi.*, u.name as user_name, u.employee_id,
-                   pr.period_month, pr.period_year,
+                   pr.period_month, pr.period_year, pr.period_type,
+                   to_char(pr.week_start, 'YYYY-MM-DD') AS week_start,
+                   to_char(pr.week_end, 'YYYY-MM-DD') AS week_end,
                    ed.department, ed.position, ed.bank_name, ed.bank_account
             FROM payroll_items pi
             JOIN users u ON pi.user_id = u.id
@@ -531,7 +669,17 @@ router.get('/:id/slip/:userId', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Slip gaji tidak ditemukan' });
         }
 
-        res.json(result.rows[0]);
+        const slip = result.rows[0];
+        const layout = await resolvePayslipLayout(pool, slip.user_id, slip.department);
+        res.json({
+            ...slip,
+            payslip_layout: {
+                hide_zero: layout.hide_zero,
+                fields: layout.fields,
+                source: layout.source,
+                department: layout.department,
+            },
+        });
     } catch (error) {
         console.error('Get slip error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
@@ -633,7 +781,7 @@ router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, r
 
         // Title
         doc.fontSize(16).font('Helvetica-Bold').text('LAPORAN PAYROLL', { align: 'center' });
-        doc.fontSize(11).font('Helvetica').text(`Periode: ${monthNamesID[run.period_month]} ${run.period_year}`, { align: 'center' });
+        doc.fontSize(11).font('Helvetica').text(`Periode: ${formatPayrollPeriod(run)}`, { align: 'center' });
         doc.fontSize(9).text(`Status: ${run.status === 'finalized' ? 'Final' : 'Draft'}`, { align: 'center' });
         doc.moveDown(1);
 
@@ -745,7 +893,7 @@ router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req,
         ws.getCell('A1').alignment = { horizontal: 'center' };
 
         ws.mergeCells('A2:P2');
-        ws.getCell('A2').value = `Periode: ${monthNamesID[run.period_month]} ${run.period_year} | Status: ${run.status === 'finalized' ? 'Final' : 'Draft'}`;
+        ws.getCell('A2').value = `Periode: ${formatPayrollPeriod(run)} | Status: ${run.status === 'finalized' ? 'Final' : 'Draft'}`;
         ws.getCell('A2').alignment = { horizontal: 'center' };
 
         // Header
@@ -820,7 +968,9 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
 
         const result = await pool.query(`
             SELECT pi.*, u.name as user_name, u.employee_id,
-                   pr.period_month, pr.period_year,
+                   pr.period_month, pr.period_year, pr.period_type,
+                   to_char(pr.week_start, 'YYYY-MM-DD') AS week_start,
+                   to_char(pr.week_end, 'YYYY-MM-DD') AS week_end,
                    ed.department, ed.position, ed.bank_name, ed.bank_account, ed.npwp
             FROM payroll_items pi
             JOIN users u ON pi.user_id = u.id
@@ -832,6 +982,7 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
         if (result.rows.length === 0) return res.status(404).json({ error: 'Slip gaji tidak ditemukan' });
         const slip = result.rows[0];
         const logoFile = await getPayslipLogoFile();
+        const sections = await payslipSectionsFor(slip);
 
         const PDFDocument = require('pdfkit');
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -849,24 +1000,27 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
             doc.y = startY + fitH + 10;
         }
         doc.fontSize(18).font('Helvetica-Bold').text('SLIP GAJI', { align: 'center' });
-        doc.fontSize(11).font('Helvetica').text(`Periode: ${monthNamesID[slip.period_month]} ${slip.period_year}`, { align: 'center' });
+        doc.fontSize(11).font('Helvetica').text(`Periode: ${formatPayrollPeriod(slip)}`, { align: 'center' });
         doc.moveDown(1);
         doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
         doc.moveDown(0.5);
 
         // Employee info
-        doc.fontSize(10);
-        const infoY = doc.y;
-        doc.text(`Nama       : ${slip.user_name}`, 50, infoY);
-        doc.text(`Departemen : ${slip.department || '-'}`, 300, infoY);
-        doc.text(`ID         : ${slip.employee_id}`, 50, infoY + 16);
-        doc.text(`Jabatan    : ${slip.position || '-'}`, 300, infoY + 16);
-        if (slip.npwp) doc.text(`NPWP       : ${slip.npwp}`, 50, infoY + 32);
-        doc.moveDown(3);
+        doc.fontSize(10).font('Helvetica');
+        if (sections.identity.length > 0) {
+            for (let i = 0; i < sections.identity.length; i += 2) {
+                const y = doc.y;
+                const left = sections.identity[i];
+                const right = sections.identity[i + 1];
+                doc.text(`${left[0].padEnd(11, ' ')}: ${left[1]}`, 50, y, { width: 240 });
+                if (right) doc.text(`${right[0].padEnd(11, ' ')}: ${right[1]}`, 300, y, { width: 240 });
+                doc.moveDown(0.2);
+            }
+            doc.moveDown(0.6);
+        }
         doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
         doc.moveDown(0.5);
 
-        // Helper for row
         function addRow(label, amount, isDeduction = false, isBold = false) {
             const y = doc.y;
             doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(10);
@@ -876,77 +1030,52 @@ router.get('/:id/slip/:userId/pdf', authenticateToken, async (req, res) => {
             doc.moveDown(0.4);
         }
 
-        // Pendapatan
-        doc.font('Helvetica-Bold').fontSize(11).text('PENDAPATAN', 50);
-        doc.moveDown(0.3);
-        addRow('Gaji Pokok', slip.basic_salary);
-        addRow('Tunjangan Transport', slip.transport_allowance);
-        addRow('Tunjangan Makan', slip.meal_allowance);
-        addRow('Tunjangan Apresiasi', slip.appreciation_allowance);
-        addRow(`Lembur (${slip.overtime_hours} jam)`, slip.overtime_amount);
-        // Driver allowances (if any)
-        if (parseFloat(slip.driver_total_allowance) > 0) {
-            if (parseFloat(slip.driver_subuh_amount) > 0)
-                addRow(`Uang Jalan Subuh (${slip.driver_subuh_days} hari)`, slip.driver_subuh_amount);
-            if (parseFloat(slip.driver_rit_amount) > 0)
-                addRow(`Uang Mel/RIT (${slip.driver_rit_total} trip)`, slip.driver_rit_amount);
-            if (parseFloat(slip.driver_overnight_amount) > 0)
-                addRow(`Uang Menginap (${slip.driver_overnight_days} hari)`, slip.driver_overnight_amount);
-            if (parseFloat(slip.driver_ritase_dekat_amount) > 0)
-                addRow(`Uang Ritase Dekat (${slip.driver_extra_rit_dekat} trip)`, slip.driver_ritase_dekat_amount);
-            if (parseFloat(slip.driver_ritase_jauh_amount) > 0)
-                addRow(`Uang Ritase Jauh (${slip.driver_extra_rit_jauh} trip)`, slip.driver_ritase_jauh_amount);
-        }
-        if (parseFloat(slip.tuang_amount) > 0) {
-            addRow(`Insentif Tuang (${slip.tuang_days || 0} hari)`, slip.tuang_amount);
-        }
-        doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
-        doc.moveDown(0.3);
-        addRow('Total Pendapatan', slip.gross_income, false, true);
-        doc.moveDown(0.5);
-
-        // Potongan
-        doc.font('Helvetica-Bold').fontSize(11).text('POTONGAN', 50);
-        doc.moveDown(0.3);
-        const bpjsBase = parseFloat(slip.basic_salary) || 1;
-        function fmtPct(val) { const pct = (parseFloat(val) / bpjsBase * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); }
-        if (parseFloat(slip.bpjs_kes_employee) > 0) addRow(`BPJS Kesehatan (${fmtPct(slip.bpjs_kes_employee)}%)`, slip.bpjs_kes_employee, true);
-        if (parseFloat(slip.bpjs_jht_employee) > 0) addRow(`BPJS JHT (${fmtPct(slip.bpjs_jht_employee)}%)`, slip.bpjs_jht_employee, true);
-        if (parseFloat(slip.bpjs_jp_employee) > 0) addRow(`BPJS JP (${fmtPct(slip.bpjs_jp_employee)}%)`, slip.bpjs_jp_employee, true);
-        if (parseFloat(slip.pph21_amount) > 0) addRow('PPh 21', slip.pph21_amount, true);
-        if (parseFloat(slip.loan_deduction) > 0) addRow('Potongan Pinjaman', slip.loan_deduction, true);
-        doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
-        doc.moveDown(0.3);
-        addRow('Total Potongan', slip.total_deductions, true, true);
-        doc.moveDown(0.5);
-
-        // Kontribusi perusahaan
-        doc.font('Helvetica-Bold').fontSize(10).text('KONTRIBUSI PERUSAHAAN (Informasi)', 50);
-        doc.moveDown(0.3);
-        doc.font('Helvetica').fontSize(9);
-        const compItems = [
-            [parseFloat(slip.bpjs_kes_company) > 0 ? `BPJS Kesehatan (${fmtPct(slip.bpjs_kes_company)}%)` : null, slip.bpjs_kes_company],
-            [parseFloat(slip.bpjs_jht_company) > 0 ? `BPJS JHT (${fmtPct(slip.bpjs_jht_company)}%)` : null, slip.bpjs_jht_company],
-            [parseFloat(slip.bpjs_jp_company) > 0 ? `BPJS JP (${fmtPct(slip.bpjs_jp_company)}%)` : null, slip.bpjs_jp_company],
-            [parseFloat(slip.bpjs_jkk) > 0 ? `BPJS JKK (${fmtPct(slip.bpjs_jkk)}%)` : null, slip.bpjs_jkk],
-            [parseFloat(slip.bpjs_jkm) > 0 ? `BPJS JKM (${fmtPct(slip.bpjs_jkm)}%)` : null, slip.bpjs_jkm],
-        ].filter(([label]) => label !== null);
-        compItems.forEach(([label, val]) => {
-            const cy = doc.y;
-            doc.text(label, 60, cy, { width: 300 });
-            doc.text(fmtCurrency(val), 360, cy, { width: 180, align: 'right' });
+        if (sections.income.length > 0 || sections.showGross) {
+            doc.font('Helvetica-Bold').fontSize(11).text('PENDAPATAN', 50);
             doc.moveDown(0.3);
-        });
-        doc.moveDown(0.5);
+            sections.income.forEach((line) => addRow(line.label, line.amount));
+            if (sections.showGross) {
+                doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
+                doc.moveDown(0.3);
+                addRow('Total Pendapatan', slip.gross_income, false, true);
+            }
+            doc.moveDown(0.5);
+        }
 
-        // Net salary box
-        doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(2).stroke();
-        doc.moveDown(0.5);
-        doc.font('Helvetica-Bold').fontSize(12).text('GAJI BERSIH (Take Home Pay)', { align: 'center' });
-        doc.fontSize(20).text(fmtCurrency(slip.net_salary), { align: 'center' });
-        doc.moveDown(0.3);
-        if (slip.bank_name) {
-            doc.font('Helvetica').fontSize(9).text(`Transfer ke: ${slip.bank_name} - ${slip.bank_account}`, { align: 'center' });
+        if (sections.deductions.length > 0 || sections.showTotalDeduct) {
+            doc.font('Helvetica-Bold').fontSize(11).text('POTONGAN', 50);
+            doc.moveDown(0.3);
+            sections.deductions.forEach((line) => addRow(line.label, line.amount, true));
+            if (sections.showTotalDeduct) {
+                doc.moveTo(60, doc.y).lineTo(540, doc.y).stroke();
+                doc.moveDown(0.3);
+                addRow('Total Potongan', slip.total_deductions, true, true);
+            }
+            doc.moveDown(0.5);
+        }
+
+        if (sections.company.length > 0) {
+            doc.font('Helvetica-Bold').fontSize(10).text('KONTRIBUSI PERUSAHAAN (Informasi)', 50);
+            doc.moveDown(0.3);
+            doc.font('Helvetica').fontSize(9);
+            sections.company.forEach((line) => {
+                const cy = doc.y;
+                doc.text(line.label, 60, cy, { width: 300 });
+                doc.text(fmtCurrency(line.amount), 360, cy, { width: 180, align: 'right' });
+                doc.moveDown(0.3);
+            });
+            doc.moveDown(0.5);
+        }
+
+        if (sections.showNet) {
+            doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(2).stroke();
+            doc.moveDown(0.5);
+            doc.font('Helvetica-Bold').fontSize(12).text('GAJI BERSIH (Take Home Pay)', { align: 'center' });
+            doc.fontSize(20).text(fmtCurrency(slip.net_salary), { align: 'center' });
+            doc.moveDown(0.3);
+            if (sections.showBank) {
+                doc.font('Helvetica').fontSize(9).text(`Transfer ke: ${slip.bank_name} - ${slip.bank_account}`, { align: 'center' });
+            }
         }
 
         doc.moveDown(2);
@@ -969,7 +1098,9 @@ router.get('/:id/slip/:userId/excel', authenticateToken, async (req, res) => {
 
         const result = await pool.query(`
             SELECT pi.*, u.name as user_name, u.employee_id,
-                   pr.period_month, pr.period_year,
+                   pr.period_month, pr.period_year, pr.period_type,
+                   to_char(pr.week_start, 'YYYY-MM-DD') AS week_start,
+                   to_char(pr.week_end, 'YYYY-MM-DD') AS week_end,
                    ed.department, ed.position, ed.bank_name, ed.bank_account, ed.npwp
             FROM payroll_items pi
             JOIN users u ON pi.user_id = u.id
@@ -980,6 +1111,7 @@ router.get('/:id/slip/:userId/excel', authenticateToken, async (req, res) => {
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'Slip gaji tidak ditemukan' });
         const slip = result.rows[0];
+        const sections = await payslipSectionsFor(slip);
 
         const ExcelJS = require('exceljs');
         const workbook = new ExcelJS.Workbook();
@@ -992,87 +1124,75 @@ router.get('/:id/slip/:userId/excel', authenticateToken, async (req, res) => {
         ws.getCell('A1').alignment = { horizontal: 'center' };
 
         ws.mergeCells('A2:C2');
-        ws.getCell('A2').value = `Periode: ${monthNamesID[slip.period_month]} ${slip.period_year}`;
+        ws.getCell('A2').value = `Periode: ${formatPayrollPeriod(slip)}`;
         ws.getCell('A2').alignment = { horizontal: 'center' };
 
-        // Employee info
-        ws.getCell('A4').value = 'Nama'; ws.getCell('B4').value = slip.user_name;
-        ws.getCell('A5').value = 'ID Karyawan'; ws.getCell('B5').value = slip.employee_id;
-        ws.getCell('A6').value = 'Departemen'; ws.getCell('B6').value = slip.department || '-';
-        ws.getCell('A7').value = 'Jabatan'; ws.getCell('B7').value = slip.position || '-';
-        ws.getRow(4).font = { bold: true };
+        let infoRow = 4;
+        sections.identity.forEach(([label, text], index) => {
+            ws.getCell(`A${infoRow}`).value = label;
+            ws.getCell(`B${infoRow}`).value = text;
+            if (index === 0) ws.getRow(infoRow).font = { bold: true };
+            infoRow++;
+        });
 
         const headerStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } } };
         const deductHeaderStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEF4444' } } };
+        const infoStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF64748B' } } };
 
-        // Pendapatan
-        let row = 9;
-        ws.getRow(row).values = ['PENDAPATAN', '', 'Jumlah'];
-        Object.assign(ws.getCell(`A${row}`), headerStyle);
-        Object.assign(ws.getCell(`B${row}`), headerStyle);
-        Object.assign(ws.getCell(`C${row}`), headerStyle);
-        row++;
-
-        const incomeItems = [
-            ['Gaji Pokok', parseFloat(slip.basic_salary)],
-            ['Tunjangan Transport', parseFloat(slip.transport_allowance)],
-            ['Tunjangan Makan', parseFloat(slip.meal_allowance)],
-            ['Tunjangan Apresiasi', parseFloat(slip.appreciation_allowance || 0)],
-            [`Lembur (${slip.overtime_hours} jam)`, parseFloat(slip.overtime_amount)],
-        ];
-        if (parseFloat(slip.tuang_amount) > 0) {
-            incomeItems.push([`Insentif Tuang (${slip.tuang_days || 0} hari)`, parseFloat(slip.tuang_amount)]);
+        let row = infoRow + 1;
+        function writeMoney(label, amount, bold = false) {
+            ws.getCell(`A${row}`).value = label;
+            ws.getCell(`C${row}`).value = amount;
+            ws.getCell(`C${row}`).numFmt = '#,##0';
+            if (bold) {
+                ws.getCell(`A${row}`).font = { bold: true };
+                ws.getCell(`C${row}`).font = { bold: true };
+            }
+            row++;
         }
-        incomeItems.forEach(([label, val]) => {
-            ws.getCell(`A${row}`).value = label;
-            ws.getCell(`C${row}`).value = val;
-            ws.getCell(`C${row}`).numFmt = '#,##0';
+
+        if (sections.income.length > 0 || sections.showGross) {
+            ws.getRow(row).values = ['PENDAPATAN', '', 'Jumlah'];
+            Object.assign(ws.getCell(`A${row}`), headerStyle);
+            Object.assign(ws.getCell(`B${row}`), headerStyle);
+            Object.assign(ws.getCell(`C${row}`), headerStyle);
             row++;
-        });
-        ws.getCell(`A${row}`).value = 'Total Pendapatan';
-        ws.getCell(`A${row}`).font = { bold: true };
-        ws.getCell(`C${row}`).value = parseFloat(slip.gross_income);
-        ws.getCell(`C${row}`).numFmt = '#,##0';
-        ws.getCell(`C${row}`).font = { bold: true };
-        row += 2;
-
-        // Potongan
-        ws.getRow(row).values = ['POTONGAN', '', 'Jumlah'];
-        Object.assign(ws.getCell(`A${row}`), deductHeaderStyle);
-        Object.assign(ws.getCell(`B${row}`), deductHeaderStyle);
-        Object.assign(ws.getCell(`C${row}`), deductHeaderStyle);
-        row++;
-
-        const deductItems = [];
-        const excelBpjsBase = parseFloat(slip.basic_salary) || 1;
-        function excelFmtPct(val) { const pct = (parseFloat(val) / excelBpjsBase * 100); return pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2); }
-        if (parseFloat(slip.bpjs_kes_employee) > 0) deductItems.push([`BPJS Kesehatan (${excelFmtPct(slip.bpjs_kes_employee)}%)`, parseFloat(slip.bpjs_kes_employee)]);
-        if (parseFloat(slip.bpjs_jht_employee) > 0) deductItems.push([`BPJS JHT (${excelFmtPct(slip.bpjs_jht_employee)}%)`, parseFloat(slip.bpjs_jht_employee)]);
-        if (parseFloat(slip.bpjs_jp_employee) > 0) deductItems.push([`BPJS JP (${excelFmtPct(slip.bpjs_jp_employee)}%)`, parseFloat(slip.bpjs_jp_employee)]);
-        deductItems.push(['PPh 21', parseFloat(slip.pph21_amount)]);
-        deductItems.push(['Potongan Pinjaman', parseFloat(slip.loan_deduction)]);
-        deductItems.forEach(([label, val]) => {
-            ws.getCell(`A${row}`).value = label;
-            ws.getCell(`C${row}`).value = val;
-            ws.getCell(`C${row}`).numFmt = '#,##0';
+            sections.income.forEach((line) => writeMoney(line.label, line.amount));
+            if (sections.showGross) writeMoney('Total Pendapatan', parseFloat(slip.gross_income), true);
             row++;
-        });
-        ws.getCell(`A${row}`).value = 'Total Potongan';
-        ws.getCell(`A${row}`).font = { bold: true };
-        ws.getCell(`C${row}`).value = parseFloat(slip.total_deductions);
-        ws.getCell(`C${row}`).numFmt = '#,##0';
-        ws.getCell(`C${row}`).font = { bold: true };
-        row += 2;
+        }
 
-        // Net
-        ws.getCell(`A${row}`).value = 'GAJI BERSIH (Take Home Pay)';
-        ws.getCell(`A${row}`).font = { bold: true, size: 12 };
-        ws.getCell(`C${row}`).value = parseFloat(slip.net_salary);
-        ws.getCell(`C${row}`).numFmt = '#,##0';
-        ws.getCell(`C${row}`).font = { bold: true, size: 12, color: { argb: 'FF10B981' } };
-        row++;
-        if (slip.bank_name) {
-            ws.getCell(`A${row}`).value = `Transfer ke: ${slip.bank_name} - ${slip.bank_account}`;
+        if (sections.deductions.length > 0 || sections.showTotalDeduct) {
+            ws.getRow(row).values = ['POTONGAN', '', 'Jumlah'];
+            Object.assign(ws.getCell(`A${row}`), deductHeaderStyle);
+            Object.assign(ws.getCell(`B${row}`), deductHeaderStyle);
+            Object.assign(ws.getCell(`C${row}`), deductHeaderStyle);
+            row++;
+            sections.deductions.forEach((line) => writeMoney(line.label, line.amount));
+            if (sections.showTotalDeduct) writeMoney('Total Potongan', parseFloat(slip.total_deductions), true);
+            row++;
+        }
+
+        if (sections.company.length > 0) {
+            ws.getRow(row).values = ['KONTRIBUSI PERUSAHAAN', '', 'Jumlah'];
+            Object.assign(ws.getCell(`A${row}`), infoStyle);
+            Object.assign(ws.getCell(`B${row}`), infoStyle);
+            Object.assign(ws.getCell(`C${row}`), infoStyle);
+            row++;
+            sections.company.forEach((line) => writeMoney(line.label, line.amount));
+            row++;
+        }
+
+        if (sections.showNet) {
+            ws.getCell(`A${row}`).value = 'GAJI BERSIH (Take Home Pay)';
+            ws.getCell(`A${row}`).font = { bold: true, size: 12 };
+            ws.getCell(`C${row}`).value = parseFloat(slip.net_salary);
+            ws.getCell(`C${row}`).numFmt = '#,##0';
+            ws.getCell(`C${row}`).font = { bold: true, size: 12, color: { argb: 'FF10B981' } };
+            row++;
+            if (sections.showBank) {
+                ws.getCell(`A${row}`).value = `Transfer ke: ${slip.bank_name} - ${slip.bank_account}`;
+            }
         }
 
         ws.getColumn(1).width = 30;

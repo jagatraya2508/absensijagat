@@ -289,9 +289,17 @@ router.delete('/:id', authenticateToken, canAssess, async (req, res) => {
 router.get('/employees', authenticateToken, canAssess, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT u.id, u.name, u.employee_id, ed.department, ed.position
+            `SELECT u.id, u.name, u.employee_id,
+                    COALESCE(ed.department, '') AS department,
+                    COALESCE(ed.position, '') AS position
              FROM users u
-             LEFT JOIN employee_details ed ON u.id = ed.user_id
+             LEFT JOIN LATERAL (
+                SELECT department, position
+                FROM employee_details
+                WHERE user_id = u.id
+                ORDER BY id DESC
+                LIMIT 1
+             ) ed ON true
              WHERE u.role = 'employee'
              ORDER BY u.name`
         );
