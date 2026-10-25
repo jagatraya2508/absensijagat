@@ -25,6 +25,7 @@ export default function AdminTuang() {
     const [month, setMonth] = useState(now.getMonth() + 1);
     const [year, setYear] = useState(now.getFullYear());
     const [department, setDepartment] = useState('');
+    const [nameQuery, setNameQuery] = useState('');
     const [departments, setDepartments] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [amounts, setAmounts] = useState({});
@@ -107,6 +108,14 @@ export default function AdminTuang() {
         }
     }
 
+    const visibleEmployees = useMemo(() => {
+        const query = nameQuery.trim().toLowerCase();
+        if (!query) return employees;
+        return employees.filter((emp) =>
+            String(emp.name || '').toLowerCase().includes(query)
+            || String(emp.employee_id || '').toLowerCase().includes(query)
+        );
+    }, [employees, nameQuery]);
     const dailyTotal = useMemo(
         () => employees.reduce((s, emp) => s + (parseFloat(amounts[emp.id]) || 0), 0),
         [employees, amounts]
@@ -331,7 +340,7 @@ export default function AdminTuang() {
     }
 
     const exportButtons = (
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="tuang-export-buttons">
             <button type="button" className="btn btn-outline" onClick={handlePrint} disabled={loading} title="Cetak">
                 <Icon name="Printer" size={16} inline /> Print
             </button>
@@ -346,7 +355,7 @@ export default function AdminTuang() {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="tuang-page-head">
                 <div>
                     <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '0.25rem' }}>
                         Insentif Tuang Produksi
@@ -355,7 +364,7 @@ export default function AdminTuang() {
                         Manager mengisi nilai tuang per karyawan sesuai pendapatan hari itu. Total bulan masuk ke payroll.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="tuang-view-switch">
                     <button className={`btn ${view === 'daily' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setView('daily')}>
                         Input Harian
                     </button>
@@ -371,8 +380,8 @@ export default function AdminTuang() {
 
             {view === 'daily' && (
                 <>
-                    <div className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                    <div className="card tuang-filter-card">
+                        <div className="tuang-toolbar">
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label className="form-label">Tanggal</label>
                                 <input type="date" className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -384,11 +393,21 @@ export default function AdminTuang() {
                                     {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                                 </select>
                             </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Nama Karyawan</label>
+                                <input
+                                    type="search"
+                                    className="form-input"
+                                    placeholder="Cari nama karyawan"
+                                    value={nameQuery}
+                                    onChange={(e) => setNameQuery(e.target.value)}
+                                />
+                            </div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--gray-700)' }}>
                                 <strong>{filledCount}</strong> karyawan terisi
                                 <div style={{ fontWeight: 700, color: 'var(--success-500)' }}>{formatCurrency(dailyTotal)}</div>
                             </div>
-                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <div className="tuang-actions">
                                 {exportButtons}
                                 <button className="btn btn-primary" onClick={saveDaily} disabled={saving || loading}>
                                     <Icon name="Save" size={16} inline /> {saving ? 'Menyimpan...' : 'Simpan Tuang'}
@@ -400,8 +419,10 @@ export default function AdminTuang() {
                     <div className="card tuang-daily-card">
                         {loading ? (
                             <p style={{ padding: '1.5rem', color: 'var(--gray-600)' }}>Memuat...</p>
-                        ) : employees.length === 0 ? (
-                            <p style={{ padding: '1.5rem', color: 'var(--gray-600)' }}>Tidak ada karyawan.</p>
+                        ) : visibleEmployees.length === 0 ? (
+                            <p style={{ padding: '1.5rem', color: 'var(--gray-600)' }}>
+                                {employees.length === 0 ? 'Tidak ada karyawan.' : 'Tidak ada karyawan dengan nama itu.'}
+                            </p>
                         ) : (
                             <table className="table stack-table tuang-daily-table" style={{ fontSize: '0.85rem' }}>
                                 <thead>
@@ -413,7 +434,7 @@ export default function AdminTuang() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {employees.map((emp) => {
+                                    {visibleEmployees.map((emp) => {
                                         const note = notes[emp.id] ?? '';
                                         return (
                                         <tr key={emp.id}>
@@ -462,8 +483,8 @@ export default function AdminTuang() {
 
             {view === 'summary' && (
                 <>
-                    <div className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                    <div className="card tuang-filter-card">
+                        <div className="tuang-toolbar">
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label className="form-label">Bulan</label>
                                 <select className="form-input form-select" value={month} onChange={(e) => setMonth(parseInt(e.target.value, 10))}>
@@ -478,7 +499,7 @@ export default function AdminTuang() {
                                 Total {MONTHS[month]} {year}
                                 <div style={{ fontWeight: 700, color: 'var(--success-500)' }}>{formatCurrency(summaryTotal)}</div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <div className="tuang-actions">
                                 {exportButtons}
                             </div>
                         </div>

@@ -137,7 +137,7 @@ export default function AdminLoans() {
             {success && <div className="alert alert-success mb-3"><span className="alert-icon"><Icon name="Check" size={16} inline /></span> {success}</div>}
 
             {/* Summary */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="swipe-cards">
                 <div className="card status-card">
                     <div className="status-card-icon warning"><Icon name="Wallet" size={16} inline /></div>
                     <div className="status-card-content">

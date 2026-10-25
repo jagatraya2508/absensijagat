@@ -264,9 +264,12 @@ export const locationsAPI = {
 // Reports API
 export const reportsAPI = {
     getEmployees: () => request('/reports/employees'),
-    getDaily: (date) => {
-        const query = date ? `?date=${date}` : '';
-        return request(`/reports/daily${query}`);
+    getDaily: (startDate, endDate) => {
+        const params = new URLSearchParams();
+        if (startDate) params.set('start_date', startDate);
+        if (endDate) params.set('end_date', endDate);
+        const query = params.toString();
+        return request(`/reports/daily${query ? `?${query}` : ''}`);
     },
 
     getMonthly: (year, month) => {
@@ -291,28 +294,34 @@ export const reportsAPI = {
     },
 
     // Export functions - return download URLs
-    exportDailyPDF: (date) => {
+    exportDailyPDF: (startDate, endDate) => {
         const token = localStorage.getItem('token');
-        const url = `${API_BASE}/reports/export/daily/pdf?date=${date}`;
+        const params = new URLSearchParams();
+        if (startDate) params.set('start_date', startDate);
+        if (endDate) params.set('end_date', endDate);
+        const url = `${API_BASE}/reports/export/daily/pdf?${params}`;
         return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.blob())
             .then(blob => {
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `laporan-absensi-${date}.pdf`;
+                link.download = `laporan-absensi-${startDate}-sd-${endDate || startDate}.pdf`;
                 link.click();
             });
     },
 
-    exportDailyExcel: (date) => {
+    exportDailyExcel: (startDate, endDate) => {
         const token = localStorage.getItem('token');
-        const url = `${API_BASE}/reports/export/daily/excel?date=${date}`;
+        const params = new URLSearchParams();
+        if (startDate) params.set('start_date', startDate);
+        if (endDate) params.set('end_date', endDate);
+        const url = `${API_BASE}/reports/export/daily/excel?${params}`;
         return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.blob())
             .then(blob => {
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `laporan-absensi-${date}.xlsx`;
+                link.download = `laporan-absensi-${startDate}-sd-${endDate || startDate}.xlsx`;
                 link.click();
             });
     },

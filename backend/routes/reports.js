@@ -16,10 +16,19 @@ const ExcelJS = require('exceljs');
 router.get('/employees', authenticateToken, canViewReports, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, employee_id, name, role
-             FROM users
-             WHERE COALESCE(role, '') <> 'kiosk'
-             ORDER BY name`
+            `SELECT u.id, u.employee_id, u.name, u.role,
+                    COALESCE(ed.department, '') AS department,
+                    COALESCE(ed.division, '') AS division
+             FROM users u
+             LEFT JOIN LATERAL (
+                SELECT department, division
+                FROM employee_details
+                WHERE user_id = u.id
+                ORDER BY id DESC
+                LIMIT 1
+             ) ed ON true
+             WHERE u.role IN ('employee', 'manager')
+             ORDER BY u.name`
         );
         res.json(result.rows);
     } catch (error) {
@@ -28,75 +37,152 @@ router.get('/employees', authenticateToken, canViewReports, async (req, res) => 
     }
 });
 
-// Get daily report (Admin only)
+function dateOnly(value) {
+    if (!value) return '';
+    if (typeof value === 'string') return value.slice(0, 10);
+    const d = new Date(value);
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+}
+
+function resolveReportRange(query) {
+    const today = new Date();
+    const fallback = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    let start = query.start_date || query.date || fallback;
+    let end = query.end_date || query.date || start;
+    if (start > end) {
+        const swap = start;
+        start = end;
+        end = swap;
+    }
+    const startMs = Date.parse(`${start}T00:00:00Z`);
+    const endMs = Date.parse(`${end}T00:00:00Z`);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+        return { error: 'Tanggal tidak valid' };
+    }
+    const days = Math.round((endMs - startMs) / 86400000) + 1;
+    if (days > 62) {
+        return { error: 'Rentang tanggal maksimal 62 hari' };
+    }
+    return { start, end };
+}
+
+function attendanceStatusLabel(row) {
+    if (row.is_off_day) return 'OFF';
+    if (row.leave_type === 'late') return 'Izin Terlambat';
+    if (row.leave_type === 'leave') return 'Cuti';
+    if (row.leave_type === 'sick') return 'Sakit';
+    if (row.leave_type === 'permission') return 'Izin Tidak Masuk';
+    if (row.leave_type === 'change_off') return 'Tukar Libur';
+    if (row.check_in_time && row.check_out_time) return 'Lengkap';
+    if (row.check_in_time) return 'Belum Pulang';
+    if (row.manual_id) return 'Pengajuan Absensi';
+    return 'Tidak Hadir';
+}
+
+async function fetchAttendanceRows(start, end) {
+    const result = await pool.query(
+        `SELECT
+            u.id AS user_id,
+            u.employee_id,
+            u.name,
+            COALESCE(ed.department, '') AS department,
+            COALESCE(ed.division, '') AS division,
+            d.day::date AS report_date,
+            ci.recorded_at AS check_in_time,
+            ci.is_valid AS check_in_valid,
+            co.recorded_at AS check_out_time,
+            co.is_valid AS check_out_valid,
+            al.name AS location_name,
+            lr.type AS leave_type,
+            CASE WHEN uod.id IS NOT NULL THEN true ELSE false END AS is_off_day,
+            ma.id AS manual_id,
+            ma.status AS manual_status
+        FROM users u
+        CROSS JOIN generate_series($1::date, $2::date, '1 day') AS d(day)
+        LEFT JOIN LATERAL (
+            SELECT department, division
+            FROM employee_details
+            WHERE user_id = u.id
+            ORDER BY id DESC
+            LIMIT 1
+        ) ed ON true
+        LEFT JOIN LATERAL (
+            SELECT recorded_at, is_valid, location_id
+            FROM attendance_records
+            WHERE user_id = u.id AND type = 'check_in' AND DATE(recorded_at) = d.day::date
+            ORDER BY recorded_at ASC
+            LIMIT 1
+        ) ci ON true
+        LEFT JOIN LATERAL (
+            SELECT recorded_at, is_valid, location_id
+            FROM attendance_records
+            WHERE user_id = u.id AND type = 'check_out' AND DATE(recorded_at) = d.day::date
+            ORDER BY recorded_at DESC
+            LIMIT 1
+        ) co ON true
+        LEFT JOIN attendance_locations al ON al.id = COALESCE(ci.location_id, co.location_id)
+        LEFT JOIN LATERAL (
+            SELECT type
+            FROM leave_requests
+            WHERE user_id = u.id
+              AND status = 'approved'
+              AND d.day::date BETWEEN start_date AND end_date
+            ORDER BY id DESC
+            LIMIT 1
+        ) lr ON true
+        LEFT JOIN user_off_days uod ON uod.user_id = u.id AND uod.off_date = d.day::date
+        LEFT JOIN LATERAL (
+            SELECT id, status
+            FROM manual_attendances
+            WHERE user_id = u.id
+              AND date = d.day::date
+              AND status IN ('pending', 'approved')
+            ORDER BY id DESC
+            LIMIT 1
+        ) ma ON true
+        WHERE u.role IN ('employee', 'manager')
+        ORDER BY d.day, u.name`,
+        [start, end]
+    );
+
+    return result.rows.map((row) => ({
+        ...row,
+        report_date: dateOnly(row.report_date),
+        department: row.department || '',
+        division: row.division || '',
+        is_off_day: row.is_off_day === true || row.is_off_day === 't',
+        manual_id: row.manual_id || null
+    }));
+}
+
+function summarizeAttendance(records, start, end) {
+    return {
+        start_date: start,
+        end_date: end,
+        total_employees: new Set(records.map((row) => row.user_id)).size,
+        present: records.filter((row) => row.check_in_time).length,
+        absent: records.filter((row) => !row.check_in_time && !row.leave_type && !row.is_off_day && !row.manual_id).length,
+        completed: records.filter((row) => row.check_in_time && row.check_out_time).length,
+        on_late: records.filter((row) => row.leave_type === 'late').length,
+        on_leave: records.filter((row) => row.leave_type === 'leave').length,
+        on_manual: records.filter((row) => row.manual_id).length,
+        on_off: records.filter((row) => row.is_off_day).length,
+        on_sick: records.filter((row) => row.leave_type === 'sick').length
+    };
+}
+
+// Get daily report
 router.get('/daily', authenticateToken, canViewReports, async (req, res) => {
     try {
-        const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
-
-        // Get attendance records
-        const result = await pool.query(
-            `SELECT 
-        u.id as user_id,
-        u.employee_id,
-        u.name,
-        ci.recorded_at as check_in_time,
-        ci.photo_path as check_in_photo,
-        ci.latitude as check_in_lat,
-        ci.longitude as check_in_lng,
-        ci.distance_meters as check_in_distance,
-        ci.is_valid as check_in_valid,
-        co.recorded_at as check_out_time,
-        co.photo_path as check_out_photo,
-        co.latitude as check_out_lat,
-        co.longitude as check_out_lng,
-        co.distance_meters as check_out_distance,
-        co.is_valid as check_out_valid,
-        al.name as location_name,
-        lr.id as leave_id,
-        lr.type as leave_type,
-        lr.status as leave_status,
-        lr.reason as leave_reason,
-        CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
-      FROM users u
-      LEFT JOIN attendance_records ci ON u.id = ci.user_id 
-        AND ci.type = 'check_in' 
-        AND DATE(ci.recorded_at) = $1
-      LEFT JOIN attendance_records co ON u.id = co.user_id 
-        AND co.type = 'check_out' 
-        AND DATE(co.recorded_at) = $1
-      LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
-      LEFT JOIN leave_requests lr ON u.id = lr.user_id
-        AND lr.status = 'approved'
-        AND $1::date BETWEEN lr.start_date AND lr.end_date
-      LEFT JOIN user_off_days uod ON u.id = uod.user_id
-        AND uod.off_date = $1::date
-      WHERE u.role IN ('employee', 'manager')
-      ORDER BY u.name`,
-            [targetDate]
-        );
-
-        // Calculate summary with leave breakdown
-        const records = result.rows;
-        const onLeave = records.filter(r => r.leave_type === 'leave');
-        const onSick = records.filter(r => r.leave_type === 'sick');
-        const onLate = records.filter(r => r.leave_type === 'late');
-        const onOff = records.filter(r => r.is_off_day);
-
-        const summary = {
-            date: targetDate,
-            total_employees: records.length,
-            present: records.filter(r => r.check_in_time).length,
-            absent: records.filter(r => !r.check_in_time && !r.leave_type && !r.is_off_day).length,
-            completed: records.filter(r => r.check_in_time && r.check_out_time).length,
-            on_leave: onLeave.length,
-            on_sick: onSick.length,
-            on_late: onLate.length,
-            on_off: onOff.length
-        };
-
+        const range = resolveReportRange(req.query);
+        if (range.error) {
+            return res.status(400).json({ error: range.error });
+        }
+        const records = await fetchAttendanceRows(range.start, range.end);
         res.json({
-            summary,
+            summary: summarizeAttendance(records, range.start, range.end),
             records
         });
     } catch (error) {
@@ -120,14 +206,19 @@ router.get('/monthly', authenticateToken, canViewReports, async (req, res) => {
         u.id as user_id,
         u.employee_id,
         u.name,
+        COALESCE(ed.department, '') AS department,
+        COALESCE(ed.division, '') AS division,
         COUNT(DISTINCT CASE WHEN ar.type = 'check_in' THEN DATE(ar.recorded_at) END) as total_present,
         COUNT(DISTINCT CASE WHEN ar.type = 'check_in' AND ar.is_valid = true THEN DATE(ar.recorded_at) END) as valid_checkins,
         COUNT(DISTINCT CASE WHEN ar.type = 'check_in' AND ar.is_valid = false THEN DATE(ar.recorded_at) END) as invalid_checkins
       FROM users u
+      LEFT JOIN LATERAL (
+        SELECT department, division FROM employee_details WHERE user_id = u.id ORDER BY id DESC LIMIT 1
+      ) ed ON true
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
       WHERE u.role IN ('employee', 'manager')
-      GROUP BY u.id, u.employee_id, u.name
+      GROUP BY u.id, u.employee_id, u.name, ed.department, ed.division
       ORDER BY u.name`,
             [startDate, endDate]
         );
@@ -201,35 +292,15 @@ router.get('/employee/:id', authenticateToken, async (req, res) => {
 // Export Daily Report as PDF
 router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, res) => {
     try {
-        const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
-
-        const result = await pool.query(
-            `SELECT 
-        u.employee_id,
-        u.name,
-        ci.recorded_at as check_in_time,
-        ci.is_valid as check_in_valid,
-        co.recorded_at as check_out_time,
-        al.name as location_name,
-        CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
-      FROM users u
-      LEFT JOIN attendance_records ci ON u.id = ci.user_id 
-        AND ci.type = 'check_in' 
-        AND DATE(ci.recorded_at) = $1
-      LEFT JOIN attendance_records co ON u.id = co.user_id 
-        AND co.type = 'check_out' 
-        AND DATE(co.recorded_at) = $1
-      LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
-      LEFT JOIN user_off_days uod ON u.id = uod.user_id
-        AND uod.off_date = $1::date
-      WHERE u.role IN ('employee', 'manager')
-      ORDER BY u.name`,
-            [targetDate]
-        );
+        const range = resolveReportRange(req.query);
+        if (range.error) {
+            return res.status(400).json({ error: range.error });
+        }
+        const rows = await fetchAttendanceRows(range.start, range.end);
+        const targetDate = range.start === range.end ? range.start : `${range.start}-sd-${range.end}`;
 
         // Create PDF
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=laporan-absensi-${targetDate}.pdf`);
@@ -238,53 +309,45 @@ router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, r
 
         // Title
         doc.fontSize(20).text('LAPORAN ABSENSI HARIAN', { align: 'center' });
-        doc.fontSize(12).text(`Tanggal: ${formatDateID(targetDate)}`, { align: 'center' });
+        doc.fontSize(12).text(`Periode: ${formatDateID(range.start)} - ${formatDateID(range.end)}`, { align: 'center' });
         doc.moveDown(2);
 
-        // Summary
-        const present = result.rows.filter(r => r.check_in_time).length;
-        const offDay = result.rows.filter(r => r.is_off_day).length;
-        const absent = result.rows.filter(r => !r.check_in_time && !r.is_off_day).length;
-
+        const summary = summarizeAttendance(rows, range.start, range.end);
         doc.fontSize(11);
-        doc.text(`Total Karyawan: ${result.rows.length}`);
-        doc.text(`Hadir: ${present}`);
-        doc.text(`OFF: ${offDay}`);
-        doc.text(`Tidak Hadir: ${absent}`);
-        doc.moveDown(2);
+        doc.text(`Karyawan: ${summary.total_employees}   Hadir: ${summary.present}   Tidak Hadir: ${summary.absent}   Lengkap: ${summary.completed}`);
+        doc.text(`Izin Terlambat: ${summary.on_late}   Cuti: ${summary.on_leave}   Pengajuan Absensi: ${summary.on_manual}`);
+        doc.moveDown(1);
 
-        // Table Header
         const tableTop = doc.y;
-        const col1 = 50, col2 = 120, col3 = 250, col4 = 330, col5 = 420;
+        const columns = [36, 60, 150, 250, 340, 430, 520, 600, 680];
+        doc.font('Helvetica-Bold').fontSize(8);
+        ['No', 'ID', 'Nama', 'Departemen', 'Divisi', 'Tanggal', 'Masuk', 'Pulang', 'Status'].forEach((label, index) => {
+            doc.text(label, columns[index], tableTop, { width: 80 });
+        });
+        doc.moveTo(36, tableTop + 14).lineTo(800, tableTop + 14).stroke();
 
-        doc.font('Helvetica-Bold').fontSize(10);
-        doc.text('No', col1, tableTop);
-        doc.text('Nama', col2, tableTop);
-        doc.text('Check-in', col3, tableTop);
-        doc.text('Check-out', col4, tableTop);
-        doc.text('Status', col5, tableTop);
-
-        doc.moveTo(col1, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-
-        // Table Rows
-        doc.font('Helvetica').fontSize(9);
-        let yPosition = tableTop + 25;
-
-        result.rows.forEach((row, index) => {
-            if (yPosition > 700) {
+        doc.font('Helvetica').fontSize(8);
+        let yPosition = tableTop + 22;
+        rows.forEach((row, index) => {
+            if (yPosition > 540) {
                 doc.addPage();
-                yPosition = 50;
+                yPosition = 40;
             }
-
-            const status = row.is_off_day ? 'OFF' : (row.check_in_time ? (row.check_in_valid ? 'Valid' : 'Diluar Radius') : 'Tidak Hadir');
-
-            doc.text(String(index + 1), col1, yPosition);
-            doc.text(row.name || '-', col2, yPosition, { width: 120 });
-            doc.text(row.is_off_day ? 'OFF' : (row.check_in_time ? formatTimeID(row.check_in_time) : '-'), col3, yPosition);
-            doc.text(row.is_off_day ? 'OFF' : (row.check_out_time ? formatTimeID(row.check_out_time) : '-'), col4, yPosition);
-            doc.text(status, col5, yPosition);
-
-            yPosition += 20;
+            const values = [
+                String(index + 1),
+                row.employee_id || '-',
+                row.name || '-',
+                row.department || '-',
+                row.division || '-',
+                row.report_date || '-',
+                row.check_in_time ? formatTimeID(row.check_in_time) : '-',
+                row.check_out_time ? formatTimeID(row.check_out_time) : '-',
+                attendanceStatusLabel(row)
+            ];
+            values.forEach((value, col) => {
+                doc.text(String(value), columns[col], yPosition, { width: col === 2 ? 95 : 80 });
+            });
+            yPosition += 16;
         });
 
         // Footer
@@ -300,85 +363,57 @@ router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, r
 // Export Daily Report as Excel
 router.get('/export/daily/excel', authenticateToken, canViewReports, async (req, res) => {
     try {
-        const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
-
-        const result = await pool.query(
-            `SELECT 
-        u.employee_id,
-        u.name,
-        ci.recorded_at as check_in_time,
-        ci.is_valid as check_in_valid,
-        ci.distance_meters as check_in_distance,
-        co.recorded_at as check_out_time,
-        al.name as location_name,
-        CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
-      FROM users u
-      LEFT JOIN attendance_records ci ON u.id = ci.user_id 
-        AND ci.type = 'check_in' 
-        AND DATE(ci.recorded_at) = $1
-      LEFT JOIN attendance_records co ON u.id = co.user_id 
-        AND co.type = 'check_out' 
-        AND DATE(co.recorded_at) = $1
-      LEFT JOIN attendance_locations al ON COALESCE(ci.location_id, co.location_id) = al.id
-      LEFT JOIN user_off_days uod ON u.id = uod.user_id
-        AND uod.off_date = $1::date
-      WHERE u.role IN ('employee', 'manager')
-      ORDER BY u.name`,
-            [targetDate]
-        );
+        const range = resolveReportRange(req.query);
+        if (range.error) {
+            return res.status(400).json({ error: range.error });
+        }
+        const rows = await fetchAttendanceRows(range.start, range.end);
+        const targetDate = range.start === range.end ? range.start : `${range.start}-sd-${range.end}`;
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Laporan Absensi');
 
         // Title
-        worksheet.mergeCells('A1:G1');
+        worksheet.mergeCells('A1:J1');
         worksheet.getCell('A1').value = 'LAPORAN ABSENSI HARIAN';
         worksheet.getCell('A1').font = { bold: true, size: 16 };
         worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-        worksheet.mergeCells('A2:G2');
-        worksheet.getCell('A2').value = `Tanggal: ${formatDateID(targetDate)}`;
+        worksheet.mergeCells('A2:J2');
+        worksheet.getCell('A2').value = `Periode: ${formatDateID(range.start)} - ${formatDateID(range.end)}`;
         worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-        // Header
-        worksheet.getRow(4).values = ['No', 'ID Karyawan', 'Nama', 'Check-in', 'Check-out', 'Lokasi', 'Status'];
-        worksheet.getRow(4).font = { bold: true };
+        worksheet.getRow(4).values = ['No', 'ID Karyawan', 'Nama', 'Departemen', 'Divisi', 'Tanggal', 'Check-in', 'Check-out', 'Lokasi', 'Status'];
+        worksheet.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         worksheet.getRow(4).fill = {
             type: 'pattern',
             pattern: 'solid',
             fgColor: { argb: 'FF1E3A8A' }
         };
-        worksheet.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
-        // Data rows
-        result.rows.forEach((row, index) => {
-            const status = row.is_off_day ? 'OFF' : (row.check_in_time ? (row.check_in_valid ? 'Valid' : 'Diluar Radius') : 'Tidak Hadir');
+        rows.forEach((row, index) => {
             worksheet.addRow([
                 index + 1,
                 row.employee_id || '-',
                 row.name || '-',
-                row.is_off_day ? 'OFF' : (row.check_in_time ? formatTimeID(row.check_in_time) : '-'),
-                row.is_off_day ? 'OFF' : (row.check_out_time ? formatTimeID(row.check_out_time) : '-'),
+                row.department || '-',
+                row.division || '-',
+                row.report_date || '-',
+                row.check_in_time ? formatTimeID(row.check_in_time) : '-',
+                row.check_out_time ? formatTimeID(row.check_out_time) : '-',
                 row.location_name || '-',
-                status
+                attendanceStatusLabel(row)
             ]);
         });
 
-        // Column width
         worksheet.columns = [
-            { width: 5 },
-            { width: 15 },
-            { width: 25 },
-            { width: 12 },
-            { width: 12 },
-            { width: 20 },
-            { width: 15 }
+            { width: 5 }, { width: 14 }, { width: 24 }, { width: 16 }, { width: 16 },
+            { width: 14 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 18 }
         ];
 
-        // Summary row
+        const excelSummary = summarizeAttendance(rows, range.start, range.end);
         const summaryRow = worksheet.rowCount + 2;
-        worksheet.getCell(`A${summaryRow}`).value = `Total Hadir: ${result.rows.filter(r => r.check_in_time).length} / ${result.rows.length}`;
+        worksheet.getCell(`A${summaryRow}`).value = `Hadir: ${excelSummary.present} | Tidak Hadir: ${excelSummary.absent} | Lengkap: ${excelSummary.completed} | Izin Terlambat: ${excelSummary.on_late} | Cuti: ${excelSummary.on_leave} | Pengajuan Absensi: ${excelSummary.on_manual}`;
         worksheet.getCell(`A${summaryRow}`).font = { bold: true };
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -636,12 +671,17 @@ router.get('/off', authenticateToken, canViewReports, async (req, res) => {
             `SELECT 
                 u.employee_id,
                 u.name,
+                COALESCE(ed.department, '') AS department,
+                COALESCE(ed.division, '') AS division,
                 d.date::date as off_date,
                 'leave' as type,
                 lr.type as category,
                 lr.reason
             FROM leave_requests lr
             JOIN users u ON lr.user_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT department, division FROM employee_details WHERE user_id = u.id ORDER BY id DESC LIMIT 1
+            ) ed ON true
             CROSS JOIN LATERAL generate_series(lr.start_date, lr.end_date, '1 day') AS d(date)
             WHERE lr.status = 'approved' AND d.date BETWEEN $1 AND $2
 
@@ -650,12 +690,17 @@ router.get('/off', authenticateToken, canViewReports, async (req, res) => {
             SELECT 
                 u.employee_id,
                 u.name,
+                COALESCE(ed.department, '') AS department,
+                COALESCE(ed.division, '') AS division,
                 uod.off_date,
                 'off_day' as type,
                 'Libur' as category,
                 'Jadwal Libur' as reason
             FROM user_off_days uod
             JOIN users u ON uod.user_id = u.id
+            LEFT JOIN LATERAL (
+                SELECT department, division FROM employee_details WHERE user_id = u.id ORDER BY id DESC LIMIT 1
+            ) ed ON true
             WHERE uod.off_date BETWEEN $1 AND $2
 
             ORDER BY off_date DESC, name ASC`,
@@ -891,7 +936,9 @@ router.get('/history', authenticateToken, canViewReports, async (req, res) => {
                 u.id as user_id,
                 u.employee_id,
                 u.name,
-                DATE(ci.recorded_at) as attendance_date,
+                COALESCE(ed.department, '') AS department,
+                COALESCE(ed.division, '') AS division,
+                d.date::date as attendance_date,
                 ci.recorded_at as check_in_time,
                 ci.is_valid as check_in_valid,
                 ci.distance_meters as check_in_distance,
@@ -903,6 +950,9 @@ router.get('/history', authenticateToken, canViewReports, async (req, res) => {
                 CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
+            LEFT JOIN LATERAL (
+                SELECT department, division FROM employee_details WHERE user_id = u.id ORDER BY id DESC LIMIT 1
+            ) ed ON true
             LEFT JOIN attendance_records ci ON u.id = ci.user_id 
                 AND ci.type = 'check_in' 
                 AND DATE(ci.recorded_at) = d.date::date

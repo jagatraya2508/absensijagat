@@ -255,6 +255,7 @@ export default function AdminPayroll() {
                         </div>
                         <div className="modal-body">
                             {selectedRun.items && selectedRun.items.length > 0 ? (
+                                <div className="table-container">
                                 <table className="table payroll-detail-table">
                                     <thead>
                                         <tr>
@@ -318,6 +319,7 @@ export default function AdminPayroll() {
                                         </tr>
                                     </tfoot>
                                 </table>
+                                </div>
                             ) : (
                                 <p style={{ color: 'var(--gray-500)', textAlign: 'center' }}>Tidak ada data</p>
                             )}
