@@ -22,6 +22,7 @@ router.get('/active', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const role = req.user.role;
+        const { type } = req.query; // 'check-in' or 'check-out'
 
         const userLocs = await pool.query('SELECT location_id FROM user_locations WHERE user_id = $1', [userId]);
 
@@ -32,6 +33,13 @@ router.get('/active', authenticateToken, async (req, res) => {
             const locIds = userLocs.rows.map(r => r.location_id);
             query += ' AND id = ANY($1)';
             params.push(locIds);
+        }
+
+        // Filter based on location_type ('all', 'check_in', 'check_out')
+        if (type === 'check-in') {
+            query += ` AND (location_type = 'all' OR location_type = 'check_in' OR location_type IS NULL)`;
+        } else if (type === 'check-out') {
+            query += ` AND (location_type = 'all' OR location_type = 'check_out' OR location_type IS NULL)`;
         }
 
         query += ' ORDER BY name';
@@ -67,17 +75,19 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // Create location (Admin only)
 router.post('/', authenticateToken, canManageLocations, async (req, res) => {
     try {
-        const { name, latitude, longitude, radius_meters, is_active } = req.body;
+        const { name, latitude, longitude, radius_meters, is_active, location_type } = req.body;
 
         if (!name || !latitude || !longitude) {
             return res.status(400).json({ error: 'Nama, latitude, dan longitude harus diisi' });
         }
 
+        const validLocationType = ['all', 'check_in', 'check_out'].includes(location_type) ? location_type : 'all';
+
         const result = await pool.query(
-            `INSERT INTO attendance_locations (name, latitude, longitude, radius_meters, is_active)
-       VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO attendance_locations (name, latitude, longitude, radius_meters, is_active, location_type)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-            [name, latitude, longitude, radius_meters || 100, is_active !== false]
+            [name, latitude, longitude, radius_meters || 100, is_active !== false, validLocationType]
         );
 
         res.status(201).json(result.rows[0]);
@@ -91,7 +101,11 @@ router.post('/', authenticateToken, canManageLocations, async (req, res) => {
 router.put('/:id', authenticateToken, canManageLocations, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, latitude, longitude, radius_meters, is_active } = req.body;
+        const { name, latitude, longitude, radius_meters, is_active, location_type } = req.body;
+
+        const validLocationType = location_type && ['all', 'check_in', 'check_out'].includes(location_type)
+            ? location_type
+            : undefined;
 
         const result = await pool.query(
             `UPDATE attendance_locations 
@@ -99,10 +113,11 @@ router.put('/:id', authenticateToken, canManageLocations, async (req, res) => {
            latitude = COALESCE($2, latitude),
            longitude = COALESCE($3, longitude),
            radius_meters = COALESCE($4, radius_meters),
-           is_active = COALESCE($5, is_active)
-       WHERE id = $6
+           is_active = COALESCE($5, is_active),
+           location_type = COALESCE($6, location_type)
+       WHERE id = $7
        RETURNING *`,
-            [name, latitude, longitude, radius_meters, is_active, id]
+            [name, latitude, longitude, radius_meters, is_active, validLocationType, id]
         );
 
         if (result.rows.length === 0) {

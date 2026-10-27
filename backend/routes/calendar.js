@@ -7,7 +7,7 @@ const hd = new Holidays('ID');
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const { month, year, user_id } = req.query;
+        const { month, year, user_id, search } = req.query;
 
         let dateFilter = '';
         const params = [];
@@ -23,6 +23,13 @@ router.get('/', authenticateToken, async (req, res) => {
         if (user_id) {
             userFilter = ` AND u.id = $${paramCount}`;
             params.push(user_id);
+            paramCount++;
+        }
+
+        if (search && search.trim()) {
+            userFilter += ` AND (u.name ILIKE $${paramCount} OR COALESCE(u.employee_id, '') ILIKE $${paramCount})`;
+            params.push(`%${search.trim()}%`);
+            paramCount++;
         }
 
         const events = [];
@@ -69,7 +76,11 @@ router.get('/', authenticateToken, async (req, res) => {
                 end: endDate,
                 allDay: false,
                 type: 'shift',
-                user_name: shift.user_name
+                user_name: shift.user_name,
+                shift_name: shift.shift_name,
+                start_time: shift.start_time,
+                end_time: shift.end_time,
+                date: shift.date
             });
         });
 

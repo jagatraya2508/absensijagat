@@ -35,7 +35,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/history', icon: 'History', label: 'Riwayat' },
         { path: '/leaves', icon: 'FileText', label: 'Izin & Cuti' },
         { path: '/overtime', icon: 'Clock', label: 'Pengajuan Lembur' },
-        { path: '/schedule', icon: 'Calendar', label: 'Kalender' },
+        { path: '/schedule', icon: 'CalendarClock', label: 'Jadwal & Shift' },
         ...((user?.use_tracking || user?.role === 'admin') ? [{ path: '/driver-tracking', icon: 'MapPin', label: 'Tracking' }] : []),
     ];
 
@@ -70,6 +70,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
     const pimpinanItems = [
         { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals', showIfManager: true },
         { path: '/leave-approvals', icon: 'ClipboardCheck', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
+        { path: '/admin/work-schedule?tab=shift_requests', icon: 'Repeat', label: 'Persetujuan Shift', permissionKey: 'admin.work_schedule', extraKeys: ['manager.approvals'], showIfSupervisor: true },
         { path: '/admin/leaves', icon: 'FileText', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
         { path: '/admin/manual-attendance', icon: 'ClipboardList', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
         { path: '/off-days', icon: 'CalendarOff', label: 'Atur Libur', permissionKey: 'admin.off_days' },

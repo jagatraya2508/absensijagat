@@ -258,12 +258,17 @@ router.get('/', authenticateToken, hasPermission('admin.employees'), async (req,
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
                    ed.nik, ed.phone, ed.department, ed.division, ed.position, ed.employment_status, ed.join_date,
                    ed.basic_salary, ed.salary_type, ed.gender, ed.bpjs_kesehatan_no, ed.npwp,
+                   COALESCE(ed.appreciation_allowance, 0) as appreciation_allowance,
+                   COALESCE(ed.transport_allowance, 0) as transport_allowance,
+                   COALESCE(ed.meal_allowance, 0) as meal_allowance,
+                   COALESCE(ed.overtime_rate, 50000) as overtime_rate,
                    ed.is_driver, ed.is_collector, ed.is_sales, ed.use_tracking, COALESCE(ed.receives_tuang, true) as receives_tuang, ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance, ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
                    ed.bpjs_kes_enrolled, ed.bpjs_jht_enrolled, ed.bpjs_jp_enrolled, ed.bpjs_jkk_enrolled, ed.bpjs_jkm_enrolled, ed.pph21_enabled,
                    ed.bpjs_kes_employee_rate, ed.bpjs_kes_company_rate, ed.bpjs_jht_employee_rate, ed.bpjs_jht_company_rate,
                    ed.bpjs_jp_employee_rate, ed.bpjs_jp_company_rate, ed.bpjs_jkk_rate, ed.bpjs_jkm_rate,
                    ed.vehicle_type_id, vt.name as vehicle_type_name,
-                   ed.supervisor_id, supervisor.name as supervisor_name
+                   ed.supervisor_id, supervisor.name as supervisor_name,
+                   COALESCE(ed.require_different_checkout, false) as require_different_checkout
             FROM users u
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN vehicle_types vt ON ed.vehicle_type_id = vt.id
@@ -817,7 +822,8 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
             no_kk,
-            location_ids, vehicle_type_id, supervisor_id, receives_tuang
+            location_ids, vehicle_type_id, supervisor_id, receives_tuang,
+            require_different_checkout
         } = req.body;
 
 
@@ -868,6 +874,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
                 bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
                 no_kk, vehicle_type_id,
+                require_different_checkout,
                 updated_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
@@ -876,7 +883,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 $28, $29, $30, $31, $32, $33, $34, $35, $36,
                 $37, $38, $39, $40, $41, $42,
                 $43, $44, $45, $46, $47, $48, $49, $50,
-                $51, $52, $53,
+                $51, $52, $53, $54,
                 CURRENT_TIMESTAMP
             )
             ON CONFLICT (user_id) DO UPDATE SET
@@ -932,6 +939,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 bpjs_jkm_rate = EXCLUDED.bpjs_jkm_rate,
                 no_kk = EXCLUDED.no_kk,
                 vehicle_type_id = EXCLUDED.vehicle_type_id,
+                require_different_checkout = EXCLUDED.require_different_checkout,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING *
         `, [
@@ -946,7 +954,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bpjs_kes_enrolled !== false, bpjs_jht_enrolled !== false, bpjs_jp_enrolled !== false, bpjs_jkk_enrolled !== false, bpjs_jkm_enrolled !== false, pph21_enabled !== false,
             bpjs_kes_employee_rate || null, bpjs_kes_company_rate || null, bpjs_jht_employee_rate || null, bpjs_jht_company_rate || null,
             bpjs_jp_employee_rate || null, bpjs_jp_company_rate || null, bpjs_jkk_rate || null, bpjs_jkm_rate || null,
-            no_kk || null, vehicle_type_id || null
+            no_kk || null, vehicle_type_id || null, require_different_checkout || false
         ]);
 
         // Manage locations

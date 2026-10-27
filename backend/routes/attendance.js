@@ -86,6 +86,11 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
             );
             if (locationResult.rows.length > 0) {
                 nearestLocation = locationResult.rows[0];
+                if (nearestLocation.location_type === 'check_out') {
+                    return res.status(400).json({
+                        error: `Lokasi "${nearestLocation.name}" hanya diperuntukkan untuk absen pulang (Check-Out)`
+                    });
+                }
                 distance = calculateDistance(
                     parseFloat(latitude),
                     parseFloat(longitude),
@@ -94,7 +99,8 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
                 );
                 isValid = distance <= nearestLocation.radius_meters;
             }
-            // Find nearest active location among ALLOWED locations (Option B: if no allowed locations, allow ALL)
+        } else {
+            // Find nearest active location among ALLOWED locations (only 'all' or 'check_in')
             const allowedCheck = await pool.query('SELECT location_id FROM user_locations WHERE user_id = $1', [req.user.id]);
             let locationsResult;
             
@@ -102,13 +108,17 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
                 // User has restricted locations
                 const allowedIds = allowedCheck.rows.map(r => r.location_id);
                 locationsResult = await pool.query(
-                    'SELECT * FROM attendance_locations WHERE is_active = true AND id = ANY($1)',
+                    `SELECT * FROM attendance_locations 
+                     WHERE is_active = true AND id = ANY($1) 
+                       AND (location_type = 'all' OR location_type = 'check_in' OR location_type IS NULL)`,
                     [allowedIds]
                 );
             } else {
-                // Option B: Fallback to ALL active locations
+                // Option B: Fallback to ALL active check-in locations
                 locationsResult = await pool.query(
-                    'SELECT * FROM attendance_locations WHERE is_active = true'
+                    `SELECT * FROM attendance_locations 
+                     WHERE is_active = true 
+                       AND (location_type = 'all' OR location_type = 'check_in' OR location_type IS NULL)`
                 );
             }
 
@@ -128,13 +138,15 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
             }
             if (nearestLocation) {
                 isValid = distance <= nearestLocation.radius_meters;
+            } else {
+                isValid = false;
             }
         }
 
         if (!isValid) {
             return res.status(400).json({
-                error: 'Lokasi Anda berada di luar jangkauan lokasi absen',
-                distance: Math.round(distance)
+                error: 'Lokasi Anda berada di luar jangkauan lokasi absen masuk yang diizinkan',
+                distance: distance !== null ? Math.round(distance) : null
             });
         }
 
@@ -218,6 +230,11 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
             );
             if (locationResult.rows.length > 0) {
                 nearestLocation = locationResult.rows[0];
+                if (nearestLocation.location_type === 'check_in') {
+                    return res.status(400).json({
+                        error: `Lokasi "${nearestLocation.name}" hanya diperuntukkan untuk absen masuk (Check-In)`
+                    });
+                }
                 distance = calculateDistance(
                     parseFloat(latitude),
                     parseFloat(longitude),
@@ -233,12 +250,16 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
             if (allowedCheck.rows.length > 0) {
                 const allowedIds = allowedCheck.rows.map(r => r.location_id);
                 locationsResult = await pool.query(
-                    'SELECT * FROM attendance_locations WHERE is_active = true AND id = ANY($1)',
+                    `SELECT * FROM attendance_locations 
+                     WHERE is_active = true AND id = ANY($1) 
+                       AND (location_type = 'all' OR location_type = 'check_out' OR location_type IS NULL)`,
                     [allowedIds]
                 );
             } else {
                 locationsResult = await pool.query(
-                    'SELECT * FROM attendance_locations WHERE is_active = true'
+                    `SELECT * FROM attendance_locations 
+                     WHERE is_active = true 
+                       AND (location_type = 'all' OR location_type = 'check_out' OR location_type IS NULL)`
                 );
             }
 
@@ -258,14 +279,80 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
             }
             if (nearestLocation) {
                 isValid = distance <= nearestLocation.radius_meters;
+            } else {
+                isValid = false;
             }
         }
 
         if (!isValid) {
             return res.status(400).json({
-                error: 'Lokasi Anda berada di luar jangkauan lokasi absen',
-                distance: Math.round(distance)
+                error: 'Lokasi Anda berada di luar jangkauan lokasi absen pulang yang diizinkan',
+                distance: distance !== null ? Math.round(distance) : null
             });
+        }
+
+        // Validate different checkout location settings
+        // Check system rule mode: 'disabled', 'specific' (only flagged users), or 'all' (every employee)
+        const modeSetting = await pool.query(
+            `SELECT key, value FROM settings WHERE key IN ('checkout_location_rule_mode', 'require_different_location_checkout')`
+        );
+        let ruleMode = 'specific';
+        let legacyGlobal = false;
+        modeSetting.rows.forEach(r => {
+            if (r.key === 'checkout_location_rule_mode') ruleMode = r.value;
+            if (r.key === 'require_different_location_checkout') legacyGlobal = r.value === 'true';
+        });
+        if (!modeSetting.rows.some(r => r.key === 'checkout_location_rule_mode') && legacyGlobal) {
+            ruleMode = 'all';
+        }
+
+        let requireDiff = false;
+        if (ruleMode === 'all') {
+            requireDiff = true;
+        } else if (ruleMode === 'specific') {
+            const userDiffCheck = await pool.query(
+                `SELECT COALESCE(require_different_checkout, false) as require_different_checkout 
+                 FROM employee_details WHERE user_id = $1`,
+                [req.user.id]
+            );
+            requireDiff = userDiffCheck.rows.length > 0 && userDiffCheck.rows[0].require_different_checkout;
+        }
+
+        if (requireDiff && existingCheckin.rows.length > 0) {
+            const inRecord = existingCheckin.rows[0];
+
+            // Get min distance setting
+            const minDistSetting = await pool.query(
+                `SELECT value FROM settings WHERE key = 'min_checkout_distance_meters'`
+            );
+            const minCheckoutDist = minDistSetting.rows.length > 0 ? (parseFloat(minDistSetting.rows[0].value) || 0) : 0;
+
+            // 1. Check if same location_id
+            if (inRecord.location_id && nearestLocation?.id && inRecord.location_id === nearestLocation.id) {
+                return res.status(400).json({
+                    error: `Absen pulang wajib di lokasi yang berbeda dengan absen masuk! (Lokasi masuk: ${nearestLocation.name})`
+                });
+            }
+
+            // 2. Check distance between check-in and check-out coordinates
+            if (inRecord.latitude && inRecord.longitude) {
+                const distFromIn = calculateDistance(
+                    parseFloat(latitude),
+                    parseFloat(longitude),
+                    parseFloat(inRecord.latitude),
+                    parseFloat(inRecord.longitude)
+                );
+
+                if (minCheckoutDist > 0 && distFromIn < minCheckoutDist) {
+                    return res.status(400).json({
+                        error: `Absen pulang wajib berjarak minimal ${minCheckoutDist} meter dari titik absen masuk (jarak saat ini: ${Math.round(distFromIn)} meter)`
+                    });
+                } else if (minCheckoutDist <= 0 && distFromIn <= (nearestLocation?.radius_meters || 100)) {
+                    return res.status(400).json({
+                        error: 'Absen pulang harus dilakukan di titik koordinat yang berbeda dari absen masuk!'
+                    });
+                }
+            }
         }
 
         const photoPath = `/uploads/attendance/${req.file.filename}`;

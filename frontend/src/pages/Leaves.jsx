@@ -13,6 +13,9 @@ export default function Leaves() {
 
     // Form state
     const [type, setType] = useState('late');
+    const [isHourly, setIsHourly] = useState(false);
+    const [startTime, setStartTime] = useState('08:00');
+    const [endTime, setEndTime] = useState('12:00');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [replacementDate, setReplacementDate] = useState('');
@@ -67,7 +70,12 @@ export default function Leaves() {
             const formData = new FormData();
             formData.append('type', type);
             formData.append('start_date', startDate);
-            formData.append('end_date', endDate);
+            formData.append('end_date', type === 'leave' && isHourly ? startDate : endDate);
+            if (type === 'leave' && isHourly) {
+                formData.append('is_hourly', 'true');
+                formData.append('start_time', startTime);
+                formData.append('end_time', endTime);
+            }
             if (type === 'change_off' && replacementDate) {
                 formData.append('replacement_date', replacementDate);
             }
@@ -80,15 +88,19 @@ export default function Leaves() {
 
             // Reset form
             setType('late');
+            setIsHourly(false);
             setStartDate(new Date().toISOString().split('T')[0]);
             setEndDate(new Date().toISOString().split('T')[0]);
+            setStartTime('08:00');
+            setEndTime('12:00');
             setReplacementDate('');
             setReason('');
             setAttachment(null);
             setShowForm(false);
 
-            // Refresh list
+            // Refresh list & quota
             fetchRequests();
+            fetchQuota();
             alert('Pengajuan berhasil dibuat!');
         } catch (error) {
             alert(error.message || 'Gagal membuat pengajuan');
@@ -125,6 +137,31 @@ export default function Leaves() {
         const diffTime = Math.abs(endDate - startDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         return diffDays;
+    }
+
+    function formatTime(timeStr) {
+        if (!timeStr) return '';
+        return String(timeStr).substring(0, 5);
+    }
+
+    function calculateHours(start, end) {
+        if (!start || !end) return 0;
+        const [sh, sm] = start.substring(0, 5).split(':').map(Number);
+        const [eh, em] = end.substring(0, 5).split(':').map(Number);
+        let s = sh * 60 + sm;
+        let e = eh * 60 + em;
+        if (e < s) e += 1440;
+        return Math.round(((e - s) / 60) * 100) / 100;
+    }
+
+    function adjustHour(baseTime, addHours) {
+        if (!baseTime) return '';
+        const [h, m] = baseTime.substring(0, 5).split(':').map(Number);
+        let totalMins = h * 60 + m + Math.round(addHours * 60);
+        totalMins = ((totalMins % 1440) + 1440) % 1440;
+        const resH = String(Math.floor(totalMins / 60)).padStart(2, '0');
+        const resM = String(totalMins % 60).padStart(2, '0');
+        return `${resH}:${resM}`;
     }
 
     return (
@@ -171,7 +208,15 @@ export default function Leaves() {
                 </button>
                 <button
                     className="card status-card"
-                    onClick={() => { setType('leave'); setShowForm(true); }}
+                    onClick={() => {
+                        setType('leave');
+                        if (quota?.leave_calculation_mode === 'hourly') {
+                            setIsHourly(true);
+                        } else {
+                            setIsHourly(false);
+                        }
+                        setShowForm(true);
+                    }}
                     style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
                     disabled={quota && quota.remaining <= 0}
                 >
@@ -180,7 +225,14 @@ export default function Leaves() {
                         <h3>Cuti</h3>
                         <p style={{ fontSize: '0.85rem' }}>
                             {quota ? (
-                                <>Sisa: <strong>{quota.remaining}</strong> dari {quota.quota} hari</>
+                                <>
+                                    Sisa: <strong>{quota.remaining}</strong> hari
+                                    {quota.remaining_hours != null && (
+                                        <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--primary-400)' }}>
+                                            ({quota.remaining_hours} jam • @{quota.hours_per_leave_day || 8} jam/hari)
+                                        </span>
+                                    )}
+                                </>
                             ) : (
                                 'Ambil cuti tahunan'
                             )}
@@ -217,29 +269,162 @@ export default function Leaves() {
                     </div>
 
                     <form onSubmit={handleSubmit}>
-                        <div className="grid grid-2" style={{ gap: '1rem' }}>
-                            <div className="form-group">
-                                <label className="form-label">Tanggal Mulai</label>
-                                <input
-                                    type="date"
-                                    className="form-input"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    required
-                                />
+                        {/* Mode Selection if Type is Leave and Mode is Both or Hourly */}
+                        {type === 'leave' && (quota?.leave_calculation_mode === 'both' || quota?.leave_calculation_mode === 'hourly' || !quota?.leave_calculation_mode) && (
+                            <div style={{ marginBottom: '1.25rem' }}>
+                                <label className="form-label" style={{ fontWeight: 600 }}>Tipe Pengajuan Cuti</label>
+                                <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.35rem', borderRadius: 'var(--radius-md)' }}>
+                                    <button
+                                        type="button"
+                                        className={`btn ${!isHourly ? 'btn-primary' : 'btn-outline'}`}
+                                        style={{ flex: 1, padding: '0.45rem', fontSize: '0.85rem' }}
+                                        onClick={() => setIsHourly(false)}
+                                        disabled={quota?.leave_calculation_mode === 'hourly'}
+                                    >
+                                        📅 Cuti Harian (Full Day)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn ${isHourly ? 'btn-primary' : 'btn-outline'}`}
+                                        style={{ flex: 1, padding: '0.45rem', fontSize: '0.85rem' }}
+                                        onClick={() => setIsHourly(true)}
+                                        disabled={quota?.leave_calculation_mode === 'daily'}
+                                    >
+                                        ⏱️ Cuti Per Jam (Hourly)
+                                    </button>
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">Tanggal Selesai</label>
-                                <input
-                                    type="date"
-                                    className="form-input"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    min={startDate}
-                                    required
-                                />
+                        )}
+
+                        {type === 'leave' && isHourly ? (
+                            <div style={{
+                                background: 'rgba(59, 130, 246, 0.08)',
+                                border: '1px solid rgba(59, 130, 246, 0.25)',
+                                borderRadius: 'var(--radius-md)',
+                                padding: '1rem',
+                                marginBottom: '1rem'
+                            }}>
+                                <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+                                    <label className="form-label">Tanggal Cuti *</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={startDate}
+                                        onChange={(e) => {
+                                            setStartDate(e.target.value);
+                                            setEndDate(e.target.value);
+                                        }}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-2" style={{ gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Jam Mulai Cuti *</label>
+                                        <input
+                                            type="time"
+                                            className="form-input"
+                                            value={startTime}
+                                            onChange={(e) => setStartTime(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Jam Selesai Cuti *</label>
+                                        <input
+                                            type="time"
+                                            className="form-input"
+                                            value={endTime}
+                                            onChange={(e) => setEndTime(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Quick duration shortcuts */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--primary-400)', fontWeight: 600 }}>Shortcut Durasi:</span>
+                                    {[1, 2, 3, 4].map(h => (
+                                        <button
+                                            key={h}
+                                            type="button"
+                                            className="btn btn-outline"
+                                            style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                                            onClick={() => setEndTime(adjustHour(startTime, h))}
+                                        >
+                                            +{h} Jam
+                                        </button>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                                        onClick={() => setEndTime(adjustHour(startTime, quota?.hours_per_leave_day || 8))}
+                                    >
+                                        1 Hari ({quota?.hours_per_leave_day || 8} Jam)
+                                    </button>
+                                </div>
+
+                                {/* Live Calculation Alert */}
+                                {(() => {
+                                    const durHours = calculateHours(startTime, endTime);
+                                    const hoursPerDay = quota?.hours_per_leave_day || 8;
+                                    const durDays = Math.round((durHours / hoursPerDay) * 100) / 100;
+                                    const isExceeded = quota && durDays > (quota.remaining || 0);
+
+                                    return (
+                                        <div style={{
+                                            padding: '0.6rem 0.85rem',
+                                            borderRadius: 'var(--radius-sm)',
+                                            background: isExceeded ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                            border: `1px solid ${isExceeded ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            fontSize: '0.82rem'
+                                        }}>
+                                            <Icon name={isExceeded ? 'AlertTriangle' : 'Info'} size={16} inline />
+                                            <div>
+                                                <strong>Kalkulasi Durasi:</strong> {durHours} Jam ({durDays} hari cuti).
+                                                {isExceeded ? (
+                                                    <span style={{ color: '#ef4444', marginLeft: '0.35rem', fontWeight: 600 }}>
+                                                        Melebihi sisa kuota cuti Anda ({quota?.remaining} hari / {quota?.remaining_hours} jam)!
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ color: '#10b981', marginLeft: '0.35rem' }}>
+                                                        Sisa cuti setelah pengajuan: {Math.round(((quota?.remaining || 0) - durDays) * 100) / 100} hari
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
-                        </div>
+                        ) : (
+                            <div className="grid grid-2" style={{ gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Tanggal Mulai</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Tanggal Selesai</label>
+                                    <input
+                                        type="date"
+                                        className="form-input"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        min={startDate}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         {type === 'change_off' && (
                             <div className="form-group">
@@ -350,10 +535,16 @@ export default function Leaves() {
                                             <h4 style={{ margin: 0, color: 'white' }}>{leaveTypes[req.type].label}</h4>
                                             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--gray-400)' }}>
                                                 {formatDate(req.start_date)}
-                                                {req.start_date !== req.end_date && ` - ${formatDate(req.end_date)}`}
-                                                <span style={{ marginLeft: '0.5rem' }}>
-                                                    ({calculateDays(req.start_date, req.end_date)} hari)
-                                                </span>
+                                                {!req.is_hourly && req.start_date !== req.end_date && ` - ${formatDate(req.end_date)}`}
+                                                {req.is_hourly ? (
+                                                    <span className="badge badge-info" style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                                                        ⏱️ {req.duration_hours || 0} Jam ({formatTime(req.start_time)} - {formatTime(req.end_time)}) • {req.duration_days} hari
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ marginLeft: '0.5rem' }}>
+                                                        ({calculateDays(req.start_date, req.end_date)} hari)
+                                                    </span>
+                                                )}
                                             </p>
                                         </div>
                                     </div>

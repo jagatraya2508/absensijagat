@@ -52,6 +52,11 @@ export default function LeaveApprovals() {
         }
     }
 
+    function formatTime(timeStr) {
+        if (!timeStr) return '';
+        return String(timeStr).substring(0, 5);
+    }
+
     function formatDate(dateStr) {
         return new Date(dateStr).toLocaleDateString('id-ID', {
             weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
@@ -110,10 +115,16 @@ export default function LeaveApprovals() {
                                         </div>
                                         <p style={{ margin: 0, color: 'var(--gray-300)', fontSize: '0.9rem' }}>
                                             {leaveTypes[req.type]?.label} • {formatDate(req.start_date)}
-                                            {req.start_date !== req.end_date && ` - ${formatDate(req.end_date)}`}
-                                            <span style={{ marginLeft: '0.5rem', color: 'var(--primary-400)' }}>
-                                                ({calculateDays(req.start_date, req.end_date)} hari)
-                                            </span>
+                                            {!req.is_hourly && req.start_date !== req.end_date && ` - ${formatDate(req.end_date)}`}
+                                            {req.is_hourly ? (
+                                                <span className="badge badge-info" style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                                                    ⏱️ {req.duration_hours || 0} Jam ({formatTime(req.start_time)} - {formatTime(req.end_time)}) • {req.duration_days} hari
+                                                </span>
+                                            ) : (
+                                                <span style={{ marginLeft: '0.5rem', color: 'var(--primary-400)' }}>
+                                                    ({calculateDays(req.start_date, req.end_date)} hari)
+                                                </span>
+                                            )}
                                         </p>
                                         {(req.department || req.position) && (
                                             <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--gray-400)' }}>

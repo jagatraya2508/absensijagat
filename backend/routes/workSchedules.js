@@ -616,6 +616,64 @@ async function generateSplNumber(date) {
     return `${prefix}/${String(seq).padStart(4, '0')}`;
 }
 
+function checkShiftOvertimeOverlap(otStartStr, otEndStr, shiftStartStr, shiftEndStr) {
+    if (!otStartStr || !otEndStr || !shiftStartStr || !shiftEndStr) return false;
+    const toM = (t) => {
+        const parts = String(t).substring(0, 5).split(':').map(Number);
+        return parts[0] * 60 + parts[1];
+    };
+    const otStart = toM(otStartStr);
+    const otEnd = toM(otEndStr);
+    const sStart = toM(shiftStartStr);
+    const sEnd = toM(shiftEndStr);
+
+    const otRanges = otStart < otEnd ? [[otStart, otEnd]] : [[otStart, 1440], [0, otEnd]];
+    const shiftRanges = sStart < sEnd ? [[sStart, sEnd]] : [[sStart, 1440], [0, sEnd]];
+
+    for (const [oa, ob] of otRanges) {
+        for (const [sa, sb] of shiftRanges) {
+            if (Math.max(oa, sa) < Math.min(ob, sb)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function getOvertimeCategory(otStartStr, otEndStr, shiftStartStr, shiftEndStr) {
+    if (!otStartStr || !otEndStr) return null;
+    if (!shiftStartStr || !shiftEndStr) return 'Lembur Bebas';
+    const toM = (t) => {
+        const parts = String(t).substring(0, 5).split(':').map(Number);
+        return parts[0] * 60 + parts[1];
+    };
+    const otStart = toM(otStartStr);
+    const otEnd = toM(otEndStr);
+    const sStart = toM(shiftStartStr);
+    const sEnd = toM(shiftEndStr);
+
+    if (sStart < sEnd) {
+        if (otEnd <= sStart || (otStart < sStart && otEnd <= sStart + 60)) {
+            return 'Lembur Awal';
+        }
+        if (otStart >= sEnd || (otStart >= sEnd - 60 && otEnd > sEnd)) {
+            return 'Lembur Akhir';
+        }
+        if (otStart < sStart) return 'Lembur Awal';
+        if (otStart >= sEnd) return 'Lembur Akhir';
+        return 'Lembur';
+    } else {
+        const midpoint = (sEnd + sStart) / 2;
+        if (otStart >= midpoint && otStart < sStart) {
+            return 'Lembur Awal';
+        }
+        if (otStart >= sEnd && otStart < midpoint) {
+            return 'Lembur Akhir';
+        }
+        return 'Lembur';
+    }
+}
+
 // Get overtime requests
 router.get('/overtime-requests/list', authenticateToken, async (req, res) => {
     try {
@@ -624,7 +682,10 @@ router.get('/overtime-requests/list', authenticateToken, async (req, res) => {
             SELECT otr.*,
                    u_req.name as requested_by_name,
                    u_app.name as approved_by_name,
-                   ws.name as shift_name,
+                   COALESCE(ws.name, esa_shift.shift_name) as shift_name,
+                   COALESCE(ws.start_time, esa_shift.start_time) as shift_start_time,
+                   COALESCE(ws.end_time, esa_shift.end_time) as shift_end_time,
+                   COALESCE(ws.is_overnight, esa_shift.is_overnight, false) as shift_is_overnight,
                    COALESCE(json_agg(
                        json_build_object(
                            'id', ore.id,
@@ -639,6 +700,17 @@ router.get('/overtime-requests/list', authenticateToken, async (req, res) => {
             LEFT JOIN users u_req ON u_req.id = otr.requested_by
             LEFT JOIN users u_app ON u_app.id = otr.approved_by
             LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+            LEFT JOIN LATERAL (
+                SELECT ws_esa.name as shift_name, ws_esa.start_time, ws_esa.end_time, ws_esa.is_overnight
+                FROM employee_shift_assignments esa
+                JOIN work_shifts ws_esa ON ws_esa.id = esa.shift_id
+                WHERE esa.assignment_date = otr.date
+                  AND esa.user_id = COALESCE(
+                      (SELECT ore_first.user_id FROM overtime_request_employees ore_first WHERE ore_first.overtime_request_id = otr.id LIMIT 1),
+                      otr.requested_by
+                  )
+                LIMIT 1
+            ) esa_shift ON true
             LEFT JOIN overtime_request_employees ore ON ore.overtime_request_id = otr.id
             LEFT JOIN users u_emp ON u_emp.id = ore.user_id
             WHERE 1=1
@@ -670,10 +742,14 @@ router.get('/overtime-requests/list', authenticateToken, async (req, res) => {
             p++;
         }
 
-        query += ' GROUP BY otr.id, u_req.name, u_app.name, ws.name ORDER BY otr.date DESC, otr.created_at DESC';
+        query += ' GROUP BY otr.id, u_req.name, u_app.name, ws.name, ws.start_time, ws.end_time, ws.is_overnight, esa_shift.shift_name, esa_shift.start_time, esa_shift.end_time, esa_shift.is_overnight ORDER BY otr.date DESC, otr.created_at DESC';
 
         const result = await pool.query(query, values);
-        res.json(result.rows);
+        const rowsWithCategory = result.rows.map(r => ({
+            ...r,
+            overtime_category: getOvertimeCategory(r.overtime_start, r.overtime_end, r.shift_start_time, r.shift_end_time)
+        }));
+        res.json(rowsWithCategory);
     } catch (error) {
         console.error('Get overtime requests error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
@@ -688,6 +764,29 @@ router.post('/overtime-requests', authenticateToken, async (req, res) => {
 
         if (!date || !overtime_start || !overtime_end || !reason || !employee_ids || !employee_ids.length) {
             return res.status(400).json({ error: 'Tanggal, jam mulai, jam selesai, alasan, dan karyawan harus diisi' });
+        }
+
+        // Validate overlap with shift working hours
+        let shiftToCheck = null;
+        if (shift_id) {
+            const shiftRes = await pool.query('SELECT * FROM work_shifts WHERE id = $1', [shift_id]);
+            if (shiftRes.rows.length > 0) shiftToCheck = shiftRes.rows[0];
+        } else if (employee_ids && employee_ids.length > 0 && date) {
+            const assignRes = await pool.query(`
+                SELECT ws.* FROM employee_shift_assignments esa
+                JOIN work_shifts ws ON ws.id = esa.shift_id
+                WHERE esa.user_id = $1 AND esa.assignment_date = $2
+                LIMIT 1
+            `, [employee_ids[0], date]);
+            if (assignRes.rows.length > 0) shiftToCheck = assignRes.rows[0];
+        }
+
+        if (shiftToCheck) {
+            if (checkShiftOvertimeOverlap(overtime_start, overtime_end, shiftToCheck.start_time, shiftToCheck.end_time)) {
+                return res.status(400).json({
+                    error: `Jam lembur (${String(overtime_start).substring(0, 5)} - ${String(overtime_end).substring(0, 5)}) bertabrakan dengan jam kerja reguler shift ${shiftToCheck.name} (${String(shiftToCheck.start_time).substring(0, 5)} - ${String(shiftToCheck.end_time).substring(0, 5)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.`
+                });
+            }
         }
 
         await client.query('BEGIN');
@@ -725,6 +824,10 @@ router.post('/overtime-requests', authenticateToken, async (req, res) => {
         const fullResult = await pool.query(`
             SELECT otr.*,
                    u_req.name as requested_by_name,
+                   ws.name as shift_name,
+                   ws.start_time as shift_start_time,
+                   ws.end_time as shift_end_time,
+                   ws.is_overnight as shift_is_overnight,
                    COALESCE(json_agg(
                        json_build_object('id', ore.id, 'user_id', ore.user_id,
                            'user_name', u_emp.name, 'employee_id', u_emp.employee_id,
@@ -733,13 +836,19 @@ router.post('/overtime-requests', authenticateToken, async (req, res) => {
                    ) FILTER (WHERE ore.id IS NOT NULL), '[]') as employees
             FROM overtime_requests otr
             LEFT JOIN users u_req ON u_req.id = otr.requested_by
+            LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
             LEFT JOIN overtime_request_employees ore ON ore.overtime_request_id = otr.id
             LEFT JOIN users u_emp ON u_emp.id = ore.user_id
             WHERE otr.id = $1
-            GROUP BY otr.id, u_req.name
+            GROUP BY otr.id, u_req.name, ws.name, ws.start_time, ws.end_time, ws.is_overnight
         `, [otRequest.id]);
 
-        res.status(201).json(fullResult.rows[0]);
+        const row = fullResult.rows[0];
+        if (row) {
+            row.overtime_category = getOvertimeCategory(row.overtime_start, row.overtime_end, row.shift_start_time, row.shift_end_time);
+        }
+
+        res.status(201).json(row);
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Create overtime request error:', error);
@@ -809,6 +918,29 @@ router.put('/overtime-requests/:id', ...canManage, async (req, res) => {
             return res.status(400).json({ error: 'Tanggal, jam mulai, jam selesai, dan alasan harus diisi' });
         }
 
+        // Validate overlap with shift working hours
+        let shiftToCheck = null;
+        if (shift_id) {
+            const shiftRes = await pool.query('SELECT * FROM work_shifts WHERE id = $1', [shift_id]);
+            if (shiftRes.rows.length > 0) shiftToCheck = shiftRes.rows[0];
+        } else if (employee_ids && employee_ids.length > 0 && date) {
+            const assignRes = await pool.query(`
+                SELECT ws.* FROM employee_shift_assignments esa
+                JOIN work_shifts ws ON ws.id = esa.shift_id
+                WHERE esa.user_id = $1 AND esa.assignment_date = $2
+                LIMIT 1
+            `, [employee_ids[0], date]);
+            if (assignRes.rows.length > 0) shiftToCheck = assignRes.rows[0];
+        }
+
+        if (shiftToCheck) {
+            if (checkShiftOvertimeOverlap(overtime_start, overtime_end, shiftToCheck.start_time, shiftToCheck.end_time)) {
+                return res.status(400).json({
+                    error: `Jam lembur (${String(overtime_start).substring(0, 5)} - ${String(overtime_end).substring(0, 5)}) bertabrakan dengan jam kerja reguler shift ${shiftToCheck.name} (${String(shiftToCheck.start_time).substring(0, 5)} - ${String(shiftToCheck.end_time).substring(0, 5)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.`
+                });
+            }
+        }
+
         await client.query('BEGIN');
 
         // Check if request exists
@@ -845,6 +977,9 @@ router.put('/overtime-requests/:id', ...canManage, async (req, res) => {
                    u_req.name as requested_by_name,
                    u_app.name as approved_by_name,
                    ws.name as shift_name,
+                   ws.start_time as shift_start_time,
+                   ws.end_time as shift_end_time,
+                   ws.is_overnight as shift_is_overnight,
                    COALESCE(json_agg(
                        json_build_object('id', ore.id, 'user_id', ore.user_id,
                            'user_name', u_emp.name, 'employee_id', u_emp.employee_id,
@@ -858,10 +993,15 @@ router.put('/overtime-requests/:id', ...canManage, async (req, res) => {
             LEFT JOIN overtime_request_employees ore ON ore.overtime_request_id = otr.id
             LEFT JOIN users u_emp ON u_emp.id = ore.user_id
             WHERE otr.id = $1
-            GROUP BY otr.id, u_req.name, u_app.name, ws.name
+            GROUP BY otr.id, u_req.name, u_app.name, ws.name, ws.start_time, ws.end_time, ws.is_overnight
         `, [id]);
 
-        res.json({ message: 'Pengajuan lembur berhasil diperbarui', data: fullResult.rows[0] });
+        const row = fullResult.rows[0];
+        if (row) {
+            row.overtime_category = getOvertimeCategory(row.overtime_start, row.overtime_end, row.shift_start_time, row.shift_end_time);
+        }
+
+        res.json({ message: 'Pengajuan lembur berhasil diperbarui', data: row });
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Edit overtime request error:', error);
@@ -902,7 +1042,7 @@ router.get('/helpers/employees', authenticateToken, async (req, res) => {
             SELECT u.id, u.name, u.employee_id, ed.department, ed.position
             FROM users u
             LEFT JOIN employee_details ed ON ed.user_id = u.id
-            WHERE u.role != 'admin'
+            WHERE u.role != 'kiosk'
         `;
         const values = [];
         if (department) {

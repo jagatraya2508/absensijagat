@@ -39,7 +39,7 @@ export default function Attendance() {
     useEffect(() => {
         fetchLocations();
         checkFaceStatus();
-    }, []);
+    }, [type]);
 
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
         const R = 6371000;
@@ -107,7 +107,7 @@ export default function Attendance() {
 
     async function fetchLocations() {
         try {
-            const data = await locationsAPI.getActive();
+            const data = await locationsAPI.getActive(type);
             setLocations(data);
             if (data.length > 0) {
                 setSelectedLocation(data[0]);

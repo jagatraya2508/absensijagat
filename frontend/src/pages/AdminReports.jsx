@@ -96,6 +96,7 @@ export default function AdminReports() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState('');
     const [detailPage, setDetailPage] = useState(1);
+    const [detailSort, setDetailSort] = useState({ key: 'report_date', direction: 'descending' });
 
     const requestSort = (key) => {
         let direction = 'ascending';
@@ -104,6 +105,28 @@ export default function AdminReports() {
         }
         setSortConfig({ key, direction });
     };
+
+    function sortMark(key) {
+        if (sortConfig.key !== key) return <Icon name="ArrowUpDown" size={12} />;
+        return sortConfig.direction === 'ascending'
+            ? <Icon name="ChevronUp" size={12} />
+            : <Icon name="ChevronDown" size={12} />;
+    }
+
+    const requestDetailSort = (key) => {
+        let direction = 'ascending';
+        if (detailSort.key === key && detailSort.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setDetailSort({ key, direction });
+    };
+
+    function detailSortMark(key) {
+        if (detailSort.key !== key) return <Icon name="ArrowUpDown" size={12} />;
+        return detailSort.direction === 'ascending'
+            ? <Icon name="ChevronUp" size={12} />
+            : <Icon name="ChevronDown" size={12} />;
+    }
 
     useEffect(() => {
         departmentsAPI.getAll().then((rows) => {
@@ -243,6 +266,8 @@ export default function AdminReports() {
 
     const dailySummary = useMemo(() => {
         if (reportType !== 'daily') return null;
+        const otRecords = visibleRecords.filter((row) => (parseFloat(row.overtime_hours) || 0) > 0);
+        const totalOtHours = otRecords.reduce((sum, row) => sum + (parseFloat(row.overtime_hours) || 0), 0);
         return {
             total_employees: new Set(visibleRecords.map((row) => row.user_id)).size,
             present: visibleRecords.filter((row) => row.check_in_time).length,
@@ -250,7 +275,9 @@ export default function AdminReports() {
             completed: visibleRecords.filter((row) => row.check_in_time && row.check_out_time).length,
             on_late: visibleRecords.filter((row) => row.leave_type === 'late').length,
             on_leave: visibleRecords.filter((row) => row.leave_type === 'leave').length,
-            on_manual: visibleRecords.filter((row) => row.manual_id).length
+            on_manual: visibleRecords.filter((row) => row.manual_id).length,
+            on_overtime: otRecords.length,
+            total_overtime_hours: Math.round(totalOtHours * 10) / 10
         };
     }, [reportType, visibleRecords]);
 
@@ -262,11 +289,31 @@ export default function AdminReports() {
         const rows = [...visibleRecords];
         if (!sortConfig.key) return rows;
         rows.sort((a, b) => {
-            const aValue = a[sortConfig.key] ?? '';
-            const bValue = b[sortConfig.key] ?? '';
-            if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
-            if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
-            return 0;
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            if (sortConfig.key === 'status') {
+                aValue = statusText(a);
+                bValue = statusText(b);
+            } else if (sortConfig.key === 'overtime_hours') {
+                aValue = parseFloat(a.overtime_hours) || 0;
+                bValue = parseFloat(b.overtime_hours) || 0;
+                return sortConfig.direction === 'ascending' ? aValue - bValue : bValue - aValue;
+            } else if (sortConfig.key === 'overtime_start') {
+                aValue = a.overtime_start || '';
+                bValue = b.overtime_start || '';
+            } else if (sortConfig.key === 'check_in_time' || sortConfig.key === 'check_out_time') {
+                aValue = a[sortConfig.key] ? new Date(a[sortConfig.key]).getTime() : 0;
+                bValue = b[sortConfig.key] ? new Date(b[sortConfig.key]).getTime() : 0;
+                return sortConfig.direction === 'ascending' ? aValue - bValue : bValue - aValue;
+            } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+                return sortConfig.direction === 'ascending' ? aValue - bValue : bValue - aValue;
+            }
+
+            const strA = String(aValue ?? '');
+            const strB = String(bValue ?? '');
+            const cmp = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+            return sortConfig.direction === 'ascending' ? cmp : -cmp;
         });
         return rows;
     }, [visibleRecords, sortConfig]);
@@ -283,9 +330,32 @@ export default function AdminReports() {
     }, [detailMode, detailWeekDate, detailMonth, detailYear, detailYearOnly, detailStart, detailEnd]);
 
     const detailRows = useMemo(() => {
-        const rows = detailReport?.records || [];
-        return [...rows].sort((a, b) => String(b.report_date).localeCompare(String(a.report_date)));
-    }, [detailReport]);
+        const rows = [...(detailReport?.records || [])];
+        if (!detailSort.key) return rows;
+        rows.sort((a, b) => {
+            let aVal = a[detailSort.key];
+            let bVal = b[detailSort.key];
+
+            if (detailSort.key === 'status') {
+                aVal = statusText(a);
+                bVal = statusText(b);
+            } else if (detailSort.key === 'overtime_hours') {
+                aVal = parseFloat(a.overtime_hours) || 0;
+                bVal = parseFloat(b.overtime_hours) || 0;
+                return detailSort.direction === 'ascending' ? aVal - bVal : bVal - aVal;
+            } else if (detailSort.key === 'check_in_time' || detailSort.key === 'check_out_time') {
+                aVal = a[detailSort.key] ? new Date(a[detailSort.key]).getTime() : 0;
+                bVal = b[detailSort.key] ? new Date(b[detailSort.key]).getTime() : 0;
+                return detailSort.direction === 'ascending' ? aVal - bVal : bVal - aVal;
+            }
+
+            const strA = String(aVal ?? '');
+            const strB = String(bVal ?? '');
+            const cmp = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+            return detailSort.direction === 'ascending' ? cmp : -cmp;
+        });
+        return rows;
+    }, [detailReport, detailSort]);
 
     const pagedDetail = slicePage(detailRows, detailPage);
 
@@ -362,13 +432,28 @@ export default function AdminReports() {
 
     function statusText(record) {
         if (record.is_off_day) return 'OFF';
+        if (record.check_in_time && record.check_out_time) {
+            if (record.leave_type === 'leave' && record.leave_is_hourly && record.leave_duration_hours) {
+                return `Lengkap (Cuti ${record.leave_duration_hours} Jam)`;
+            }
+            return 'Lengkap';
+        }
+        if (record.check_in_time) {
+            if (record.leave_type === 'leave' && record.leave_is_hourly && record.leave_duration_hours) {
+                return `Belum Pulang (Cuti ${record.leave_duration_hours} Jam)`;
+            }
+            return 'Belum Pulang';
+        }
         if (record.leave_type === 'late') return 'Izin Terlambat';
-        if (record.leave_type === 'leave') return 'Cuti';
+        if (record.leave_type === 'leave') {
+            if (record.leave_is_hourly && record.leave_duration_hours) {
+                return `Cuti (${record.leave_duration_hours} Jam)`;
+            }
+            return 'Cuti';
+        }
         if (record.leave_type === 'sick') return 'Sakit';
         if (record.leave_type === 'permission') return 'Izin Tidak Masuk';
         if (record.leave_type === 'change_off') return 'Tukar Libur';
-        if (record.check_in_time && record.check_out_time) return 'Lengkap';
-        if (record.check_in_time) return 'Belum Pulang';
         if (record.manual_id) return 'Pengajuan Absensi';
         return 'Tidak Hadir';
     }
@@ -381,20 +466,29 @@ export default function AdminReports() {
         const title = reportType === 'daily'
             ? `Laporan Absensi ${formatIsoDate(dailyStart)} - ${formatIsoDate(dailyEnd)}`
             : 'Laporan Absensi';
-        const head = '<tr><th>No</th><th>ID</th><th>Nama</th><th>Departemen</th><th>Divisi</th><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th></tr>';
-        const body = visibleRecords.map((record, index) => `<tr>
-            <td>${index + 1}</td>
-            <td>${escapeHtml(record.employee_id)}</td>
-            <td>${escapeHtml(record.name)}</td>
-            <td>${escapeHtml(record.department || '-')}</td>
-            <td>${escapeHtml(record.division || '-')}</td>
-            <td>${escapeHtml(record.report_date || record.attendance_date || record.off_date || '-')}</td>
-            <td>${escapeHtml(record.check_in_time ? formatTime(record.check_in_time) : '-')}</td>
-            <td>${escapeHtml(record.check_out_time ? formatTime(record.check_out_time) : '-')}</td>
-            <td>${escapeHtml(statusText(record))}</td>
-        </tr>`).join('');
+        const head = '<tr><th>No</th><th>ID</th><th>Nama</th><th>Departemen</th><th>Divisi</th><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Waktu Lembur</th><th>Durasi Lembur</th><th>Status</th></tr>';
+        const body = visibleRecords.map((record, index) => {
+            const otCatSuffix = record.overtime_category ? ` (${record.overtime_category === 'Lembur Awal' ? 'Awal' : record.overtime_category === 'Lembur Akhir' ? 'Akhir' : record.overtime_category})` : '';
+            const otTime = record.overtime_start && record.overtime_end
+                ? `${record.overtime_start} - ${record.overtime_end}${otCatSuffix}`
+                : (record.overtime_hours > 0 ? `Lembur${otCatSuffix}` : '-');
+            const otDuration = record.overtime_hours > 0 ? `${record.overtime_hours} jam` : '-';
+            return `<tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(record.employee_id)}</td>
+                <td>${escapeHtml(record.name)}</td>
+                <td>${escapeHtml(record.department || '-')}</td>
+                <td>${escapeHtml(record.division || '-')}</td>
+                <td>${escapeHtml(record.report_date || record.attendance_date || record.off_date || '-')}</td>
+                <td>${escapeHtml(record.check_in_time ? formatTime(record.check_in_time) : '-')}</td>
+                <td>${escapeHtml(record.check_out_time ? formatTime(record.check_out_time) : '-')}</td>
+                <td>${escapeHtml(otTime)}</td>
+                <td>${escapeHtml(otDuration)}</td>
+                <td>${escapeHtml(statusText(record))}</td>
+            </tr>`;
+        }).join('');
         const counts = dailySummary
-            ? `<p>Karyawan ${dailySummary.total_employees} · Hadir ${dailySummary.present} · Tidak Hadir ${dailySummary.absent} · Lengkap ${dailySummary.completed} · Izin Terlambat ${dailySummary.on_late} · Cuti ${dailySummary.on_leave} · Pengajuan Absensi ${dailySummary.on_manual}</p>`
+            ? `<p>Karyawan ${dailySummary.total_employees} · Hadir ${dailySummary.present} · Tidak Hadir ${dailySummary.absent} · Lengkap ${dailySummary.completed} · Izin Terlambat ${dailySummary.on_late} · Cuti ${dailySummary.on_leave} · Pengajuan Absensi ${dailySummary.on_manual} · Lembur ${dailySummary.on_overtime || 0} (${dailySummary.total_overtime_hours || 0} jam)</p>`
             : '';
         const win = window.open('', '_blank');
         if (!win) {
@@ -641,6 +735,15 @@ export default function AdminReports() {
                             <p>{dailySummary.on_manual}</p>
                         </div>
                     </div>
+                    {dailySummary.on_overtime > 0 && (
+                        <div className="card status-card">
+                            <div className="status-card-icon warning"><Icon name="Clock" size={16} inline /></div>
+                            <div className="status-card-content">
+                                <h3>Lembur</h3>
+                                <p>{dailySummary.on_overtime} org ({dailySummary.total_overtime_hours} jam)</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -681,6 +784,15 @@ export default function AdminReports() {
                             <div className="status-card-content">
                                 <h3>Izin/Cuti</h3>
                                 <p>{report.records.filter(r => r.leave_type).length}</p>
+                            </div>
+                        </div>
+                    )}
+                    {report.records.some(r => (parseFloat(r.overtime_hours) || 0) > 0) && (
+                        <div className="card status-card">
+                            <div className="status-card-icon warning"><Icon name="Clock" size={16} inline /></div>
+                            <div className="status-card-content">
+                                <h3>Lembur</h3>
+                                <p>{report.records.filter(r => (parseFloat(r.overtime_hours) || 0) > 0).length} org ({Math.round(report.records.reduce((sum, r) => sum + (parseFloat(r.overtime_hours) || 0), 0) * 10) / 10} jam)</p>
                             </div>
                         </div>
                     )}
@@ -753,31 +865,17 @@ export default function AdminReports() {
                                         <table className="table stack-table">
                                             <thead>
                                                 <tr>
-                                                    <th onClick={() => requestSort('report_date')} style={{ cursor: 'pointer' }}>
-                                                        Tanggal {sortConfig.key === 'report_date' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                        Employee ID {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('department')} style={{ cursor: 'pointer' }}>
-                                                        Departemen {sortConfig.key === 'department' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('division')} style={{ cursor: 'pointer' }}>
-                                                        Divisi {sortConfig.key === 'division' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('check_in_time')} style={{ cursor: 'pointer' }}>
-                                                        Check-in {sortConfig.key === 'check_in_time' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('check_out_time')} style={{ cursor: 'pointer' }}>
-                                                        Check-out {sortConfig.key === 'check_out_time' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('location_name')} style={{ cursor: 'pointer' }}>
-                                                        Lokasi {sortConfig.key === 'location_name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th>Status</th>
+                                                    <th className={`sortable${sortConfig.key === 'report_date' ? ' active' : ''}`} onClick={() => requestSort('report_date')}>Tanggal {sortMark('report_date')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'employee_id' ? ' active' : ''}`} onClick={() => requestSort('employee_id')}>Employee ID {sortMark('employee_id')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>Nama {sortMark('name')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'department' ? ' active' : ''}`} onClick={() => requestSort('department')}>Departemen {sortMark('department')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'division' ? ' active' : ''}`} onClick={() => requestSort('division')}>Divisi {sortMark('division')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'check_in_time' ? ' active' : ''}`} onClick={() => requestSort('check_in_time')}>Check-in {sortMark('check_in_time')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'check_out_time' ? ' active' : ''}`} onClick={() => requestSort('check_out_time')}>Check-out {sortMark('check_out_time')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'overtime_start' ? ' active' : ''}`} onClick={() => requestSort('overtime_start')}>Waktu Lembur {sortMark('overtime_start')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'overtime_hours' ? ' active' : ''}`} onClick={() => requestSort('overtime_hours')}>Durasi Lembur {sortMark('overtime_hours')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'location_name' ? ' active' : ''}`} onClick={() => requestSort('location_name')}>Lokasi {sortMark('location_name')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'status' ? ' active' : ''}`} onClick={() => requestSort('status')}>Status {sortMark('status')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -816,6 +914,31 @@ export default function AdminReports() {
                                                                 <span className="text-muted">-</span>
                                                             )}
                                                         </td>
+                                                        <td data-label="Waktu Lembur">
+                                                            {record.overtime_start && record.overtime_end ? (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }}>
+                                                                    <span className="badge badge-secondary" style={{ fontFamily: 'monospace' }}>
+                                                                        {record.overtime_start} - {record.overtime_end}
+                                                                    </span>
+                                                                    {record.overtime_category && (
+                                                                        <span className={`badge ${record.overtime_category === 'Lembur Awal' ? 'badge-info' : record.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                                                                            {record.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : record.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : record.overtime_category}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-muted">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td data-label="Durasi Lembur">
+                                                            {record.overtime_hours > 0 ? (
+                                                                <span className="badge badge-warning" style={{ fontWeight: 600 }}>
+                                                                    {record.overtime_hours} jam
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-muted">-</span>
+                                                            )}
+                                                        </td>
                                                         <td data-label="Lokasi">{record.location_name || '-'}</td>
                                                         <td data-label="Status">
                                                             <span className={`badge ${statusText(record) === 'Lengkap' ? 'badge-success' : statusText(record) === 'Tidak Hadir' ? 'badge-danger' : statusText(record) === 'Cuti' || statusText(record) === 'OFF' ? 'badge-primary' : 'badge-warning'}`}>
@@ -836,29 +959,15 @@ export default function AdminReports() {
                                         <table className="table stack-table">
                                             <thead>
                                                 <tr>
-                                                    <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                        Employee ID {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th>Departemen</th>
-                                                    <th>Divisi</th>
-                                                    <th onClick={() => requestSort('total_present')} style={{ cursor: 'pointer' }}>
-                                                        Hadir {sortConfig.key === 'total_present' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('total_absent')} style={{ cursor: 'pointer' }}>
-                                                        Tidak Hadir {sortConfig.key === 'total_absent' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('valid_checkins')} style={{ cursor: 'pointer' }}>
-                                                        Valid {sortConfig.key === 'valid_checkins' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('invalid_checkins')} style={{ cursor: 'pointer' }}>
-                                                        Diluar Area {sortConfig.key === 'invalid_checkins' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('attendance_rate')} style={{ cursor: 'pointer' }}>
-                                                        Persentase {sortConfig.key === 'attendance_rate' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
+                                                    <th className={`sortable${sortConfig.key === 'employee_id' ? ' active' : ''}`} onClick={() => requestSort('employee_id')}>Employee ID {sortMark('employee_id')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>Nama {sortMark('name')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'department' ? ' active' : ''}`} onClick={() => requestSort('department')}>Departemen {sortMark('department')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'division' ? ' active' : ''}`} onClick={() => requestSort('division')}>Divisi {sortMark('division')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'total_present' ? ' active' : ''}`} onClick={() => requestSort('total_present')}>Hadir {sortMark('total_present')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'total_absent' ? ' active' : ''}`} onClick={() => requestSort('total_absent')}>Tidak Hadir {sortMark('total_absent')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'valid_checkins' ? ' active' : ''}`} onClick={() => requestSort('valid_checkins')}>Valid {sortMark('valid_checkins')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'invalid_checkins' ? ' active' : ''}`} onClick={() => requestSort('invalid_checkins')}>Diluar Area {sortMark('invalid_checkins')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'attendance_rate' ? ' active' : ''}`} onClick={() => requestSort('attendance_rate')}>Persentase {sortMark('attendance_rate')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -908,23 +1017,17 @@ export default function AdminReports() {
                                         <table className="table stack-table">
                                             <thead>
                                                 <tr>
-                                                    <th onClick={() => requestSort('attendance_date')} style={{ cursor: 'pointer' }}>
-                                                        Tanggal {sortConfig.key === 'attendance_date' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                        ID Karyawan {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                        Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th>Departemen</th>
-                                                    <th>Divisi</th>
-                                                    <th>Check-in</th>
-                                                    <th>Check-out</th>
-                                                    <th onClick={() => requestSort('location_name')} style={{ cursor: 'pointer' }}>
-                                                        Lokasi {sortConfig.key === 'location_name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                    </th>
-                                                    <th>Status</th>
+                                                    <th className={`sortable${sortConfig.key === 'attendance_date' ? ' active' : ''}`} onClick={() => requestSort('attendance_date')}>Tanggal {sortMark('attendance_date')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'employee_id' ? ' active' : ''}`} onClick={() => requestSort('employee_id')}>ID Karyawan {sortMark('employee_id')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>Nama {sortMark('name')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'department' ? ' active' : ''}`} onClick={() => requestSort('department')}>Departemen {sortMark('department')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'division' ? ' active' : ''}`} onClick={() => requestSort('division')}>Divisi {sortMark('division')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'check_in_time' ? ' active' : ''}`} onClick={() => requestSort('check_in_time')}>Check-in {sortMark('check_in_time')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'check_out_time' ? ' active' : ''}`} onClick={() => requestSort('check_out_time')}>Check-out {sortMark('check_out_time')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'overtime_start' ? ' active' : ''}`} onClick={() => requestSort('overtime_start')}>Waktu Lembur {sortMark('overtime_start')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'overtime_hours' ? ' active' : ''}`} onClick={() => requestSort('overtime_hours')}>Durasi Lembur {sortMark('overtime_hours')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'location_name' ? ' active' : ''}`} onClick={() => requestSort('location_name')}>Lokasi {sortMark('location_name')}</th>
+                                                    <th className={`sortable${sortConfig.key === 'status' ? ' active' : ''}`} onClick={() => requestSort('status')}>Status {sortMark('status')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -964,6 +1067,31 @@ export default function AdminReports() {
                                                                 <span className="text-muted">-</span>
                                                             )}
                                                         </td>
+                                                        <td data-label="Waktu Lembur">
+                                                            {record.overtime_start && record.overtime_end ? (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }}>
+                                                                    <span className="badge badge-secondary" style={{ fontFamily: 'monospace' }}>
+                                                                        {record.overtime_start} - {record.overtime_end}
+                                                                    </span>
+                                                                    {record.overtime_category && (
+                                                                        <span className={`badge ${record.overtime_category === 'Lembur Awal' ? 'badge-info' : record.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                                                                            {record.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : record.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : record.overtime_category}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-muted">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td data-label="Durasi Lembur">
+                                                            {record.overtime_hours > 0 ? (
+                                                                <span className="badge badge-warning" style={{ fontWeight: 600 }}>
+                                                                    {record.overtime_hours} jam
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-muted">-</span>
+                                                            )}
+                                                        </td>
                                                         <td data-label="Lokasi">{record.location_name || '-'}</td>
                                                         <td data-label="Status">
                                                             {record.is_off_day ? (
@@ -999,23 +1127,13 @@ export default function AdminReports() {
                                     <table className="table stack-table">
                                         <thead>
                                             <tr>
-                                                <th onClick={() => requestSort('off_date')} style={{ cursor: 'pointer' }}>
-                                                    Tanggal {sortConfig.key === 'off_date' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                </th>
-                                                <th onClick={() => requestSort('employee_id')} style={{ cursor: 'pointer' }}>
-                                                    ID Karyawan {sortConfig.key === 'employee_id' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                </th>
-                                                    <th onClick={() => requestSort('name')} style={{ cursor: 'pointer' }}>
-                                                    Nama {sortConfig.key === 'name' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                </th>
-                                                <th>Departemen</th>
-                                                <th>Divisi</th>
-                                                <th onClick={() => requestSort('type')} style={{ cursor: 'pointer' }}>
-                                                    Kategori {sortConfig.key === 'type' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                </th>
-                                                <th onClick={() => requestSort('reason')} style={{ cursor: 'pointer' }}>
-                                                    Keterangan {sortConfig.key === 'reason' && (sortConfig.direction === 'ascending' ? <Icon name="ChevronUp" size={12} /> : <Icon name="ChevronDown" size={12} />)}
-                                                </th>
+                                                <th className={`sortable${sortConfig.key === 'off_date' ? ' active' : ''}`} onClick={() => requestSort('off_date')}>Tanggal {sortMark('off_date')}</th>
+                                                <th className={`sortable${sortConfig.key === 'employee_id' ? ' active' : ''}`} onClick={() => requestSort('employee_id')}>ID Karyawan {sortMark('employee_id')}</th>
+                                                <th className={`sortable${sortConfig.key === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>Nama {sortMark('name')}</th>
+                                                <th className={`sortable${sortConfig.key === 'department' ? ' active' : ''}`} onClick={() => requestSort('department')}>Departemen {sortMark('department')}</th>
+                                                <th className={`sortable${sortConfig.key === 'division' ? ' active' : ''}`} onClick={() => requestSort('division')}>Divisi {sortMark('division')}</th>
+                                                <th className={`sortable${sortConfig.key === 'type' ? ' active' : ''}`} onClick={() => requestSort('type')}>Kategori {sortMark('type')}</th>
+                                                <th className={`sortable${sortConfig.key === 'reason' ? ' active' : ''}`} onClick={() => requestSort('reason')}>Keterangan {sortMark('reason')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1150,6 +1268,11 @@ export default function AdminReports() {
                                     <span>Cuti {detailReport.summary.on_leave}</span>
                                     <span>Sakit {detailReport.summary.on_sick}</span>
                                     <span>OFF {detailReport.summary.on_off}</span>
+                                    {(detailReport.summary.total_overtime_hours > 0 || detailReport.summary.on_overtime > 0) && (
+                                        <span style={{ color: 'var(--warning-400)', fontWeight: 600 }}>
+                                            ⚡ Lembur {detailReport.summary.on_overtime}x ({detailReport.summary.total_overtime_hours} jam)
+                                        </span>
+                                    )}
                                 </div>
                             )}
 
@@ -1167,11 +1290,13 @@ export default function AdminReports() {
                                         <table className="table">
                                             <thead>
                                                 <tr>
-                                                    <th>Tanggal</th>
-                                                    <th>Check-in</th>
-                                                    <th>Check-out</th>
-                                                    <th>Lokasi</th>
-                                                    <th>Status</th>
+                                                    <th className={`sortable${detailSort.key === 'report_date' ? ' active' : ''}`} onClick={() => requestDetailSort('report_date')}>Tanggal {detailSortMark('report_date')}</th>
+                                                    <th className={`sortable${detailSort.key === 'check_in_time' ? ' active' : ''}`} onClick={() => requestDetailSort('check_in_time')}>Check-in {detailSortMark('check_in_time')}</th>
+                                                    <th className={`sortable${detailSort.key === 'check_out_time' ? ' active' : ''}`} onClick={() => requestDetailSort('check_out_time')}>Check-out {detailSortMark('check_out_time')}</th>
+                                                    <th className={`sortable${detailSort.key === 'overtime_start' ? ' active' : ''}`} onClick={() => requestDetailSort('overtime_start')}>Waktu Lembur {detailSortMark('overtime_start')}</th>
+                                                    <th className={`sortable${detailSort.key === 'overtime_hours' ? ' active' : ''}`} onClick={() => requestDetailSort('overtime_hours')}>Durasi Lembur {detailSortMark('overtime_hours')}</th>
+                                                    <th className={`sortable${detailSort.key === 'location_name' ? ' active' : ''}`} onClick={() => requestDetailSort('location_name')}>Lokasi {detailSortMark('location_name')}</th>
+                                                    <th className={`sortable${detailSort.key === 'status' ? ' active' : ''}`} onClick={() => requestDetailSort('status')}>Status {detailSortMark('status')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1180,6 +1305,31 @@ export default function AdminReports() {
                                                         <td>{record.report_date}</td>
                                                         <td>{record.check_in_time ? formatTime(record.check_in_time) : '-'}</td>
                                                         <td>{record.check_out_time ? formatTime(record.check_out_time) : '-'}</td>
+                                                        <td>
+                                                            {record.overtime_start && record.overtime_end ? (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }}>
+                                                                    <span className="badge badge-secondary" style={{ fontFamily: 'monospace' }}>
+                                                                        {record.overtime_start} - {record.overtime_end}
+                                                                    </span>
+                                                                    {record.overtime_category && (
+                                                                        <span className={`badge ${record.overtime_category === 'Lembur Awal' ? 'badge-info' : record.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                                                                            {record.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : record.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : record.overtime_category}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-muted">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            {record.overtime_hours > 0 ? (
+                                                                <span className="badge badge-warning" style={{ fontWeight: 600 }}>
+                                                                    {record.overtime_hours} jam
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-muted">-</span>
+                                                            )}
+                                                        </td>
                                                         <td>{record.location_name || '-'}</td>
                                                         <td>
                                                             <span className={`badge ${statusText(record) === 'Lengkap' ? 'badge-success' : statusText(record) === 'Tidak Hadir' ? 'badge-danger' : statusText(record) === 'Cuti' || statusText(record) === 'OFF' ? 'badge-primary' : 'badge-warning'}`}>

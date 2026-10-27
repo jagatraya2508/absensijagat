@@ -59,6 +59,19 @@ function calculateDays(startDate, endDate) {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 }
 
+function calculateHours(startTime, endTime) {
+    if (!startTime || !endTime) return 0;
+    const [sh, sm] = startTime.substring(0, 5).split(':').map(Number);
+    const [eh, em] = endTime.substring(0, 5).split(':').map(Number);
+    let startMins = sh * 60 + sm;
+    let endMins = eh * 60 + em;
+    if (endMins < startMins) {
+        endMins += 1440;
+    }
+    const diffMins = endMins - startMins;
+    return Math.round((diffMins / 60) * 100) / 100;
+}
+
 async function getUsedLeaveDays(userId, year, settings) {
     let types = ["'leave'"];
     if (settings && settings.late_deducts_leave) types.push("'late'");
@@ -66,7 +79,7 @@ async function getUsedLeaveDays(userId, year, settings) {
     if (settings && settings.permission_deducts_leave) types.push("'permission'");
 
     const result = await pool.query(
-        `SELECT start_date, end_date 
+        `SELECT start_date, end_date, is_hourly, duration_hours, duration_days 
          FROM leave_requests 
          WHERE user_id = $1 
            AND type IN (${types.join(',')}) 
@@ -75,16 +88,23 @@ async function getUsedLeaveDays(userId, year, settings) {
         [userId, year]
     );
 
+    const hoursPerDay = parseFloat(settings?.hours_per_leave_day) || 8.0;
     let totalDays = 0;
     for (const row of result.rows) {
-        totalDays += calculateDays(row.start_date, row.end_date);
+        if (row.duration_days != null && parseFloat(row.duration_days) > 0) {
+            totalDays += parseFloat(row.duration_days);
+        } else if (row.is_hourly && row.duration_hours != null && parseFloat(row.duration_hours) > 0) {
+            totalDays += parseFloat(row.duration_hours) / hoursPerDay;
+        } else {
+            totalDays += calculateDays(row.start_date, row.end_date);
+        }
     }
-    return totalDays;
+    return Math.round(totalDays * 100) / 100;
 }
 
 async function getUserLeaveQuota(userId, year) {
     const setRes = await pool.query('SELECT * FROM leave_settings LIMIT 1');
-    const settings = setRes.rows[0] || { annual_leave_quota: 12 };
+    const settings = setRes.rows[0] || { annual_leave_quota: 12, leave_calculation_mode: 'both', hours_per_leave_day: 8.0 };
 
     let quota = settings.annual_leave_quota;
 
@@ -104,23 +124,50 @@ async function getUserLeaveQuota(userId, year) {
     return { quota, settings };
 }
 
-async function createLeaveRequestForUser({ userId, type, start_date, end_date, reason, replacement_date, file }) {
+async function createLeaveRequestForUser({
+    userId,
+    type,
+    start_date,
+    end_date,
+    reason,
+    replacement_date,
+    file,
+    is_hourly,
+    start_time,
+    end_time
+}) {
     if (!['late', 'sick', 'leave', 'change_off', 'permission'].includes(type)) {
         const err = new Error('Jenis izin tidak valid');
         err.status = 400;
         throw err;
     }
 
-    if (!start_date || !end_date) {
-        const err = new Error('Tanggal mulai dan selesai harus diisi');
-        err.status = 400;
-        throw err;
-    }
+    const isHourlyBool = (is_hourly === true || is_hourly === 'true' || is_hourly === 1 || is_hourly === '1') && type === 'leave';
 
-    if (new Date(start_date) > new Date(end_date)) {
-        const err = new Error('Tanggal mulai tidak boleh lebih dari tanggal selesai');
-        err.status = 400;
-        throw err;
+    if (isHourlyBool) {
+        if (!start_date) {
+            const err = new Error('Tanggal cuti harus diisi');
+            err.status = 400;
+            throw err;
+        }
+        end_date = start_date;
+        if (!start_time || !end_time) {
+            const err = new Error('Jam mulai dan jam selesai cuti per jam harus diisi');
+            err.status = 400;
+            throw err;
+        }
+    } else {
+        if (!start_date || !end_date) {
+            const err = new Error('Tanggal mulai dan selesai harus diisi');
+            err.status = 400;
+            throw err;
+        }
+
+        if (new Date(start_date) > new Date(end_date)) {
+            const err = new Error('Tanggal mulai tidak boleh lebih dari tanggal selesai');
+            err.status = 400;
+            throw err;
+        }
     }
 
     if (type === 'change_off' && !replacement_date) {
@@ -144,6 +191,21 @@ async function createLeaveRequestForUser({ userId, type, start_date, end_date, r
 
     const year = new Date(start_date).getFullYear();
     const { quota, settings } = await getUserLeaveQuota(userId, year);
+    const hoursPerDay = parseFloat(settings.hours_per_leave_day) || 8.0;
+    const leaveMode = settings.leave_calculation_mode || 'both';
+
+    if (type === 'leave') {
+        if (isHourlyBool && leaveMode === 'daily') {
+            const err = new Error('Pengaturan perusahaan hanya mengizinkan pengajuan cuti harian penuh');
+            err.status = 400;
+            throw err;
+        }
+        if (!isHourlyBool && leaveMode === 'hourly') {
+            const err = new Error('Pengaturan perusahaan hanya mengizinkan pengajuan cuti per jam');
+            err.status = 400;
+            throw err;
+        }
+    }
 
     let deductsLeave = false;
     if (type === 'leave') deductsLeave = true;
@@ -151,14 +213,32 @@ async function createLeaveRequestForUser({ userId, type, start_date, end_date, r
     if (type === 'sick' && settings.sick_deducts_leave) deductsLeave = true;
     if (type === 'permission' && settings.permission_deducts_leave) deductsLeave = true;
 
-    if (deductsLeave) {
-        const requestedDays = calculateDays(start_date, end_date);
-        const usedDays = await getUsedLeaveDays(userId, year, settings);
-        const remainingDays = quota - usedDays;
+    let durationHours = null;
+    let durationDays = null;
 
-        if (requestedDays > remainingDays) {
+    if (isHourlyBool) {
+        durationHours = calculateHours(start_time, end_time);
+        if (durationHours <= 0) {
+            const err = new Error('Durasi cuti per jam tidak valid (harus lebih dari 0 jam)');
+            err.status = 400;
+            throw err;
+        }
+        durationDays = Math.round((durationHours / hoursPerDay) * 100) / 100;
+    } else {
+        durationDays = calculateDays(start_date, end_date);
+        durationHours = Math.round(durationDays * hoursPerDay * 100) / 100;
+    }
+
+    if (deductsLeave) {
+        const usedDays = await getUsedLeaveDays(userId, year, settings);
+        const remainingDays = Math.round((quota - usedDays) * 100) / 100;
+
+        if (durationDays > remainingDays) {
+            const remainingHours = Math.round(remainingDays * hoursPerDay * 10) / 10;
             const err = new Error(
-                `Sisa cuti tahun ${year} adalah ${remainingDays} hari. Pengajuan ${requestedDays} hari.`
+                isHourlyBool
+                    ? `Sisa cuti tahun ${year} adalah ${remainingDays} hari (${remainingHours} jam). Pengajuan cuti ini membutuhkan ${durationHours} jam (${durationDays} hari).`
+                    : `Sisa cuti tahun ${year} adalah ${remainingDays} hari. Pengajuan ${durationDays} hari.`
             );
             err.status = 400;
             throw err;
@@ -171,10 +251,17 @@ async function createLeaveRequestForUser({ userId, type, start_date, end_date, r
         await client.query('BEGIN');
 
         const result = await client.query(
-            `INSERT INTO leave_requests (user_id, type, start_date, end_date, reason, attachment_path, replacement_date) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) 
+            `INSERT INTO leave_requests (
+                user_id, type, start_date, end_date, reason, attachment_path, replacement_date,
+                is_hourly, start_time, end_time, duration_hours, duration_days
+             ) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
              RETURNING *`,
-            [userId, type, start_date, end_date, reason.trim(), attachmentPath, replacement_date || null]
+            [
+                userId, type, start_date, end_date, reason.trim(), attachmentPath, replacement_date || null,
+                isHourlyBool, isHourlyBool ? start_time : null, isHourlyBool ? end_time : null,
+                durationHours, durationDays
+            ]
         );
 
         const request = result.rows[0];
@@ -197,6 +284,10 @@ async function createLeaveRequestForUser({ userId, type, start_date, end_date, r
             type,
             startDate: start_date,
             endDate: end_date,
+            isHourly: isHourlyBool,
+            startTime: start_time,
+            endTime: end_time,
+            durationHours: durationHours,
         });
         return {
             message: 'Pengajuan izin berhasil dibuat',
@@ -214,7 +305,7 @@ async function createLeaveRequestForUser({ userId, type, start_date, end_date, r
 // Create new leave request (Employee)
 router.post('/', authenticateToken, upload.single('attachment'), async (req, res) => {
     try {
-        const { type, start_date, end_date, reason, replacement_date } = req.body;
+        const { type, start_date, end_date, reason, replacement_date, is_hourly, start_time, end_time } = req.body;
         const payload = await createLeaveRequestForUser({
             userId: req.user.id,
             type,
@@ -223,6 +314,9 @@ router.post('/', authenticateToken, upload.single('attachment'), async (req, res
             reason,
             replacement_date,
             file: req.file,
+            is_hourly,
+            start_time,
+            end_time,
         });
         res.status(201).json(payload);
     } catch (error) {
@@ -236,7 +330,7 @@ router.post('/', authenticateToken, upload.single('attachment'), async (req, res
 // Kiosk: create leave on behalf of recognized employee
 router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.single('attachment'), async (req, res) => {
     try {
-        const { user_id, type, start_date, end_date, reason, replacement_date } = req.body;
+        const { user_id, type, start_date, end_date, reason, replacement_date, is_hourly, start_time, end_time } = req.body;
         if (!user_id) {
             return res.status(400).json({ error: 'User ID tidak ditemukan' });
         }
@@ -248,6 +342,9 @@ router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.si
             reason,
             replacement_date,
             file: req.file,
+            is_hourly,
+            start_time,
+            end_time,
         });
         res.status(201).json({
             ...payload,
@@ -267,11 +364,17 @@ router.get('/kiosk-quota/:userId', authenticateToken, hasPermission('admin.kiosk
         const year = new Date().getFullYear();
         const { quota, settings } = await getUserLeaveQuota(userId, year);
         const usedDays = await getUsedLeaveDays(userId, year, settings);
+        const hoursPerDay = parseFloat(settings?.hours_per_leave_day) || 8.0;
+        const remaining = Math.round((quota - usedDays) * 100) / 100;
+        const remainingHours = Math.round(remaining * hoursPerDay * 10) / 10;
         res.json({
             year,
             quota,
             used: usedDays,
-            remaining: quota - usedDays,
+            remaining,
+            remaining_hours: remainingHours,
+            hours_per_leave_day: hoursPerDay,
+            leave_calculation_mode: settings.leave_calculation_mode || 'both',
             settings,
         });
     } catch (error) {
@@ -316,12 +419,18 @@ router.get('/my-quota', authenticateToken, async (req, res) => {
         const year = new Date().getFullYear();
         const { quota, settings } = await getUserLeaveQuota(userId, year);
         const usedDays = await getUsedLeaveDays(userId, year, settings);
+        const hoursPerDay = parseFloat(settings?.hours_per_leave_day) || 8.0;
+        const remaining = Math.round((quota - usedDays) * 100) / 100;
+        const remainingHours = Math.round(remaining * hoursPerDay * 10) / 10;
 
         res.json({
             year,
             quota: quota,
             used: usedDays,
-            remaining: quota - usedDays,
+            remaining: remaining,
+            remaining_hours: remainingHours,
+            hours_per_leave_day: hoursPerDay,
+            leave_calculation_mode: settings.leave_calculation_mode || 'both',
             settings
         });
     } catch (error) {

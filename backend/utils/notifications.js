@@ -94,10 +94,13 @@ async function createNotifications(db, rows) {
     });
 }
 
-async function notifyLeaveSubmitted(pool, { requestId, requesterId, requesterName, type, startDate, endDate }) {
+async function notifyLeaveSubmitted(pool, { requestId, requesterId, requesterName, type, startDate, endDate, isHourly, startTime, endTime, durationHours }) {
     try {
         const label = LEAVE_LABELS[type] || 'Izin';
-        const when = dateRange(startDate, endDate);
+        let when = dateRange(startDate, endDate);
+        if (isHourly && startTime && endTime) {
+            when = `${dateRange(startDate, endDate)} (${startTime.substring(0, 5)} - ${endTime.substring(0, 5)}, ${durationHours} jam)`;
+        }
         const title = `Pengajuan ${label}`;
         const message = `${requesterName} mengajukan ${label} untuk ${when}.`;
 

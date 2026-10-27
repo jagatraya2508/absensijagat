@@ -221,6 +221,74 @@ export default function Overtime() {
         return t.substring(0, 5);
     }
 
+    function adjustTime(timeStr, hourOffset) {
+        if (!timeStr) return '';
+        const [h, m] = timeStr.substring(0, 5).split(':').map(Number);
+        let totalMins = h * 60 + m + Math.round(hourOffset * 60);
+        totalMins = ((totalMins % 1440) + 1440) % 1440;
+        const resH = String(Math.floor(totalMins / 60)).padStart(2, '0');
+        const resM = String(totalMins % 60).padStart(2, '0');
+        return `${resH}:${resM}`;
+    }
+
+    function checkShiftOvertimeOverlap(otStartStr, otEndStr, shiftStartStr, shiftEndStr) {
+        if (!otStartStr || !otEndStr || !shiftStartStr || !shiftEndStr) return false;
+        const toM = (t) => {
+            const parts = String(t).substring(0, 5).split(':').map(Number);
+            return parts[0] * 60 + parts[1];
+        };
+        const otStart = toM(otStartStr);
+        const otEnd = toM(otEndStr);
+        const sStart = toM(shiftStartStr);
+        const sEnd = toM(shiftEndStr);
+
+        const otRanges = otStart < otEnd ? [[otStart, otEnd]] : [[otStart, 1440], [0, otEnd]];
+        const shiftRanges = sStart < sEnd ? [[sStart, sEnd]] : [[sStart, 1440], [0, sEnd]];
+
+        for (const [oa, ob] of otRanges) {
+            for (const [sa, sb] of shiftRanges) {
+                if (Math.max(oa, sa) < Math.min(ob, sb)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getOvertimeCategory(otStartStr, otEndStr, shiftStartStr, shiftEndStr) {
+        if (!otStartStr || !otEndStr) return null;
+        if (!shiftStartStr || !shiftEndStr) return 'Lembur Bebas';
+        const toM = (t) => {
+            const parts = String(t).substring(0, 5).split(':').map(Number);
+            return parts[0] * 60 + parts[1];
+        };
+        const otStart = toM(otStartStr);
+        const otEnd = toM(otEndStr);
+        const sStart = toM(shiftStartStr);
+        const sEnd = toM(shiftEndStr);
+
+        if (sStart < sEnd) {
+            if (otEnd <= sStart || (otStart < sStart && otEnd <= sStart + 60)) {
+                return 'Lembur Awal';
+            }
+            if (otStart >= sEnd || (otStart >= sEnd - 60 && otEnd > sEnd)) {
+                return 'Lembur Akhir';
+            }
+            if (otStart < sStart) return 'Lembur Awal';
+            if (otStart >= sEnd) return 'Lembur Akhir';
+            return 'Lembur';
+        } else {
+            const midpoint = (sEnd + sStart) / 2;
+            if (otStart >= midpoint && otStart < sStart) {
+                return 'Lembur Awal';
+            }
+            if (otStart >= sEnd && otStart < midpoint) {
+                return 'Lembur Akhir';
+            }
+            return 'Lembur';
+        }
+    }
+
     const toggleEmployeeSelection = (empId) => {
         setOtForm(f => {
             const current = f.employee_ids;
@@ -240,6 +308,24 @@ export default function Overtime() {
 
     const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger', completed: 'primary' };
     const statusLabels = { pending: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak', completed: 'Selesai' };
+
+    const selectedShift = allShifts.find(s => String(s.id) === String(otForm.shift_id));
+    const isOverlap = selectedShift ? checkShiftOvertimeOverlap(otForm.overtime_start, otForm.overtime_end, selectedShift.start_time, selectedShift.end_time) : false;
+    const currentCategory = selectedShift ? getOvertimeCategory(otForm.overtime_start, otForm.overtime_end, selectedShift.start_time, selectedShift.end_time) : (otForm.overtime_start && otForm.overtime_end ? 'Lembur Bebas' : '');
+
+    function applyBeforeShift(hours) {
+        if (!selectedShift) return;
+        const end = selectedShift.start_time.substring(0, 5);
+        const start = adjustTime(end, -hours);
+        setOtForm(f => ({ ...f, overtime_start: start, overtime_end: end }));
+    }
+
+    function applyAfterShift(hours) {
+        if (!selectedShift) return;
+        const start = selectedShift.end_time.substring(0, 5);
+        const end = adjustTime(start, hours);
+        setOtForm(f => ({ ...f, overtime_start: start, overtime_end: end }));
+    }
 
     return (
         <>
@@ -294,9 +380,17 @@ export default function Overtime() {
                                         <td style={{ fontFamily: 'monospace' }}>{req.spl_number}</td>
                                         <td>{new Date(req.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                <span>{formatTime(req.overtime_start)} - {formatTime(req.overtime_end)}</span>
-                                                <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>{req.estimated_hours}h</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                    <span style={{ fontWeight: 600 }}>{formatTime(req.overtime_start)} - {formatTime(req.overtime_end)}</span>
+                                                    <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>{req.estimated_hours}h</span>
+                                                </div>
+                                                {req.overtime_category && (
+                                                    <span className={`badge ${req.overtime_category === 'Lembur Awal' ? 'badge-info' : req.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`}
+                                                        style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', width: 'fit-content' }}>
+                                                        {req.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : req.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : req.overtime_category}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td>
@@ -382,6 +476,64 @@ export default function Overtime() {
                                 )}
                             </div>
 
+                            <div className="form-group">
+                                <label className="form-label">Shift Terkait (Opsional)</label>
+                                <select className="form-input form-select" value={otForm.shift_id}
+                                    onChange={e => setOtForm(f => ({ ...f, shift_id: e.target.value }))}>
+                                    <option value="">-- Bebas / Tidak Terkait Shift --</option>
+                                    {Object.entries(groupedShifts).map(([group, shifts]) => (
+                                        <optgroup key={group} label={group}>
+                                            {shifts.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name} ({formatTime(s.start_time)} - {formatTime(s.end_time)})</option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Shortcut buttons if shift selected */}
+                            {selectedShift && (
+                                <div style={{
+                                    background: 'rgba(59, 130, 246, 0.08)',
+                                    border: '1px dashed rgba(59, 130, 246, 0.4)',
+                                    borderRadius: 'var(--radius-md)',
+                                    padding: '0.75rem',
+                                    marginBottom: '0.85rem'
+                                }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-400)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        <Icon name="Zap" size={14} inline /> Shortcut Pengisian Jam Lembur ({selectedShift.name}: {formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)})
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#06b6d4', fontWeight: 600 }}>🌅 Sebelum Shift:</span>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                                onClick={() => applyBeforeShift(1)}>
+                                                1 Jam ({adjustTime(selectedShift.start_time, -1)} - {formatTime(selectedShift.start_time)})
+                                            </button>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                                onClick={() => applyBeforeShift(2)}>
+                                                2 Jam ({adjustTime(selectedShift.start_time, -2)} - {formatTime(selectedShift.start_time)})
+                                            </button>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>🌆 Sesudah Shift:</span>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                onClick={() => applyAfterShift(1)}>
+                                                1 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 1)})
+                                            </button>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                onClick={() => applyAfterShift(2)}>
+                                                2 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 2)})
+                                            </button>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                onClick={() => applyAfterShift(3)}>
+                                                3 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 3)})
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                                 <div className="form-group">
                                     <label className="form-label">Jam Mulai *</label>
@@ -399,20 +551,23 @@ export default function Overtime() {
                                 </div>
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">Shift Terkait (Opsional)</label>
-                                <select className="form-input form-select" value={otForm.shift_id}
-                                    onChange={e => setOtForm(f => ({ ...f, shift_id: e.target.value }))}>
-                                    <option value="">-- Bebas / Tidak Terkait Shift --</option>
-                                    {Object.entries(groupedShifts).map(([group, shifts]) => (
-                                        <optgroup key={group} label={group}>
-                                            {shifts.map(s => (
-                                                <option key={s.id} value={s.id}>{s.name} ({formatTime(s.start_time)} - {formatTime(s.end_time)})</option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
-                                </select>
-                            </div>
+                            {/* Overlap Error Warning Alert */}
+                            {isOverlap && (
+                                <div className="alert alert-danger mb-3" style={{ fontSize: '0.82rem', padding: '0.6rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <Icon name="AlertTriangle" size={16} inline />
+                                    <span><strong>Peringatan Jam Lembur:</strong> Jam lembur bertabrakan dengan jam kerja reguler shift <strong>{selectedShift.name}</strong> ({formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.</span>
+                                </div>
+                            )}
+
+                            {/* Category detection badge preview */}
+                            {!isOverlap && otForm.overtime_start && otForm.overtime_end && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+                                    <span style={{ color: 'var(--gray-400)' }}>Kategori Lembur:</span>
+                                    <span className={`badge ${currentCategory === 'Lembur Awal' ? 'badge-info' : currentCategory === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`}>
+                                        {currentCategory === 'Lembur Awal' ? '🌅 Lembur Awal (Sebelum Masuk Shift)' : currentCategory === 'Lembur Akhir' ? '🌆 Lembur Akhir (Setelah Pulang Shift)' : 'Lembur Bebas'}
+                                    </span>
+                                </div>
+                            )}
 
                             <div className="form-group">
                                 <label className="form-label">Alasan & Detail Pekerjaan Lembur *</label>
@@ -477,7 +632,7 @@ export default function Overtime() {
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                                 <button className="btn btn-outline" onClick={() => { setShowModal(false); setEditingId(null); }}>Batal</button>
                                 <button className="btn btn-primary" onClick={saveOvertimeRequest}
-                                    disabled={loading || !otForm.date || !otForm.overtime_start || !otForm.overtime_end || !otForm.reason || !otForm.employee_ids.length}>
+                                    disabled={loading || isOverlap || !otForm.date || !otForm.overtime_start || !otForm.overtime_end || !otForm.reason || !otForm.employee_ids.length}>
                                     {loading ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Ajukan Lembur'}
                                 </button>
                             </div>
@@ -536,7 +691,13 @@ export default function Overtime() {
                                 </tr>
                                 <tr>
                                     <td style={{ padding: '0.25rem 0' }}><strong>Waktu Lembur</strong></td>
-                                    <td style={{ padding: '0.25rem 0' }}>: {formatTime(printData.overtime_start)} s/d {formatTime(printData.overtime_end)} ({printData.estimated_hours} jam)</td>
+                                    <td style={{ padding: '0.25rem 0' }}>: {formatTime(printData.overtime_start)} s/d {formatTime(printData.overtime_end)} ({printData.estimated_hours} jam)
+                                        {printData.overtime_category && (
+                                            <span style={{ marginLeft: '0.5rem', fontWeight: 600 }}>
+                                                [{printData.overtime_category === 'Lembur Awal' ? 'Lembur Awal (Sebelum Shift)' : printData.overtime_category === 'Lembur Akhir' ? 'Lembur Akhir (Sesudah Shift)' : printData.overtime_category}]
+                                            </span>
+                                        )}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td style={{ padding: '0.25rem 0' }}><strong>Departemen</strong></td>

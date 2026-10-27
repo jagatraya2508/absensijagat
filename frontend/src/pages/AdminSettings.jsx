@@ -7,6 +7,7 @@ import PayslipFieldSettings from '../components/PayslipFieldSettings';
 import { parsePayslipFields } from '../utils/payslipFields';
 import { FACE_MATCH_MAX, FACE_MATCH_MIN, normalizeFaceMatchPercent } from '../utils/faceMatch';
 import { settingsAPI } from '../utils/api';
+import { AVAILABLE_EMPLOYEE_COLUMNS, DEFAULT_VISIBLE_COLUMNS, STORAGE_KEY_EMPLOYEE_COLUMNS, getInitialVisibleColumns } from '../utils/employeeColumns';
 
 const THEME_PRESETS = [
     { name: 'Merah Marun', icon: 'Circle', primary: '#6D0000', bg: '#fff8f8', card_bg: '#ffffff', btn_bg: '#ef4444' },
@@ -159,6 +160,8 @@ export default function AdminSettings() {
     // Leave Settings state
     const [leaveSettings, setLeaveSettings] = useState({
         annual_leave_quota: 12,
+        leave_calculation_mode: 'both',
+        hours_per_leave_day: 8,
         late_deducts_leave: false,
         sick_deducts_leave: false,
         permission_deducts_leave: false
@@ -204,6 +207,62 @@ export default function AdminSettings() {
     const [restoreMessage, setRestoreMessage] = useState({ type: '', text: '' });
     const [dbInfo, setDbInfo] = useState(null);
 
+    // Attendance Location Settings state
+    const [attLocSettings, setAttLocSettings] = useState({
+        require_different_location_checkout: false,
+        checkout_location_rule_mode: 'specific',
+        min_checkout_distance_meters: 0
+    });
+    const [attLocLoading, setAttLocLoading] = useState(false);
+    const [attLocMessage, setAttLocMessage] = useState({ type: '', text: '' });
+
+    // Employee Columns Configuration state
+    const [empColumns, setEmpColumns] = useState(() => getInitialVisibleColumns());
+    const [empColumnsLoading, setEmpColumnsLoading] = useState(false);
+    const [empColumnsMessage, setEmpColumnsMessage] = useState({ type: '', text: '' });
+
+    useEffect(() => {
+        settingsAPI.getEmployeeColumns().then(res => {
+            if (res && res.columns) {
+                const cols = getInitialVisibleColumns(res.columns);
+                setEmpColumns(cols);
+            }
+        }).catch(err => {
+            console.warn('Failed to load employee columns in settings:', err);
+        });
+    }, []);
+
+    const handleEmpColumnsSave = async () => {
+        setEmpColumnsLoading(true);
+        setEmpColumnsMessage({ type: '', text: '' });
+        try {
+            const colsToSave = [...empColumns];
+            if (!colsToSave.includes('name')) colsToSave.push('name');
+            if (!colsToSave.includes('actions')) colsToSave.push('actions');
+
+            await settingsAPI.updateEmployeeColumns(colsToSave);
+            try {
+                localStorage.setItem(STORAGE_KEY_EMPLOYEE_COLUMNS, JSON.stringify(colsToSave));
+            } catch (e) {}
+            setEmpColumnsMessage({ type: 'success', text: 'Pengaturan kolom data karyawan berhasil disimpan!' });
+        } catch (error) {
+            setEmpColumnsMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan kolom' });
+        } finally {
+            setEmpColumnsLoading(false);
+        }
+    };
+
+    const toggleEmpColumn = (key) => {
+        if (key === 'name' || key === 'actions') return;
+        setEmpColumns(prev => {
+            if (prev.includes(key)) {
+                return prev.filter(k => k !== key);
+            } else {
+                return [...prev, key];
+            }
+        });
+    };
+
     // Sync when themeColors change (e.g. after save)
     useEffect(() => {
         setSelectedPrimary(themeColors.primary);
@@ -238,6 +297,7 @@ export default function AdminSettings() {
         fetchLeaveSettings();
         fetchSmtpSettings();
         fetchBackupInfo();
+        fetchAttendanceLocationSettings();
     }, []);
 
     const fetchBackupInfo = async () => {
@@ -273,6 +333,8 @@ export default function AdminSettings() {
             if (data.settings) {
                 setLeaveSettings({
                     annual_leave_quota: data.settings.annual_leave_quota,
+                    leave_calculation_mode: data.settings.leave_calculation_mode || 'both',
+                    hours_per_leave_day: parseFloat(data.settings.hours_per_leave_day) || 8,
                     late_deducts_leave: data.settings.late_deducts_leave,
                     sick_deducts_leave: data.settings.sick_deducts_leave,
                     permission_deducts_leave: data.settings.permission_deducts_leave
@@ -291,6 +353,33 @@ export default function AdminSettings() {
             console.error('Failed to load leave settings:', error);
         }
     };
+
+    const fetchAttendanceLocationSettings = async () => {
+        try {
+            const data = await settingsAPI.getAttendanceLocation();
+            setAttLocSettings({
+                require_different_location_checkout: data.require_different_location_checkout || false,
+                checkout_location_rule_mode: data.checkout_location_rule_mode || (data.require_different_location_checkout ? 'all' : 'specific'),
+                min_checkout_distance_meters: data.min_checkout_distance_meters || 0
+            });
+        } catch (error) {
+            console.error('Failed to load attendance location settings:', error);
+        }
+    };
+
+    const handleAttendanceLocationSave = async () => {
+        setAttLocLoading(true);
+        setAttLocMessage({ type: '', text: '' });
+        try {
+            const res = await settingsAPI.updateAttendanceLocation(attLocSettings);
+            setAttLocMessage({ type: 'success', text: res.message || 'Pengaturan lokasi absensi berhasil disimpan' });
+        } catch (error) {
+            setAttLocMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan lokasi absensi' });
+        } finally {
+            setAttLocLoading(false);
+        }
+    };
+
     const handlePresetSelect = (index) => {
         const preset = THEME_PRESETS[index];
         setActivePreset(index);
@@ -597,6 +686,273 @@ export default function AdminSettings() {
                         <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--gray-500)' }}>
                             Rentang {FACE_MATCH_MIN}% sampai {FACE_MATCH_MAX}%. Layar kiosk yang sudah terbuka perlu dimuat ulang agar angka baru dipakai.
                         </p>
+                    </div>
+                </div>
+
+                {/* ============ EMPLOYEE TABLE COLUMNS SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="SlidersHorizontal" size={16} inline /> Kolom Tampilan Data Karyawan</h2>
+                    </div>
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {empColumnsMessage.text && (
+                            <div className={`alert alert-${empColumnsMessage.type}`} style={{ marginBottom: '1.25rem' }}>
+                                <span className="alert-icon">{empColumnsMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {empColumnsMessage.text}
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem' }}>
+                            Atur kolom atau field data yang ingin ditampilkan pada tabel <strong>Data Karyawan</strong> (/admin/employees). Kolom yang dipilih juga berlaku otomatis pada tampilan cetak (Print), PDF, dan ekspor Excel.
+                        </p>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--gray-700)', fontWeight: 500 }}>
+                                <strong>{empColumns.length}</strong> kolom aktif dari {AVAILABLE_EMPLOYEE_COLUMNS.length} kolom yang tersedia
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={() => setEmpColumns(AVAILABLE_EMPLOYEE_COLUMNS.map(c => c.key))}
+                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                >
+                                    Pilih Semua
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={() => setEmpColumns([...DEFAULT_VISIBLE_COLUMNS])}
+                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                >
+                                    Reset Bawaan
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                            {AVAILABLE_EMPLOYEE_COLUMNS.map(col => {
+                                const isChecked = empColumns.includes(col.key);
+                                const isRequired = col.required;
+                                const isHighlighted = col.key === 'appreciation_allowance';
+                                return (
+                                    <label
+                                        key={col.key}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.75rem',
+                                            padding: '0.75rem 0.9rem',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: `1.5px solid ${isChecked ? (isHighlighted ? 'var(--primary, #7f1d1d)' : 'var(--gray-400)') : 'var(--gray-200)'}`,
+                                            background: isChecked ? (isHighlighted ? 'rgba(127, 29, 29, 0.04)' : '#f9fafb') : '#fff',
+                                            cursor: isRequired ? 'not-allowed' : 'pointer',
+                                            userSelect: 'none',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={isRequired}
+                                            onChange={() => toggleEmpColumn(col.key)}
+                                            style={{ width: '17px', height: '17px', cursor: isRequired ? 'not-allowed' : 'pointer' }}
+                                        />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--gray-800)', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                {col.label}
+                                                {isRequired && <span style={{ fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 400 }}>(Wajib)</span>}
+                                                {isHighlighted && <span className="badge badge-warning" style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem' }}>Pilihan Baru</span>}
+                                            </div>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>
+                                                Kategori: {col.category}
+                                            </div>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                        </div>
+
+                        <div>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleEmpColumnsSave}
+                                disabled={empColumnsLoading}
+                                style={{ minWidth: '150px', height: '42px' }}
+                            >
+                                {empColumnsLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    'Simpan Pengaturan Kolom'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ============ ATTENDANCE LOCATION SETTINGS SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="MapPin" size={16} inline /> Validasi Lokasi Absen Pulang (Check-Out)</h2>
+                    </div>
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {attLocMessage.text && (
+                            <div className={`alert alert-${attLocMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                <span className="alert-icon">{attLocMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {attLocMessage.text}
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem' }}>
+                            Atur aturan titik lokasi untuk absen pulang (Check-out) dibandingkan dengan lokasi saat absen masuk (Check-in).
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>
+                                    Pemberlakuan Validasi Beda Lokasi / Titik Pulang:
+                                </label>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                                    {/* Option 1: Specific employees */}
+                                    <div
+                                        onClick={() => setAttLocSettings({ ...attLocSettings, checkout_location_rule_mode: 'specific' })}
+                                        style={{
+                                            padding: '1rem',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: `2px solid ${attLocSettings.checkout_location_rule_mode === 'specific' ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: attLocSettings.checkout_location_rule_mode === 'specific' ? 'rgba(59, 130, 246, 0.08)' : 'white',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                            <input
+                                                type="radio"
+                                                name="checkout_location_rule_mode"
+                                                checked={attLocSettings.checkout_location_rule_mode === 'specific'}
+                                                onChange={() => {}}
+                                                style={{ cursor: 'pointer', accentColor: 'var(--primary-500)' }}
+                                            />
+                                            <span style={{ fontWeight: 700, fontSize: '0.92rem', color: attLocSettings.checkout_location_rule_mode === 'specific' ? 'var(--primary-600)' : 'var(--gray-800)' }}>
+                                                Hanya Karyawan Tertentu
+                                            </span>
+                                            <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }}>Rekomendasi</span>
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--gray-600)', lineHeight: 1.4, paddingLeft: '1.5rem' }}>
+                                            Hanya berlaku untuk karyawan yang dicentang di <strong>Master Data Karyawan</strong> (misal kurir, sales lapangan, driver ritase).
+                                        </p>
+                                    </div>
+
+                                    {/* Option 2: All employees */}
+                                    <div
+                                        onClick={() => setAttLocSettings({ ...attLocSettings, checkout_location_rule_mode: 'all' })}
+                                        style={{
+                                            padding: '1rem',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: `2px solid ${attLocSettings.checkout_location_rule_mode === 'all' ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: attLocSettings.checkout_location_rule_mode === 'all' ? 'rgba(59, 130, 246, 0.08)' : 'white',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                            <input
+                                                type="radio"
+                                                name="checkout_location_rule_mode"
+                                                checked={attLocSettings.checkout_location_rule_mode === 'all'}
+                                                onChange={() => {}}
+                                                style={{ cursor: 'pointer', accentColor: 'var(--primary-500)' }}
+                                            />
+                                            <span style={{ fontWeight: 700, fontSize: '0.92rem', color: attLocSettings.checkout_location_rule_mode === 'all' ? 'var(--primary-600)' : 'var(--gray-800)' }}>
+                                                Semua Karyawan
+                                            </span>
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--gray-600)', lineHeight: 1.4, paddingLeft: '1.5rem' }}>
+                                            Berlaku wajib secara global untuk seluruh karyawan tanpa kecuali saat absen pulang.
+                                        </p>
+                                    </div>
+
+                                    {/* Option 3: Disabled */}
+                                    <div
+                                        onClick={() => setAttLocSettings({ ...attLocSettings, checkout_location_rule_mode: 'disabled' })}
+                                        style={{
+                                            padding: '1rem',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: `2px solid ${attLocSettings.checkout_location_rule_mode === 'disabled' ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: attLocSettings.checkout_location_rule_mode === 'disabled' ? 'rgba(59, 130, 246, 0.08)' : 'white',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                            <input
+                                                type="radio"
+                                                name="checkout_location_rule_mode"
+                                                checked={attLocSettings.checkout_location_rule_mode === 'disabled'}
+                                                onChange={() => {}}
+                                                style={{ cursor: 'pointer', accentColor: 'var(--primary-500)' }}
+                                            />
+                                            <span style={{ fontWeight: 700, fontSize: '0.92rem', color: attLocSettings.checkout_location_rule_mode === 'disabled' ? 'var(--primary-600)' : 'var(--gray-800)' }}>
+                                                Nonaktifkan Aturan
+                                            </span>
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--gray-600)', lineHeight: 1.4, paddingLeft: '1.5rem' }}>
+                                            Tidak ada pengecekan beda lokasi pulang untuk siapapun.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {attLocSettings.checkout_location_rule_mode !== 'disabled' && (
+                                <div style={{
+                                    padding: '1rem',
+                                    background: 'white',
+                                    border: '1.5px solid var(--gray-200)',
+                                    borderRadius: 'var(--radius-lg)'
+                                }}>
+                                    <label className="form-label" style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.85rem' }}>
+                                        Jarak Minimal Perpindahan Pulang dari Titik Masuk (Meter)
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', maxWidth: '300px' }}>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            min="0"
+                                            step="50"
+                                            placeholder="Contoh: 100 atau 500"
+                                            value={attLocSettings.min_checkout_distance_meters}
+                                            onChange={(e) => setAttLocSettings({ ...attLocSettings, min_checkout_distance_meters: parseFloat(e.target.value) || 0 })}
+                                        />
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--gray-500)', fontWeight: 500 }}>Meter</span>
+                                    </div>
+                                    <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: 'var(--gray-500)' }}>
+                                        Isi <strong>0</strong> jika cukup beda lokasi atau berada di luar radius lokasi masuk. Jika diisi (misal: 500), maka jarak GPS saat pulang wajib berjarak minimal 500 meter dari titik masuk.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleAttendanceLocationSave}
+                                    disabled={attLocLoading}
+                                    style={{ minWidth: '150px', height: '42px' }}
+                                >
+                                    {attLocLoading ? (
+                                        <>
+                                            <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                                            <span>Menyimpan...</span>
+                                        </>
+                                    ) : (
+                                        'Simpan Pengaturan Lokasi'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1396,6 +1752,109 @@ export default function AdminSettings() {
                                 <small style={{ color: 'var(--gray-500)', marginTop: '0.25rem', display: 'block' }}>
                                     Jumlah hari cuti yang didapatkan setiap tahun.
                                 </small>
+                            </div>
+
+                            {/* Mode Perhitungan Cuti */}
+                            <div style={{
+                                padding: '1.25rem',
+                                background: 'var(--gray-50)',
+                                borderRadius: 'var(--radius-lg)',
+                                border: '1px solid var(--gray-200)',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
+                                    <Icon name="Clock" size={16} inline /> Mode Perhitungan & Satuan Cuti
+                                </h3>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+                                    Tentukan apakah karyawan dapat mengajukan cuti per hari penuh, per jam, atau keduanya.
+                                </p>
+
+                                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                                    <label className="form-label" style={{ fontWeight: 600 }}>Pilihan Mode Pengajuan Cuti</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                        <label style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.75rem',
+                                            borderRadius: 'var(--radius-md)', border: `2px solid ${leaveSettings.leave_calculation_mode === 'both' ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: leaveSettings.leave_calculation_mode === 'both' ? 'rgba(59,130,246,0.08)' : 'transparent',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="leave_calc_mode"
+                                                value="both"
+                                                checked={leaveSettings.leave_calculation_mode === 'both'}
+                                                onChange={() => setLeaveSettings({ ...leaveSettings, leave_calculation_mode: 'both' })}
+                                                style={{ marginTop: '0.2rem' }}
+                                            />
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Keduanya (Rekomendasi)</div>
+                                                <div style={{ fontSize: '0.78rem', color: 'var(--gray-500)' }}>Bisa ajukan harian penuh atau cuti beberapa jam</div>
+                                            </div>
+                                        </label>
+
+                                        <label style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.75rem',
+                                            borderRadius: 'var(--radius-md)', border: `2px solid ${leaveSettings.leave_calculation_mode === 'daily' ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: leaveSettings.leave_calculation_mode === 'daily' ? 'rgba(59,130,246,0.08)' : 'transparent',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="leave_calc_mode"
+                                                value="daily"
+                                                checked={leaveSettings.leave_calculation_mode === 'daily'}
+                                                onChange={() => setLeaveSettings({ ...leaveSettings, leave_calculation_mode: 'daily' })}
+                                                style={{ marginTop: '0.2rem' }}
+                                            />
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Per Hari Saja</div>
+                                                <div style={{ fontSize: '0.78rem', color: 'var(--gray-500)' }}>Hanya cuti harian penuh (minimal 1 hari)</div>
+                                            </div>
+                                        </label>
+
+                                        <label style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.75rem',
+                                            borderRadius: 'var(--radius-md)', border: `2px solid ${leaveSettings.leave_calculation_mode === 'hourly' ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: leaveSettings.leave_calculation_mode === 'hourly' ? 'rgba(59,130,246,0.08)' : 'transparent',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="radio"
+                                                name="leave_calc_mode"
+                                                value="hourly"
+                                                checked={leaveSettings.leave_calculation_mode === 'hourly'}
+                                                onChange={() => setLeaveSettings({ ...leaveSettings, leave_calculation_mode: 'hourly' })}
+                                                style={{ marginTop: '0.2rem' }}
+                                            />
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Per Jam Saja</div>
+                                                <div style={{ fontSize: '0.78rem', color: 'var(--gray-500)' }}>Semua pengajuan cuti dihitung dalam durasi jam</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label" style={{ fontWeight: 600 }}>
+                                        Konversi Jam Kerja ke 1 Hari Cuti
+                                    </label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', maxWidth: '300px' }}>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            step="0.5"
+                                            min="1"
+                                            max="24"
+                                            value={leaveSettings.hours_per_leave_day}
+                                            onChange={(e) => setLeaveSettings({ ...leaveSettings, hours_per_leave_day: parseFloat(e.target.value) || 8 })}
+                                            required
+                                        />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>Jam = 1 Hari Cuti</span>
+                                    </div>
+                                    <small style={{ color: 'var(--gray-500)', marginTop: '0.35rem', display: 'block' }}>
+                                        Contoh: Jika diatur 8 jam, cuti 2 jam akan memotong 0.25 hari cuti tahunan. Setelah terkumpul 8 jam cuti, otomatis genap memotong 1 hari kuota.
+                                    </small>
+                                </div>
                             </div>
 
                             <div style={{

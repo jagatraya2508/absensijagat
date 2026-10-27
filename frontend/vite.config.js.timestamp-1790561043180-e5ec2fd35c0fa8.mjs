@@ -1,0 +1,39 @@
+// vite.config.js
+import { defineConfig } from "file:///D:/Programer/absensijagat/frontend/node_modules/vite/dist/node/index.js";
+import react from "file:///D:/Programer/absensijagat/frontend/node_modules/@vitejs/plugin-react/dist/index.js";
+var vite_config_default = defineConfig({
+  plugins: [
+    react()
+  ],
+  server: {
+    port: 3012,
+    host: true,
+    // Listen on all addresses
+    allowedHosts: [
+      "absensigudang.sahabatjayasukses.com",
+      "absensi.jagatrayasolusindo.com",
+      "localhost",
+      ...process.env.FRONTEND_ALLOWED_HOSTS ? process.env.FRONTEND_ALLOWED_HOSTS.split(",").map((h) => h.trim()) : []
+    ],
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:5000",
+        changeOrigin: true,
+        secure: false,
+        timeout: 6e5,
+        proxyTimeout: 6e5
+      },
+      "/uploads": {
+        target: "http://127.0.0.1:5000",
+        changeOrigin: true,
+        secure: false,
+        timeout: 6e5,
+        proxyTimeout: 6e5
+      }
+    }
+  }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcuanMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCJEOlxcXFxQcm9ncmFtZXJcXFxcYWJzZW5zaWphZ2F0XFxcXGZyb250ZW5kXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ZpbGVuYW1lID0gXCJEOlxcXFxQcm9ncmFtZXJcXFxcYWJzZW5zaWphZ2F0XFxcXGZyb250ZW5kXFxcXHZpdGUuY29uZmlnLmpzXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ltcG9ydF9tZXRhX3VybCA9IFwiZmlsZTovLy9EOi9Qcm9ncmFtZXIvYWJzZW5zaWphZ2F0L2Zyb250ZW5kL3ZpdGUuY29uZmlnLmpzXCI7aW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSAndml0ZSdcclxuaW1wb3J0IHJlYWN0IGZyb20gJ0B2aXRlanMvcGx1Z2luLXJlYWN0J1xyXG5cclxuZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHtcclxuICAgIHBsdWdpbnM6IFtcclxuICAgICAgICByZWFjdCgpXHJcbiAgICBdLFxyXG4gICAgc2VydmVyOiB7XHJcbiAgICAgICAgcG9ydDogMzAxMixcclxuICAgICAgICBob3N0OiB0cnVlLCAvLyBMaXN0ZW4gb24gYWxsIGFkZHJlc3Nlc1xyXG4gICAgICAgIGFsbG93ZWRIb3N0czogW1xyXG4gICAgICAgICAgICAnYWJzZW5zaWd1ZGFuZy5zYWhhYmF0amF5YXN1a3Nlcy5jb20nLFxyXG4gICAgICAgICAgICAnYWJzZW5zaS5qYWdhdHJheWFzb2x1c2luZG8uY29tJyxcclxuICAgICAgICAgICAgJ2xvY2FsaG9zdCcsXHJcbiAgICAgICAgICAgIC4uLihwcm9jZXNzLmVudi5GUk9OVEVORF9BTExPV0VEX0hPU1RTID8gcHJvY2Vzcy5lbnYuRlJPTlRFTkRfQUxMT1dFRF9IT1NUUy5zcGxpdCgnLCcpLm1hcChoID0+IGgudHJpbSgpKSA6IFtdKVxyXG4gICAgICAgIF0sXHJcblxyXG4gICAgICAgIHByb3h5OiB7XHJcbiAgICAgICAgICAgICcvYXBpJzoge1xyXG4gICAgICAgICAgICAgICAgdGFyZ2V0OiAnaHR0cDovLzEyNy4wLjAuMTo1MDAwJyxcclxuICAgICAgICAgICAgICAgIGNoYW5nZU9yaWdpbjogdHJ1ZSxcclxuICAgICAgICAgICAgICAgIHNlY3VyZTogZmFsc2UsXHJcbiAgICAgICAgICAgICAgICB0aW1lb3V0OiA2MDAwMDAsXHJcbiAgICAgICAgICAgICAgICBwcm94eVRpbWVvdXQ6IDYwMDAwMFxyXG4gICAgICAgICAgICB9LFxyXG4gICAgICAgICAgICAnL3VwbG9hZHMnOiB7XHJcbiAgICAgICAgICAgICAgICB0YXJnZXQ6ICdodHRwOi8vMTI3LjAuMC4xOjUwMDAnLFxyXG4gICAgICAgICAgICAgICAgY2hhbmdlT3JpZ2luOiB0cnVlLFxyXG4gICAgICAgICAgICAgICAgc2VjdXJlOiBmYWxzZSxcclxuICAgICAgICAgICAgICAgIHRpbWVvdXQ6IDYwMDAwMCxcclxuICAgICAgICAgICAgICAgIHByb3h5VGltZW91dDogNjAwMDAwXHJcbiAgICAgICAgICAgIH1cclxuICAgICAgICB9XHJcbiAgICB9XHJcbn0pXHJcbiJdLAogICJtYXBwaW5ncyI6ICI7QUFBZ1MsU0FBUyxvQkFBb0I7QUFDN1QsT0FBTyxXQUFXO0FBRWxCLElBQU8sc0JBQVEsYUFBYTtBQUFBLEVBQ3hCLFNBQVM7QUFBQSxJQUNMLE1BQU07QUFBQSxFQUNWO0FBQUEsRUFDQSxRQUFRO0FBQUEsSUFDSixNQUFNO0FBQUEsSUFDTixNQUFNO0FBQUE7QUFBQSxJQUNOLGNBQWM7QUFBQSxNQUNWO0FBQUEsTUFDQTtBQUFBLE1BQ0E7QUFBQSxNQUNBLEdBQUksUUFBUSxJQUFJLHlCQUF5QixRQUFRLElBQUksdUJBQXVCLE1BQU0sR0FBRyxFQUFFLElBQUksT0FBSyxFQUFFLEtBQUssQ0FBQyxJQUFJLENBQUM7QUFBQSxJQUNqSDtBQUFBLElBRUEsT0FBTztBQUFBLE1BQ0gsUUFBUTtBQUFBLFFBQ0osUUFBUTtBQUFBLFFBQ1IsY0FBYztBQUFBLFFBQ2QsUUFBUTtBQUFBLFFBQ1IsU0FBUztBQUFBLFFBQ1QsY0FBYztBQUFBLE1BQ2xCO0FBQUEsTUFDQSxZQUFZO0FBQUEsUUFDUixRQUFRO0FBQUEsUUFDUixjQUFjO0FBQUEsUUFDZCxRQUFRO0FBQUEsUUFDUixTQUFTO0FBQUEsUUFDVCxjQUFjO0FBQUEsTUFDbEI7QUFBQSxJQUNKO0FBQUEsRUFDSjtBQUNKLENBQUM7IiwKICAibmFtZXMiOiBbXQp9Cg==

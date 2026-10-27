@@ -12,7 +12,8 @@ export default function AdminLocations() {
         latitude: '',
         longitude: '',
         radius_meters: 100,
-        is_active: true
+        is_active: true,
+        location_type: 'all'
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -39,7 +40,8 @@ export default function AdminLocations() {
             latitude: '',
             longitude: '',
             radius_meters: 100,
-            is_active: true
+            is_active: true,
+            location_type: 'all'
         });
         setShowModal(true);
         setError('');
@@ -52,7 +54,8 @@ export default function AdminLocations() {
             latitude: location.latitude,
             longitude: location.longitude,
             radius_meters: location.radius_meters,
-            is_active: location.is_active
+            is_active: location.is_active,
+            location_type: location.location_type || 'all'
         });
         setShowModal(true);
         setError('');
@@ -139,6 +142,7 @@ export default function AdminLocations() {
                             <thead>
                                 <tr>
                                     <th>Nama Lokasi</th>
+                                    <th>Peruntukan</th>
                                     <th>Koordinat</th>
                                     <th>Radius</th>
                                     <th>Status</th>
@@ -149,6 +153,21 @@ export default function AdminLocations() {
                                 {locations.map((loc) => (
                                     <tr key={loc.id}>
                                         <td style={{ fontWeight: 500 }}>{loc.name}</td>
+                                        <td>
+                                            {loc.location_type === 'check_in' ? (
+                                                <span className="badge" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                                                    🟡 Khusus Masuk
+                                                </span>
+                                            ) : loc.location_type === 'check_out' ? (
+                                                <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                                                    🔵 Khusus Pulang
+                                                </span>
+                                            ) : (
+                                                <span className="badge" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>
+                                                    🟢 Masuk & Pulang
+                                                </span>
+                                            )}
+                                        </td>
                                         <td style={{ fontSize: '0.85rem' }}>
                                             {parseFloat(loc.latitude).toFixed(6)}, {parseFloat(loc.longitude).toFixed(6)}
                                         </td>
@@ -214,6 +233,23 @@ export default function AdminLocations() {
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                         required
                                     />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Peruntukan Absen *</label>
+                                    <select
+                                        className="form-input"
+                                        value={formData.location_type || 'all'}
+                                        onChange={(e) => setFormData({ ...formData, location_type: e.target.value })}
+                                        style={{ background: 'white' }}
+                                    >
+                                        <option value="all">🟢 Masuk & Pulang (Bisa untuk Check-in maupun Check-out)</option>
+                                        <option value="check_in">🟡 Khusus Masuk Saja (Hanya bisa dipakai saat Check-in)</option>
+                                        <option value="check_out">🔵 Khusus Pulang Saja (Hanya bisa dipakai saat Check-out)</option>
+                                    </select>
+                                    <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                                        Tentukan apakah lokasi ini hanya boleh dipakai untuk absen masuk, absen pulang, atau keduanya.
+                                    </p>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '1rem' }}>

@@ -1,8 +1,9 @@
 import Icon from '../components/Icon';
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import CompanyCalendar from '../components/CompanyCalendar';
-import { departmentsAPI, positionsAPI } from '../utils/api';
+import { departmentsAPI, positionsAPI, shiftChangeRequestsAPI } from '../utils/api';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -11,6 +12,7 @@ const SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#e
 const TAB_ITEMS = [
     { key: 'schedules', icon: 'Clock', label: 'Jadwal Kerja' },
     { key: 'assignments', icon: 'Calendar', label: 'Penugasan Shift' },
+    { key: 'shift_requests', icon: 'Repeat', label: 'Persetujuan Tukar Shift' },
     { key: 'calendar', icon: 'Calendar', label: 'Kalender' },
 ];
 
@@ -262,10 +264,16 @@ function ShiftTimeline({ shifts }) {
 export default function AdminWorkSchedule() {
     const { user } = useAuth();
     const token = localStorage.getItem('token');
+    const location = useLocation();
 
     const [activeTab, setActiveTab] = useState('schedules');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+
+    // Shift change requests state
+    const [shiftRequests, setShiftRequests] = useState([]);
+    const [shiftReqLoading, setShiftReqLoading] = useState(false);
+    const [shiftReqFilter, setShiftReqFilter] = useState({ status: '', department: '' });
 
     // Schedule data
     const [schedules, setSchedules] = useState([]);
@@ -391,19 +399,63 @@ export default function AdminWorkSchedule() {
         } catch (e) { console.error(e); }
     }, [token, calendarFilter]);
 
+    const fetchShiftRequests = useCallback(async () => {
+        setShiftReqLoading(true);
+        try {
+            const params = {};
+            if (shiftReqFilter.status) params.status = shiftReqFilter.status;
+            if (shiftReqFilter.department) params.department = shiftReqFilter.department;
+            const data = await shiftChangeRequestsAPI.getList(params);
+            setShiftRequests(data || []);
+        } catch (e) {
+            console.error('Fetch shift requests error:', e);
+        } finally {
+            setShiftReqLoading(false);
+        }
+    }, [shiftReqFilter]);
+
     useEffect(() => {
         fetchSchedules();
         fetchDepartments();
         fetchPositions();
         fetchEmployees();
         fetchAllShifts();
-    }, [fetchSchedules, fetchDepartments, fetchPositions, fetchEmployees, fetchAllShifts]);
+        fetchShiftRequests();
+    }, [fetchSchedules, fetchDepartments, fetchPositions, fetchEmployees, fetchAllShifts, fetchShiftRequests]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tabParam = params.get('tab');
+        if (tabParam && ['schedules', 'assignments', 'shift_requests', 'calendar'].includes(tabParam)) {
+            setActiveTab(tabParam);
+        }
+    }, [location.search]);
 
     useEffect(() => {
         if (activeTab === 'assignments') fetchAssignments();
+        if (activeTab === 'shift_requests') fetchShiftRequests();
         if (activeTab === 'overtime') fetchOvertimeRequests();
         if (activeTab === 'calendar') fetchCalendarEvents();
-    }, [activeTab, fetchAssignments, fetchOvertimeRequests, fetchCalendarEvents]);
+    }, [activeTab, fetchAssignments, fetchShiftRequests, fetchOvertimeRequests, fetchCalendarEvents]);
+
+    const handleApproveShiftReq = async (reqId, status) => {
+        const isApprove = status === 'approved';
+        const actionLabel = isApprove ? 'menyetujui' : 'menolak';
+        const notes = window.prompt(`Masukkan catatan (opsional) untuk ${actionLabel} permohonan shift ini:`);
+        if (notes === null) return;
+
+        setLoading(true);
+        try {
+            const res = await shiftChangeRequestsAPI.updateStatus(reqId, status, notes);
+            showMsg('success', res.message || 'Status pengajuan berhasil diperbarui');
+            fetchShiftRequests();
+            fetchAssignments();
+        } catch (err) {
+            showMsg('danger', err.message || 'Gagal memproses pengajuan');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     function showMsg(type, text) {
         setMessage({ type, text });
@@ -727,6 +779,74 @@ export default function AdminWorkSchedule() {
     // ============================================
     // OVERTIME REQUESTS
     // ============================================
+    function adjustTime(timeStr, hourOffset) {
+        if (!timeStr) return '';
+        const [h, m] = timeStr.substring(0, 5).split(':').map(Number);
+        let totalMins = h * 60 + m + Math.round(hourOffset * 60);
+        totalMins = ((totalMins % 1440) + 1440) % 1440;
+        const resH = String(Math.floor(totalMins / 60)).padStart(2, '0');
+        const resM = String(totalMins % 60).padStart(2, '0');
+        return `${resH}:${resM}`;
+    }
+
+    function checkShiftOvertimeOverlap(otStartStr, otEndStr, shiftStartStr, shiftEndStr) {
+        if (!otStartStr || !otEndStr || !shiftStartStr || !shiftEndStr) return false;
+        const toM = (t) => {
+            const parts = String(t).substring(0, 5).split(':').map(Number);
+            return parts[0] * 60 + parts[1];
+        };
+        const otStart = toM(otStartStr);
+        const otEnd = toM(otEndStr);
+        const sStart = toM(shiftStartStr);
+        const sEnd = toM(shiftEndStr);
+
+        const otRanges = otStart < otEnd ? [[otStart, otEnd]] : [[otStart, 1440], [0, otEnd]];
+        const shiftRanges = sStart < sEnd ? [[sStart, sEnd]] : [[sStart, 1440], [0, sEnd]];
+
+        for (const [oa, ob] of otRanges) {
+            for (const [sa, sb] of shiftRanges) {
+                if (Math.max(oa, sa) < Math.min(ob, sb)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getOvertimeCategory(otStartStr, otEndStr, shiftStartStr, shiftEndStr) {
+        if (!otStartStr || !otEndStr) return null;
+        if (!shiftStartStr || !shiftEndStr) return 'Lembur Bebas';
+        const toM = (t) => {
+            const parts = String(t).substring(0, 5).split(':').map(Number);
+            return parts[0] * 60 + parts[1];
+        };
+        const otStart = toM(otStartStr);
+        const otEnd = toM(otEndStr);
+        const sStart = toM(shiftStartStr);
+        const sEnd = toM(shiftEndStr);
+
+        if (sStart < sEnd) {
+            if (otEnd <= sStart || (otStart < sStart && otEnd <= sStart + 60)) {
+                return 'Lembur Awal';
+            }
+            if (otStart >= sEnd || (otStart >= sEnd - 60 && otEnd > sEnd)) {
+                return 'Lembur Akhir';
+            }
+            if (otStart < sStart) return 'Lembur Awal';
+            if (otStart >= sEnd) return 'Lembur Akhir';
+            return 'Lembur';
+        } else {
+            const midpoint = (sEnd + sStart) / 2;
+            if (otStart >= midpoint && otStart < sStart) {
+                return 'Lembur Awal';
+            }
+            if (otStart >= sEnd && otStart < midpoint) {
+                return 'Lembur Akhir';
+            }
+            return 'Lembur';
+        }
+    }
+
     function calcEstimatedHours() {
         if (!otForm.overtime_start || !otForm.overtime_end) return 0;
         const [sh, sm] = otForm.overtime_start.split(':').map(Number);
@@ -991,6 +1111,173 @@ export default function AdminWorkSchedule() {
         );
     }
 
+    // --- TAB 3: SHIFT CHANGE & SWAP REQUESTS ---
+    function renderShiftRequestsTab() {
+        return (
+            <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-800)' }}>Persetujuan Perubahan & Tukar Shift</h2>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Tinjau dan proses permohonan pindah atau tukar shift dari karyawan</p>
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="card" style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Status</label>
+                            <select className="form-input form-select" value={shiftReqFilter.status}
+                                onChange={e => setShiftReqFilter(f => ({ ...f, status: e.target.value }))}>
+                                <option value="">Semua Status</option>
+                                <option value="pending">Menunggu Persetujuan</option>
+                                <option value="approved">Disetujui</option>
+                                <option value="rejected">Ditolak</option>
+                            </select>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Departemen</label>
+                            <select className="form-input form-select" value={shiftReqFilter.department}
+                                onChange={e => setShiftReqFilter(f => ({ ...f, department: e.target.value }))}>
+                                <option value="">Semua Departemen</option>
+                                {departments.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
+                            </select>
+                        </div>
+                        <button className="btn btn-primary" style={{ height: '42px' }} onClick={fetchShiftRequests}>Filter</button>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="card">
+                    {shiftReqLoading ? (
+                        <div style={{ padding: '2rem', textAlign: 'center' }}>
+                            <div className="loading-spinner" style={{ margin: '0 auto 0.75rem' }} />
+                            <span style={{ color: 'var(--gray-500)', fontSize: '0.85rem' }}>Memuat data pengajuan shift...</span>
+                        </div>
+                    ) : (
+                        <div className="table-container">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Tgl Shift</th>
+                                        <th>Karyawan Pemohon</th>
+                                        <th>Tipe</th>
+                                        <th>Perubahan Shift</th>
+                                        <th>Rekan Kerja</th>
+                                        <th>Alasan</th>
+                                        <th>Status</th>
+                                        <th style={{ textAlign: 'center' }}>Aksi / Catatan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {shiftRequests.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} style={{ textAlign: 'center', color: 'var(--gray-500)', padding: '2.5rem' }}>
+                                                Tidak ada data pengajuan shift yang sesuai filter.
+                                            </td>
+                                        </tr>
+                                    ) : shiftRequests.map(r => (
+                                        <tr key={r.id}>
+                                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                {formatDate(r.request_date)}
+                                            </td>
+                                            <td>
+                                                <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{r.user_name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
+                                                    {r.user_employee_id} {r.user_department ? `• ${r.user_department}` : ''}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {r.request_type === 'swap' ? (
+                                                    <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                        <Icon name="Repeat" size={11} inline /> Tukar Shift
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                        <Icon name="ArrowRightLeft" size={11} inline /> Pindah Shift
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
+                                                    <span style={{
+                                                        padding: '0.15rem 0.5rem',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        background: r.current_shift_color ? `${r.current_shift_color}25` : 'var(--gray-100)',
+                                                        color: r.current_shift_color || 'var(--gray-800)',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {r.current_shift_name ? `${r.current_shift_name} (${formatTime(r.current_shift_start)})` : 'Shift Reguler'}
+                                                    </span>
+                                                    <Icon name="ArrowRight" size={12} style={{ color: 'var(--gray-400)' }} />
+                                                    <span style={{
+                                                        padding: '0.15rem 0.5rem',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        background: r.target_shift_color ? `${r.target_shift_color}25` : 'rgba(16,185,129,0.15)',
+                                                        color: r.target_shift_color || '#059669',
+                                                        fontWeight: 700
+                                                    }}>
+                                                        {r.target_shift_name} ({formatTime(r.target_shift_start)}-{formatTime(r.target_shift_end)})
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {r.request_type === 'swap' ? (
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{r.target_user_name}</div>
+                                                        <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)' }}>
+                                                            {r.target_employee_id} {r.target_department ? `• ${r.target_department}` : ''}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>-</span>
+                                                )}
+                                            </td>
+                                            <td style={{ maxWidth: '220px', fontSize: '0.82rem' }}>
+                                                {r.reason}
+                                            </td>
+                                            <td>
+                                                {r.status === 'pending' && <span className="badge badge-warning">Menunggu</span>}
+                                                {r.status === 'approved' && <span className="badge badge-success">Disetujui</span>}
+                                                {r.status === 'rejected' && <span className="badge badge-danger">Ditolak</span>}
+                                                {r.status === 'cancelled' && <span className="badge badge-secondary">Dibatalkan</span>}
+                                            </td>
+                                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                                {r.status === 'pending' ? (
+                                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                                        <button
+                                                            className="btn btn-success"
+                                                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                            onClick={() => handleApproveShiftReq(r.id, 'approved')}
+                                                        >
+                                                            <Icon name="Check" size={13} inline /> Setujui
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-danger"
+                                                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                            onClick={() => handleApproveShiftReq(r.id, 'rejected')}
+                                                        >
+                                                            <Icon name="X" size={13} inline /> Tolak
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: '0.78rem', color: 'var(--gray-600)' }}>
+                                                        {r.approval_notes ? `Catatan: ${r.approval_notes}` : '-'}
+                                                        {r.approved_by_name && <div style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>oleh {r.approved_by_name}</div>}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     function renderOvertimeTab() {
         const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger', completed: 'primary' };
         const statusLabels = { pending: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak', completed: 'Selesai' };
@@ -1050,11 +1337,17 @@ export default function AdminWorkSchedule() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                                             <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-400)', fontSize: '0.9rem' }}>{ot.spl_number}</span>
                                             <span className={`badge badge-${statusColors[ot.status]}`}>{statusLabels[ot.status]}</span>
+                                            {ot.overtime_category && (
+                                                <span className={`badge ${ot.overtime_category === 'Lembur Awal' ? 'badge-info' : ot.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.75rem' }}>
+                                                    {ot.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : ot.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : ot.overtime_category}
+                                                </span>
+                                            )}
                                         </div>
                                         <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--gray-700)', flexWrap: 'wrap' }}>
                                             <span>{formatDate(ot.date)}</span>
-                                            <span>{formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)}</span>
+                                            <span style={{ fontWeight: 600 }}>{formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)}</span>
                                             <span><Icon name="Clock" size={14} inline /> {ot.estimated_hours} jam</span>
+                                            {ot.shift_name && <span style={{ color: 'var(--primary-400)' }}>Shift: {ot.shift_name}</span>}
                                             {ot.department && <span>{ot.department}</span>}
                                         </div>
                                     </div>
@@ -1505,6 +1798,24 @@ export default function AdminWorkSchedule() {
             groupedShifts[key].push(s);
         });
 
+        const selectedShift = otForm.shift_id ? allShifts.find(s => String(s.id) === String(otForm.shift_id)) : null;
+        const isOverlap = selectedShift ? checkShiftOvertimeOverlap(otForm.overtime_start, otForm.overtime_end, selectedShift.start_time, selectedShift.end_time) : false;
+        const currentCategory = selectedShift ? getOvertimeCategory(otForm.overtime_start, otForm.overtime_end, selectedShift.start_time, selectedShift.end_time) : (otForm.overtime_start && otForm.overtime_end ? 'Lembur Bebas' : '');
+
+        function applyBeforeShift(hours) {
+            if (!selectedShift) return;
+            const end = selectedShift.start_time.substring(0, 5);
+            const start = adjustTime(end, -hours);
+            setOtForm(f => ({ ...f, overtime_start: start, overtime_end: end }));
+        }
+
+        function applyAfterShift(hours) {
+            if (!selectedShift) return;
+            const start = selectedShift.end_time.substring(0, 5);
+            const end = adjustTime(start, hours);
+            setOtForm(f => ({ ...f, overtime_start: start, overtime_end: end }));
+        }
+
         return (
             <div className="modal-overlay">
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
@@ -1532,6 +1843,64 @@ export default function AdminWorkSchedule() {
                             </div>
                         </div>
 
+                        <div className="form-group">
+                            <label className="form-label">Shift Terkait (Opsional)</label>
+                            <select className="form-input form-select" value={otForm.shift_id}
+                                onChange={e => setOtForm(f => ({ ...f, shift_id: e.target.value }))}>
+                                <option value="">-- Pilih Shift untuk Deteksi Otomatis & Shortcut --</option>
+                                {Object.entries(groupedShifts).map(([group, shifts]) => (
+                                    <optgroup key={group} label={group}>
+                                        {shifts.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name} ({formatTime(s.start_time)} - {formatTime(s.end_time)})</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Shortcut Buttons for Overtime Time */}
+                        {selectedShift && (
+                            <div style={{
+                                background: 'rgba(59, 130, 246, 0.08)',
+                                border: '1px solid rgba(59, 130, 246, 0.25)',
+                                borderRadius: 'var(--radius-md)',
+                                padding: '0.75rem',
+                                marginBottom: '0.85rem'
+                            }}>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-400)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <Icon name="Zap" size={14} inline /> Shortcut Pengisian Jam Lembur ({selectedShift.name}: {formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)})
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.75rem', color: '#06b6d4', fontWeight: 600 }}>🌅 Sebelum Shift:</span>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                            onClick={() => applyBeforeShift(1)}>
+                                            1 Jam ({adjustTime(selectedShift.start_time, -1)} - {formatTime(selectedShift.start_time)})
+                                        </button>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                            onClick={() => applyBeforeShift(2)}>
+                                            2 Jam ({adjustTime(selectedShift.start_time, -2)} - {formatTime(selectedShift.start_time)})
+                                        </button>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>🌆 Sesudah Shift:</span>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                            onClick={() => applyAfterShift(1)}>
+                                            1 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 1)})
+                                        </button>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                            onClick={() => applyAfterShift(2)}>
+                                            2 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 2)})
+                                        </button>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                            onClick={() => applyAfterShift(3)}>
+                                            3 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 3)})
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
                                 <label className="form-label">Jam Mulai *</label>
@@ -1549,20 +1918,23 @@ export default function AdminWorkSchedule() {
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Shift Terkait</label>
-                            <select className="form-input form-select" value={otForm.shift_id}
-                                onChange={e => setOtForm(f => ({ ...f, shift_id: e.target.value }))}>
-                                <option value="">-- Opsional --</option>
-                                {Object.entries(groupedShifts).map(([group, shifts]) => (
-                                    <optgroup key={group} label={group}>
-                                        {shifts.map(s => (
-                                            <option key={s.id} value={s.id}>{s.name} ({formatTime(s.start_time)} - {formatTime(s.end_time)})</option>
-                                        ))}
-                                    </optgroup>
-                                ))}
-                            </select>
-                        </div>
+                        {/* Overlap Error Warning Alert */}
+                        {isOverlap && (
+                            <div className="alert alert-danger mb-3" style={{ fontSize: '0.82rem', padding: '0.6rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Icon name="AlertTriangle" size={16} inline />
+                                <span><strong>Peringatan Jam Lembur:</strong> Jam lembur bertabrakan dengan jam kerja reguler shift <strong>{selectedShift.name}</strong> ({formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.</span>
+                            </div>
+                        )}
+
+                        {/* Category detection badge preview */}
+                        {!isOverlap && otForm.overtime_start && otForm.overtime_end && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+                                <span style={{ color: 'var(--gray-400)' }}>Kategori Lembur:</span>
+                                <span className={`badge ${currentCategory === 'Lembur Awal' ? 'badge-info' : currentCategory === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`}>
+                                    {currentCategory === 'Lembur Awal' ? '🌅 Lembur Awal (Sebelum Masuk Shift)' : currentCategory === 'Lembur Akhir' ? '🌆 Lembur Akhir (Setelah Pulang Shift)' : 'Lembur Bebas'}
+                                </span>
+                            </div>
+                        )}
 
                         <div className="form-group">
                             <label className="form-label">Alasan Lembur *</label>
@@ -1627,7 +1999,7 @@ export default function AdminWorkSchedule() {
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button className="btn btn-outline" onClick={() => setShowOvertimeModal(false)}>Batal</button>
                             <button className="btn btn-primary" onClick={saveOvertimeRequest}
-                                disabled={loading || !otForm.date || !otForm.overtime_start || !otForm.overtime_end || !otForm.reason || !otForm.employee_ids.length}>
+                                disabled={loading || isOverlap || !otForm.date || !otForm.overtime_start || !otForm.overtime_end || !otForm.reason || !otForm.employee_ids.length}>
                                 {loading ? 'Menyimpan...' : 'Ajukan Lembur'}
                             </button>
                         </div>
@@ -1673,6 +2045,13 @@ export default function AdminWorkSchedule() {
                                 <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontFamily: 'monospace' }}>
                                     {formatTime(ot.overtime_start)} - {formatTime(ot.overtime_end)} ({ot.estimated_hours} jam)
                                 </div>
+                                {ot.overtime_category && (
+                                    <div style={{ marginTop: '0.25rem' }}>
+                                        <span className={`badge ${ot.overtime_category === 'Lembur Awal' ? 'badge-info' : ot.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                                            {ot.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : ot.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : ot.overtime_category}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                             {ot.department && (
                                 <div>
@@ -1836,29 +2215,38 @@ export default function AdminWorkSchedule() {
                 background: 'rgba(0,0,0,0.05)', borderRadius: 'var(--radius-lg)',
                 padding: '0.35rem'
             }}>
-                {TAB_ITEMS.map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        style={{
-                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                            padding: '0.75rem 1rem', border: 'none', borderRadius: 'var(--radius-md)',
-                            cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
-                            transition: 'all 0.2s',
-                            background: activeTab === tab.key ? 'var(--gradient-primary)' : 'transparent',
-                            color: activeTab === tab.key ? 'white' : 'var(--gray-400)',
-                            boxShadow: activeTab === tab.key ? 'var(--shadow-glow)' : 'none',
-                            fontFamily: 'inherit'
-                        }}
-                    >
-                        <span><Icon name={tab.icon} size={16} inline /></span> {tab.label}
-                    </button>
-                ))}
+                {TAB_ITEMS.map(tab => {
+                    const pendingCount = tab.key === 'shift_requests' ? shiftRequests.filter(r => r.status === 'pending').length : 0;
+                    return (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            style={{
+                                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                                padding: '0.75rem 1rem', border: 'none', borderRadius: 'var(--radius-md)',
+                                cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                                transition: 'all 0.2s',
+                                background: activeTab === tab.key ? 'var(--gradient-primary)' : 'transparent',
+                                color: activeTab === tab.key ? 'white' : 'var(--gray-400)',
+                                boxShadow: activeTab === tab.key ? 'var(--shadow-glow)' : 'none',
+                                fontFamily: 'inherit'
+                            }}
+                        >
+                            <span><Icon name={tab.icon} size={16} inline /></span> {tab.label}
+                            {pendingCount > 0 && (
+                                <span className="badge badge-warning" style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
+                                    {pendingCount}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Tab Content */}
             {activeTab === 'schedules' && renderSchedulesTab()}
             {activeTab === 'assignments' && renderAssignmentsTab()}
+            {activeTab === 'shift_requests' && renderShiftRequestsTab()}
             {activeTab === 'overtime' && renderOvertimeTab()}
             {activeTab === 'calendar' && renderCalendarTab()}
 

@@ -386,26 +386,45 @@ router.get('/leave', authenticateToken, isAdmin, async (req, res) => {
 router.put('/leave', authenticateToken, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
-        const { annual_leave_quota, late_deducts_leave, sick_deducts_leave, permission_deducts_leave, big_leave_rules, approval_config } = req.body;
+        const { annual_leave_quota, late_deducts_leave, sick_deducts_leave, permission_deducts_leave, big_leave_rules, approval_config, leave_calculation_mode, hours_per_leave_day } = req.body;
         
         await client.query('BEGIN');
         
-        // Update general settings
-        const settingsResult = await client.query(
-            `UPDATE leave_settings 
-             SET annual_leave_quota = $1, 
-                 late_deducts_leave = $2, 
-                 sick_deducts_leave = $3, 
-                 permission_deducts_leave = $4,
-                 updated_at = CURRENT_TIMESTAMP
-             RETURNING *`,
-            [
-                annual_leave_quota || 12, 
-                !!late_deducts_leave, 
-                !!sick_deducts_leave, 
-                !!permission_deducts_leave
-            ]
-        );
+        const countRes = await client.query('SELECT id FROM leave_settings LIMIT 1');
+        let settingsResult;
+        const validMode = ['daily', 'hourly', 'both'].includes(leave_calculation_mode) ? leave_calculation_mode : 'both';
+        const hoursPerDay = parseFloat(hours_per_leave_day) > 0 ? parseFloat(hours_per_leave_day) : 8.0;
+
+        if (countRes.rows.length === 0) {
+            settingsResult = await client.query(
+                `INSERT INTO leave_settings (annual_leave_quota, late_deducts_leave, sick_deducts_leave, permission_deducts_leave, leave_calculation_mode, hours_per_leave_day)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 RETURNING *`,
+                [annual_leave_quota || 12, !!late_deducts_leave, !!sick_deducts_leave, !!permission_deducts_leave, validMode, hoursPerDay]
+            );
+        } else {
+            settingsResult = await client.query(
+                `UPDATE leave_settings 
+                 SET annual_leave_quota = $1, 
+                     late_deducts_leave = $2, 
+                     sick_deducts_leave = $3, 
+                     permission_deducts_leave = $4,
+                     leave_calculation_mode = $5,
+                     hours_per_leave_day = $6,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $7
+                 RETURNING *`,
+                [
+                    annual_leave_quota || 12, 
+                    !!late_deducts_leave, 
+                    !!sick_deducts_leave, 
+                    !!permission_deducts_leave,
+                    validMode,
+                    hoursPerDay,
+                    countRes.rows[0].id
+                ]
+            );
+        }
 
         // Update big leave rules
         // For simplicity, we can delete all existing and re-insert
@@ -521,4 +540,136 @@ router.put('/face-match', authenticateToken, hasPermission('admin.settings'), as
     }
 });
 
+// Attendance location settings (require different checkout location & min distance)
+router.get('/attendance-location', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT key, value FROM settings WHERE key IN ('require_different_location_checkout', 'min_checkout_distance_meters', 'checkout_location_rule_mode')`
+        );
+        const config = {
+            require_different_location_checkout: false,
+            checkout_location_rule_mode: 'specific',
+            min_checkout_distance_meters: 0
+        };
+        result.rows.forEach(r => {
+            if (r.key === 'require_different_location_checkout') {
+                config.require_different_location_checkout = r.value === 'true';
+            } else if (r.key === 'checkout_location_rule_mode') {
+                config.checkout_location_rule_mode = r.value;
+            } else if (r.key === 'min_checkout_distance_meters') {
+                config.min_checkout_distance_meters = parseFloat(r.value) || 0;
+            }
+        });
+
+        // Default synchronization if checkout_location_rule_mode wasn't initialized yet
+        if (!result.rows.some(r => r.key === 'checkout_location_rule_mode')) {
+            config.checkout_location_rule_mode = config.require_different_location_checkout ? 'all' : 'specific';
+        }
+
+        res.json(config);
+    } catch (error) {
+        console.error('Get attendance location settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.put('/attendance-location', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const { require_different_location_checkout, min_checkout_distance_meters, checkout_location_rule_mode } = req.body;
+        
+        let mode = checkout_location_rule_mode;
+        if (!mode) {
+            mode = (require_different_location_checkout === true || require_different_location_checkout === 'true') ? 'all' : 'specific';
+        }
+        if (!['specific', 'all', 'disabled'].includes(mode)) {
+            mode = 'specific';
+        }
+
+        const reqDiff = mode === 'all' ? 'true' : 'false';
+        const minDist = Math.max(0, parseFloat(min_checkout_distance_meters) || 0).toString();
+
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('checkout_location_rule_mode', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [mode]
+        );
+
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('require_different_location_checkout', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [reqDiff]
+        );
+
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('min_checkout_distance_meters', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [minDist]
+        );
+
+        res.json({
+            message: 'Pengaturan lokasi absensi berhasil disimpan',
+            checkout_location_rule_mode: mode,
+            require_different_location_checkout: mode === 'all',
+            min_checkout_distance_meters: parseFloat(minDist)
+        });
+    } catch (error) {
+        console.error('Update attendance location settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+// Employee table column configuration (accessible by users with admin.employees or admin.settings)
+const canConfigEmployeeColumns = async (req, res, next) => {
+    try {
+        if (req.user?.role === 'admin') return next();
+        const result = await pool.query(
+            `SELECT 1 FROM role_permissions rp 
+             JOIN roles r ON rp.role_id = r.id 
+             WHERE r.name = $1 AND rp.permission_key IN ('admin.employees', 'admin.settings')`,
+            [req.user?.role]
+        );
+        if (result.rows.length > 0) return next();
+        return res.status(403).json({ error: 'Akses ditolak' });
+    } catch (err) {
+        return res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+};
+
+router.get('/employee-columns', authenticateToken, canConfigEmployeeColumns, async (req, res) => {
+    try {
+        const result = await pool.query("SELECT value FROM settings WHERE key = 'employee_table_columns'");
+        if (result.rows.length > 0 && result.rows[0].value) {
+            try {
+                return res.json({ columns: JSON.parse(result.rows[0].value) });
+            } catch (e) {
+                // Ignore json parse error and return null
+            }
+        }
+        res.json({ columns: null });
+    } catch (error) {
+        console.error('Get employee table columns error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.put('/employee-columns', authenticateToken, canConfigEmployeeColumns, async (req, res) => {
+    try {
+        const { columns } = req.body;
+        if (!columns || !Array.isArray(columns)) {
+            return res.status(400).json({ error: 'Format data kolom tidak valid' });
+        }
+        await pool.query(
+            `INSERT INTO settings (key, value) VALUES ('employee_table_columns', $1)
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+            [JSON.stringify(columns)]
+        );
+        res.json({ message: 'Pengaturan kolom berhasil disimpan', columns });
+    } catch (error) {
+        console.error('Update employee table columns error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 module.exports = router;
+
+

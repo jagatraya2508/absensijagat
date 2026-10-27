@@ -1,6 +1,7 @@
 import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI, employmentStatusesAPI, divisionsAPI } from '../utils/api';
+import { AVAILABLE_EMPLOYEE_COLUMNS, DEFAULT_VISIBLE_COLUMNS, STORAGE_KEY_EMPLOYEE_COLUMNS, getInitialVisibleColumns } from '../utils/employeeColumns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -77,6 +78,13 @@ export default function AdminEmployees() {
     const [importResult, setImportResult] = useState(null);
     const [importError, setImportError] = useState('');
     const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+    // Pengaturan Kolom Tampilan
+    const [visibleColumns, setVisibleColumns] = useState(() => getInitialVisibleColumns());
+    const [showColumnModal, setShowColumnModal] = useState(false);
+    const [tempColumns, setTempColumns] = useState(() => getInitialVisibleColumns());
+    const [savingColumns, setSavingColumns] = useState(false);
+
     const [formData, setFormData] = useState({
         nik: '', no_kk: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
@@ -87,6 +95,7 @@ export default function AdminEmployees() {
         is_driver: false, is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
         vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
+        require_different_checkout: false,
         bpjs_kes_enrolled: true, bpjs_jht_enrolled: true, bpjs_jp_enrolled: true,
         bpjs_jkk_enrolled: true, bpjs_jkm_enrolled: true, pph21_enabled: true,
         bpjs_kes_employee_rate: '', bpjs_kes_company_rate: '',
@@ -98,7 +107,71 @@ export default function AdminEmployees() {
     useEffect(() => { 
         fetchEmployees(); 
         fetchMasters();
+        fetchColumnSettings();
     }, []);
+
+    async function fetchColumnSettings() {
+        try {
+            const res = await settingsAPI.getEmployeeColumns();
+            if (res && res.columns) {
+                const cols = getInitialVisibleColumns(res.columns);
+                setVisibleColumns(cols);
+                try {
+                    localStorage.setItem(STORAGE_KEY_EMPLOYEE_COLUMNS, JSON.stringify(cols));
+                } catch (e) {}
+            }
+        } catch (err) {
+            console.warn('Gagal memuat pengaturan kolom dari server:', err);
+        }
+    }
+
+    function openColumnModal() {
+        setTempColumns([...visibleColumns]);
+        setShowColumnModal(true);
+    }
+
+    function toggleTempColumn(key) {
+        if (key === 'name' || key === 'actions') return;
+        setTempColumns(prev => {
+            if (prev.includes(key)) {
+                return prev.filter(k => k !== key);
+            } else {
+                return [...prev, key];
+            }
+        });
+    }
+
+    async function handleSaveColumns() {
+        setSavingColumns(true);
+        try {
+            const colsToSave = [...tempColumns];
+            if (!colsToSave.includes('name')) colsToSave.push('name');
+            if (!colsToSave.includes('actions')) colsToSave.push('actions');
+
+            setVisibleColumns(colsToSave);
+            try {
+                localStorage.setItem(STORAGE_KEY_EMPLOYEE_COLUMNS, JSON.stringify(colsToSave));
+            } catch (e) {}
+
+            await settingsAPI.updateEmployeeColumns(colsToSave);
+            setShowColumnModal(false);
+            setSuccess('Pengaturan kolom berhasil disimpan!');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            console.error('Failed to save columns:', err);
+            setShowColumnModal(false);
+        } finally {
+            setSavingColumns(false);
+        }
+    }
+
+    function handleResetColumns() {
+        setTempColumns([...DEFAULT_VISIBLE_COLUMNS]);
+    }
+
+    function handleSelectAllColumns() {
+        setTempColumns(AVAILABLE_EMPLOYEE_COLUMNS.map(c => c.key));
+    }
 
     async function fetchMasters() {
         try {
@@ -187,6 +260,7 @@ export default function AdminEmployees() {
                 emergency_contact_name: d.emergency_contact_name || '',
                 emergency_contact_phone: d.emergency_contact_phone || '',
                 location_ids: data.location_ids || [],
+                require_different_checkout: !!(d.require_different_checkout || emp.require_different_checkout),
                 bpjs_kes_enrolled: d.bpjs_kes_enrolled !== false,
                 bpjs_jht_enrolled: d.bpjs_jht_enrolled !== false,
                 bpjs_jp_enrolled: d.bpjs_jp_enrolled !== false,
@@ -370,7 +444,7 @@ export default function AdminEmployees() {
                 let bVal = b[sortConfig.key];
 
                 // Handle numeric fields
-                if (sortConfig.key === 'basic_salary') {
+                if (['basic_salary', 'appreciation_allowance', 'transport_allowance', 'meal_allowance'].includes(sortConfig.key)) {
                     aVal = parseFloat(aVal) || 0;
                     bVal = parseFloat(bVal) || 0;
                 } else {
@@ -434,33 +508,30 @@ export default function AdminEmployees() {
         opacity: disabled ? 0.45 : 1,
     });
 
-    // Export to Excel
+    // Export to Excel (dinamis sesuai kolom yang dipilih)
     function handleExportExcel() {
-        const data = filteredEmployees.map((emp, i) => ({
-            'No': i + 1,
-            'ID Karyawan': emp.employee_id,
-            'Nama': emp.name,
-            'Departemen': emp.department || '-',
-            'Divisi': emp.division || '-',
-            'Jabatan': emp.position || '-',
-            'Status Karyawan': employmentStatusLabel(emp.employment_status),
-            'Gaji Pokok': emp.basic_salary || 0,
-            'Tipe Gaji': emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
-        }));
+        const data = filteredEmployees.map((emp, i) => {
+            const row = { 'No': i + 1 };
+            if (visibleColumns.includes('employee_id')) row['ID Karyawan'] = emp.employee_id;
+            if (visibleColumns.includes('name')) row['Nama'] = emp.name;
+            if (visibleColumns.includes('department')) row['Departemen'] = emp.department || '-';
+            if (visibleColumns.includes('division')) row['Divisi'] = emp.division || '-';
+            if (visibleColumns.includes('position')) row['Jabatan'] = emp.position || '-';
+            if (visibleColumns.includes('employment_status')) row['Status Karyawan'] = employmentStatusLabel(emp.employment_status);
+            if (visibleColumns.includes('basic_salary')) row['Gaji Pokok'] = parseFloat(emp.basic_salary) || 0;
+            if (visibleColumns.includes('appreciation_allowance')) row['Tunjangan Apresiasi'] = parseFloat(emp.appreciation_allowance) || 0;
+            if (visibleColumns.includes('transport_allowance')) row['Tunjangan Transport'] = parseFloat(emp.transport_allowance) || 0;
+            if (visibleColumns.includes('meal_allowance')) row['Tunjangan Makan'] = parseFloat(emp.meal_allowance) || 0;
+            if (visibleColumns.includes('salary_type')) row['Tipe Gaji'] = emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan';
+            if (visibleColumns.includes('receives_tuang')) row['Tuang'] = emp.receives_tuang !== false ? 'Dapat' : 'Tidak';
+            if (visibleColumns.includes('phone')) row['No. Telepon'] = emp.phone || '-';
+            if (visibleColumns.includes('nik')) row['NIK'] = emp.nik || '-';
+            if (visibleColumns.includes('join_date')) row['Tanggal Masuk'] = emp.join_date ? emp.join_date.split('T')[0] : '-';
+            if (visibleColumns.includes('gender')) row['Jenis Kelamin'] = emp.gender || '-';
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(data);
-        // Set column widths
-        ws['!cols'] = [
-            { wch: 5 },  // No
-            { wch: 14 }, // ID
-            { wch: 28 }, // Nama
-            { wch: 18 }, // Departemen
-            { wch: 18 }, // Divisi
-            { wch: 18 }, // Jabatan
-            { wch: 18 }, // Status Karyawan
-            { wch: 18 }, // Gaji Pokok
-            { wch: 12 }, // Tipe Gaji
-        ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Data Karyawan');
         XLSX.writeFile(wb, `Data_Karyawan_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -511,7 +582,7 @@ export default function AdminEmployees() {
         }
     }
 
-    // Export to PDF
+    // Export to PDF (dinamis sesuai kolom yang dipilih)
     function handleExportPDF() {
         const doc = new jsPDF('landscape', 'mm', 'a4');
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -524,35 +595,53 @@ export default function AdminEmployees() {
         doc.setFont(undefined, 'normal');
         doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}  |  Total: ${filteredEmployees.length} karyawan`, pageWidth / 2, 22, { align: 'center' });
 
-        const tableData = filteredEmployees.map((emp, i) => [
-            i + 1,
-            emp.employee_id,
-            emp.name,
-            emp.department || '-',
-            emp.division || '-',
-            emp.position || '-',
-            employmentStatusLabel(emp.employment_status),
-            formatCurrency(emp.basic_salary),
-            emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'
-        ]);
+        const pdfHeaders = ['No'];
+        if (visibleColumns.includes('employee_id')) pdfHeaders.push('ID Karyawan');
+        if (visibleColumns.includes('name')) pdfHeaders.push('Nama');
+        if (visibleColumns.includes('department')) pdfHeaders.push('Departemen');
+        if (visibleColumns.includes('division')) pdfHeaders.push('Divisi');
+        if (visibleColumns.includes('position')) pdfHeaders.push('Jabatan');
+        if (visibleColumns.includes('employment_status')) pdfHeaders.push('Status');
+        if (visibleColumns.includes('basic_salary')) pdfHeaders.push('Gaji Pokok');
+        if (visibleColumns.includes('appreciation_allowance')) pdfHeaders.push('Tunj. Apresiasi');
+        if (visibleColumns.includes('transport_allowance')) pdfHeaders.push('Tunj. Transport');
+        if (visibleColumns.includes('meal_allowance')) pdfHeaders.push('Tunj. Makan');
+        if (visibleColumns.includes('salary_type')) pdfHeaders.push('Tipe');
+        if (visibleColumns.includes('receives_tuang')) pdfHeaders.push('Tuang');
+        if (visibleColumns.includes('phone')) pdfHeaders.push('Telepon');
+        if (visibleColumns.includes('nik')) pdfHeaders.push('NIK');
+        if (visibleColumns.includes('join_date')) pdfHeaders.push('Tgl Masuk');
+        if (visibleColumns.includes('gender')) pdfHeaders.push('Gender');
+
+        const tableData = filteredEmployees.map((emp, i) => {
+            const row = [i + 1];
+            if (visibleColumns.includes('employee_id')) row.push(emp.employee_id);
+            if (visibleColumns.includes('name')) row.push(emp.name);
+            if (visibleColumns.includes('department')) row.push(emp.department || '-');
+            if (visibleColumns.includes('division')) row.push(emp.division || '-');
+            if (visibleColumns.includes('position')) row.push(emp.position || '-');
+            if (visibleColumns.includes('employment_status')) row.push(employmentStatusLabel(emp.employment_status));
+            if (visibleColumns.includes('basic_salary')) row.push(formatCurrency(emp.basic_salary));
+            if (visibleColumns.includes('appreciation_allowance')) row.push(formatCurrency(emp.appreciation_allowance));
+            if (visibleColumns.includes('transport_allowance')) row.push(formatCurrency(emp.transport_allowance));
+            if (visibleColumns.includes('meal_allowance')) row.push(formatCurrency(emp.meal_allowance));
+            if (visibleColumns.includes('salary_type')) row.push(emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan');
+            if (visibleColumns.includes('receives_tuang')) row.push(emp.receives_tuang !== false ? 'Ya' : 'Tidak');
+            if (visibleColumns.includes('phone')) row.push(emp.phone || '-');
+            if (visibleColumns.includes('nik')) row.push(emp.nik || '-');
+            if (visibleColumns.includes('join_date')) row.push(emp.join_date ? new Date(emp.join_date).toLocaleDateString('id-ID') : '-');
+            if (visibleColumns.includes('gender')) row.push(emp.gender || '-');
+            return row;
+        });
 
         autoTable(doc, {
             startY: 28,
-            head: [['No', 'ID Karyawan', 'Nama', 'Departemen', 'Divisi', 'Jabatan', 'Status', 'Gaji Pokok', 'Tipe Gaji']],
+            head: [pdfHeaders],
             body: tableData,
-            styles: { fontSize: 8, cellPadding: 3 },
+            styles: { fontSize: 7, cellPadding: 2.5 },
             headStyles: { fillColor: [30, 41, 82], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
             alternateRowStyles: { fillColor: [240, 243, 255] },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 12 },
-                1: { cellWidth: 24 },
-                2: { cellWidth: 38 },
-                6: { halign: 'center', cellWidth: 24 },
-                7: { halign: 'right' },
-                8: { halign: 'center', cellWidth: 20 }
-            },
             didDrawPage: (data) => {
-                // Footer
                 doc.setFontSize(7);
                 doc.setTextColor(150);
                 doc.text(`Halaman ${data.pageNumber}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 7, { align: 'center' });
@@ -562,52 +651,78 @@ export default function AdminEmployees() {
         doc.save(`Data_Karyawan_${new Date().toISOString().slice(0,10)}.pdf`);
     }
 
-    // Print
+    // Print (dinamis sesuai kolom yang dipilih)
     function handlePrint() {
+        const printHeaders = ['<th class="text-center">No</th>'];
+        if (visibleColumns.includes('employee_id')) printHeaders.push('<th>ID Karyawan</th>');
+        if (visibleColumns.includes('name')) printHeaders.push('<th>Nama</th>');
+        if (visibleColumns.includes('department')) printHeaders.push('<th>Departemen</th>');
+        if (visibleColumns.includes('division')) printHeaders.push('<th>Divisi</th>');
+        if (visibleColumns.includes('position')) printHeaders.push('<th>Jabatan</th>');
+        if (visibleColumns.includes('employment_status')) printHeaders.push('<th>Status</th>');
+        if (visibleColumns.includes('basic_salary')) printHeaders.push('<th class="text-right">Gaji Pokok</th>');
+        if (visibleColumns.includes('appreciation_allowance')) printHeaders.push('<th class="text-right">Tunj. Apresiasi</th>');
+        if (visibleColumns.includes('transport_allowance')) printHeaders.push('<th class="text-right">Tunj. Transport</th>');
+        if (visibleColumns.includes('meal_allowance')) printHeaders.push('<th class="text-right">Tunj. Makan</th>');
+        if (visibleColumns.includes('salary_type')) printHeaders.push('<th class="text-center">Tipe</th>');
+        if (visibleColumns.includes('receives_tuang')) printHeaders.push('<th class="text-center">Tuang</th>');
+        if (visibleColumns.includes('phone')) printHeaders.push('<th>Telepon</th>');
+        if (visibleColumns.includes('nik')) printHeaders.push('<th>NIK</th>');
+        if (visibleColumns.includes('join_date')) printHeaders.push('<th>Tgl Masuk</th>');
+        if (visibleColumns.includes('gender')) printHeaders.push('<th>Gender</th>');
+
+        const printRows = filteredEmployees.map((emp, i) => {
+            const cols = [`<td class="text-center">${i + 1}</td>`];
+            if (visibleColumns.includes('employee_id')) cols.push(`<td>${emp.employee_id}</td>`);
+            if (visibleColumns.includes('name')) cols.push(`<td>${emp.name}</td>`);
+            if (visibleColumns.includes('department')) cols.push(`<td>${emp.department || '-'}</td>`);
+            if (visibleColumns.includes('division')) cols.push(`<td>${emp.division || '-'}</td>`);
+            if (visibleColumns.includes('position')) cols.push(`<td>${emp.position || '-'}</td>`);
+            if (visibleColumns.includes('employment_status')) cols.push(`<td>${employmentStatusLabel(emp.employment_status)}</td>`);
+            if (visibleColumns.includes('basic_salary')) cols.push(`<td class="text-right">${formatCurrency(emp.basic_salary)}</td>`);
+            if (visibleColumns.includes('appreciation_allowance')) cols.push(`<td class="text-right">${formatCurrency(emp.appreciation_allowance)}</td>`);
+            if (visibleColumns.includes('transport_allowance')) cols.push(`<td class="text-right">${formatCurrency(emp.transport_allowance)}</td>`);
+            if (visibleColumns.includes('meal_allowance')) cols.push(`<td class="text-right">${formatCurrency(emp.meal_allowance)}</td>`);
+            if (visibleColumns.includes('salary_type')) cols.push(`<td class="text-center"><span class="badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}">${emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}</span></td>`);
+            if (visibleColumns.includes('receives_tuang')) cols.push(`<td class="text-center">${emp.receives_tuang !== false ? 'Ya' : 'Tidak'}</td>`);
+            if (visibleColumns.includes('phone')) cols.push(`<td>${emp.phone || '-'}</td>`);
+            if (visibleColumns.includes('nik')) cols.push(`<td>${emp.nik || '-'}</td>`);
+            if (visibleColumns.includes('join_date')) cols.push(`<td>${emp.join_date ? new Date(emp.join_date).toLocaleDateString('id-ID') : '-'}</td>`);
+            if (visibleColumns.includes('gender')) cols.push(`<td>${emp.gender || '-'}</td>`);
+            return `<tr>${cols.join('')}</tr>`;
+        }).join('');
+
         const printContent = `
             <html>
             <head>
                 <title>Data Karyawan</title>
                 <style>
-                    @page { size: landscape; margin: 15mm; }
+                    @page { size: landscape; margin: 12mm; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; margin: 0; padding: 0; }
-                    .print-header { text-align: center; margin-bottom: 20px; }
-                    .print-header h1 { font-size: 20px; margin: 0 0 4px; color: #1e2952; }
+                    .print-header { text-align: center; margin-bottom: 16px; }
+                    .print-header h1 { font-size: 18px; margin: 0 0 4px; color: #1e2952; }
                     .print-header p { font-size: 11px; color: #666; margin: 0; }
-                    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-                    th { background: #1e2952; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
-                    td { padding: 7px 10px; border-bottom: 1px solid #e0e0e0; }
+                    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                    th { background: #1e2952; color: #fff; padding: 6px 8px; text-align: left; font-weight: 600; }
+                    td { padding: 6px 8px; border-bottom: 1px solid #e0e0e0; }
                     tr:nth-child(even) td { background: #f5f7ff; }
-                    tr:hover td { background: #eef1ff; }
                     .text-right { text-align: right; }
                     .text-center { text-align: center; }
-                    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; }
+                    .badge { display: inline-block; padding: 2px 6px; border-radius: 9999px; font-size: 9px; font-weight: 600; }
                     .badge-success { background: #d1fae5; color: #065f46; }
                     .badge-warning { background: #fef3c7; color: #92400e; }
                     .badge-info { background: #dbeafe; color: #1e40af; }
-                    .footer { text-align: center; margin-top: 20px; font-size: 9px; color: #999; }
+                    .footer { text-align: center; margin-top: 16px; font-size: 9px; color: #999; }
                 </style>
             </head>
             <body>
                 <div class="print-header">
-                    <h1>Data Karyawan</h1> <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • Total: ${filteredEmployees.length} karyawan</p> </div> <table> <thead> <tr> <th class="text-center">No</th> <th>ID Karyawan</th> <th>Nama</th> <th>Departemen</th> <th>Divisi</th> <th>Jabatan</th> <th>Status Karyawan</th> <th class="text-right">Gaji Pokok</th> <th class="text-center">Tipe Gaji</th> </tr> </thead> <tbody> ${filteredEmployees.map((emp, i) =>`
-                            <tr>
-                                <td class="text-center">${i + 1}</td>
-                                <td>${emp.employee_id}</td>
-                                <td>${emp.name}</td>
-                                <td>${emp.department || '-'}</td>
-                                <td>${emp.division || '-'}</td>
-                                <td>${emp.position || '-'}</td>
-                                <td>${employmentStatusLabel(emp.employment_status)}</td>
-                                <td class="text-right">${formatCurrency(emp.basic_salary)}</td>
-                                <td class="text-center">
-                                    <span class="badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}">
-                                        ${emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
+                    <h1>Data Karyawan</h1>
+                    <p>Dicetak: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • Total: ${filteredEmployees.length} karyawan</p>
+                </div>
+                <table>
+                    <thead><tr>${printHeaders.join('')}</tr></thead>
+                    <tbody>${printRows}</tbody>
                 </table>
                 <div class="footer">Dokumen ini dicetak secara otomatis oleh Sistem Absensi Karyawan</div>
             </body>
@@ -663,7 +778,22 @@ export default function AdminEmployees() {
                             <option value="yes">Dapat Tuang</option>
                             <option value="no">Tidak Dapat Tuang</option>
                         </select>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                                className="btn"
+                                onClick={openColumnModal}
+                                title="Atur kolom yang muncul pada tabel"
+                                style={{
+                                    padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 600,
+                                    background: '#fff', color: 'var(--gray-700)',
+                                    border: '1.5px solid var(--gray-300)', borderRadius: 'var(--radius-md)',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                }}
+                            >
+                                <Icon name="SlidersHorizontal" size={15} inline /> Atur Kolom
+                            </button>
                             <button
                                 className="btn"
                                 onClick={handleDownloadTemplate}
@@ -755,63 +885,138 @@ export default function AdminEmployees() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Nama <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'name' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('name')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('department')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Departemen <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'department' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('department')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('division')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Divisi <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'division' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('division')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('position')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Jabatan <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'position' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('position')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('employment_status')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Status <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employment_status' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employment_status')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('basic_salary')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Gaji Pokok <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'basic_salary' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('basic_salary')}</span>
-                                    </th>
-                                    <th onClick={() => handleSort('salary_type')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Tipe <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'salary_type' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('salary_type')}</span>
-                                    </th>
-                                    <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Tuang</th>
-                                    <th>Aksi</th>
+                                    {visibleColumns.includes('employee_id') && (
+                                        <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('name') && (
+                                        <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Nama <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'name' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('name')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('department') && (
+                                        <th onClick={() => handleSort('department')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Departemen <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'department' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('department')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('division') && (
+                                        <th onClick={() => handleSort('division')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Divisi <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'division' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('division')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('position') && (
+                                        <th onClick={() => handleSort('position')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Jabatan <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'position' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('position')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('employment_status') && (
+                                        <th onClick={() => handleSort('employment_status')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Status <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employment_status' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employment_status')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('basic_salary') && (
+                                        <th onClick={() => handleSort('basic_salary')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Gaji Pokok <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'basic_salary' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('basic_salary')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('appreciation_allowance') && (
+                                        <th onClick={() => handleSort('appreciation_allowance')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Tunjangan Apresiasi <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'appreciation_allowance' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('appreciation_allowance')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('transport_allowance') && (
+                                        <th onClick={() => handleSort('transport_allowance')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Tunj. Transport <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'transport_allowance' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('transport_allowance')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('meal_allowance') && (
+                                        <th onClick={() => handleSort('meal_allowance')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Tunj. Makan <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'meal_allowance' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('meal_allowance')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('salary_type') && (
+                                        <th onClick={() => handleSort('salary_type')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Tipe <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'salary_type' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('salary_type')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('receives_tuang') && (
+                                        <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Tuang</th>
+                                    )}
+                                    {visibleColumns.includes('phone') && (
+                                        <th style={{ whiteSpace: 'nowrap' }}>No. Telepon</th>
+                                    )}
+                                    {visibleColumns.includes('nik') && (
+                                        <th style={{ whiteSpace: 'nowrap' }}>NIK</th>
+                                    )}
+                                    {visibleColumns.includes('join_date') && (
+                                        <th onClick={() => handleSort('join_date')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Tgl Masuk <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'join_date' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('join_date')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('gender') && (
+                                        <th onClick={() => handleSort('gender')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Gender <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'gender' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('gender')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('actions') && <th>Aksi</th>}
                                 </tr>
                             </thead>
                             <tbody>
                                 {pagedEmployees.map(emp => (
                                     <tr key={emp.id}>
-                                        <td style={{ fontWeight: 500 }}>{emp.employee_id}</td>
-                                        <td>{emp.name}</td>
-                                        <td>{emp.department || '-'}</td>
-                                        <td>{emp.division || '-'}</td>
-                                        <td>{emp.position || '-'}</td>
-                                        <td>{employmentStatusLabel(emp.employment_status)}</td>
-                                        <td>{formatCurrency(emp.basic_salary)}</td>
-                                        <td>
-                                            <span className={`badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
-                                                {emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
-                                            </span>
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={emp.receives_tuang !== false}
-                                                onChange={e => toggleReceivesTuang(emp, e.target.checked)}
-                                                title={emp.receives_tuang !== false ? 'Dapat tuang (klik untuk menonaktifkan)' : 'Tidak dapat tuang (klik untuk mengaktifkan)'}
-                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
-                                            />
-                                        </td>
-                                        <td>
-                                            <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }} onClick={() => openDetail(emp)}>
-                                                <Icon name="FileText" size={16} inline /> Detail
-                                            </button>
-                                        </td>
+                                        {visibleColumns.includes('employee_id') && <td style={{ fontWeight: 500 }}>{emp.employee_id}</td>}
+                                        {visibleColumns.includes('name') && (
+                                            <td>
+                                                <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                                                {emp.require_different_checkout && (
+                                                    <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                        <Icon name="Compass" size={11} inline /> Beda Titik Pulang
+                                                    </span>
+                                                )}
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('department') && <td>{emp.department || '-'}</td>}
+                                        {visibleColumns.includes('division') && <td>{emp.division || '-'}</td>}
+                                        {visibleColumns.includes('position') && <td>{emp.position || '-'}</td>}
+                                        {visibleColumns.includes('employment_status') && <td>{employmentStatusLabel(emp.employment_status)}</td>}
+                                        {visibleColumns.includes('basic_salary') && <td>{formatCurrency(emp.basic_salary)}</td>}
+                                        {visibleColumns.includes('appreciation_allowance') && (
+                                            <td style={{ fontWeight: 600, color: 'var(--primary, #7f1d1d)' }}>
+                                                {formatCurrency(emp.appreciation_allowance)}
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('transport_allowance') && <td>{formatCurrency(emp.transport_allowance)}</td>}
+                                        {visibleColumns.includes('meal_allowance') && <td>{formatCurrency(emp.meal_allowance)}</td>}
+                                        {visibleColumns.includes('salary_type') && (
+                                            <td>
+                                                <span className={`badge ${emp.salary_type === 'daily' ? 'badge-info' : emp.salary_type === 'weekly' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
+                                                    {emp.salary_type === 'daily' ? 'Harian' : emp.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('receives_tuang') && (
+                                            <td style={{ textAlign: 'center' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={emp.receives_tuang !== false}
+                                                    onChange={e => toggleReceivesTuang(emp, e.target.checked)}
+                                                    title={emp.receives_tuang !== false ? 'Dapat tuang (klik untuk menonaktifkan)' : 'Tidak dapat tuang (klik untuk mengaktifkan)'}
+                                                    style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                                />
+                                            </td>
+                                        )}
+                                        {visibleColumns.includes('phone') && <td>{emp.phone || '-'}</td>}
+                                        {visibleColumns.includes('nik') && <td>{emp.nik || '-'}</td>}
+                                        {visibleColumns.includes('join_date') && <td>{emp.join_date ? new Date(emp.join_date).toLocaleDateString('id-ID') : '-'}</td>}
+                                        {visibleColumns.includes('gender') && <td>{emp.gender || '-'}</td>}
+                                        {visibleColumns.includes('actions') && (
+                                            <td>
+                                                <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }} onClick={() => openDetail(emp)}>
+                                                    <Icon name="FileText" size={16} inline /> Detail
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -1569,6 +1774,48 @@ export default function AdminEmployees() {
                                 {/* Tab: Lokasi Absen */}
                                 {activeTab === 'locations' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {/* Toggle Wajib Beda Lokasi Checkout */}
+                                        <div style={{
+                                            padding: '1rem',
+                                            background: formData.require_different_checkout ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.02)',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: formData.require_different_checkout ? '1.5px solid var(--primary-500)' : '1px solid var(--gray-700)',
+                                            transition: 'all 0.25s'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                                                <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer', marginTop: 2 }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.require_different_checkout || false}
+                                                        onChange={e => updateField('require_different_checkout', e.target.checked)}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{
+                                                        width: 44, height: 24, borderRadius: 12,
+                                                        background: formData.require_different_checkout ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'var(--gray-600)',
+                                                        position: 'relative', display: 'inline-block',
+                                                        transition: 'background 0.3s', flexShrink: 0
+                                                    }}>
+                                                        <span style={{
+                                                            position: 'absolute', top: 3, left: formData.require_different_checkout ? 23 : 3,
+                                                            width: 18, height: 18, borderRadius: '50%',
+                                                            background: '#fff', transition: 'left 0.3s',
+                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                                                        }} />
+                                                    </span>
+                                                </label>
+                                                <div style={{ flex: 1 }}>
+                                                    <span style={{ fontWeight: 600, color: formData.require_different_checkout ? 'var(--primary-400)' : 'var(--text-primary)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <Icon name="Compass" size={16} inline /> Wajib Beda Titik / Lokasi Saat Pulang (Check-out)
+                                                    </span>
+                                                    <div style={{ fontSize: '0.78rem', color: 'var(--gray-400)', marginTop: 4, lineHeight: 1.4 }}>
+                                                        Jika diaktifkan, karyawan ini <strong>tidak boleh</strong> absen pulang di titik koordinat / lokasi yang sama dengan saat ia absen masuk.
+                                                        Sangat cocok khusus untuk kurir, sales lapangan, driver ritase, atau teknisi keliling.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
                                             <Icon name="Info" size={16} inline /> <strong>Pengaturan Lokasi Absen:</strong><br />
                                             Centang lokasi mana saja yang diizinkan untuk karyawan ini melakukan absensi. <br/>
@@ -1805,6 +2052,127 @@ export default function AdminEmployees() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Pengaturan Kolom Tampilan */}
+            {showColumnModal && (
+                <div className="modal-overlay" style={{ zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="modal" style={{ maxWidth: '620px', width: '92%', borderRadius: 'var(--radius-lg)', background: '#fff', boxShadow: 'var(--shadow-xl)', overflow: 'hidden' }}>
+                        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem 1.5rem', borderBottom: '1px solid var(--gray-100)' }}>
+                            <div>
+                                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', margin: 0 }}>
+                                    <Icon name="SlidersHorizontal" size={18} inline /> Pengaturan Kolom Tampilan
+                                </h3>
+                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--gray-500)' }}>
+                                    Pilih kolom / field data karyawan yang ingin ditampilkan pada tabel
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="modal-close"
+                                onClick={() => setShowColumnModal(false)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--gray-400)', padding: '0.25rem' }}
+                            >
+                                <Icon name="X" size={18} />
+                            </button>
+                        </div>
+
+                        <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto', padding: '1.25rem 1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.82rem', color: 'var(--gray-600)' }}>
+                                    <strong>{tempColumns.length}</strong> dari {AVAILABLE_EMPLOYEE_COLUMNS.length} kolom aktif
+                                </span>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        onClick={handleSelectAllColumns}
+                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                    >
+                                        Pilih Semua
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        onClick={handleResetColumns}
+                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                    >
+                                        Reset Bawaan
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.65rem' }}>
+                                {AVAILABLE_EMPLOYEE_COLUMNS.map(col => {
+                                    const isChecked = tempColumns.includes(col.key);
+                                    const isRequired = col.required;
+                                    const isHighlighted = col.key === 'appreciation_allowance';
+                                    return (
+                                        <label
+                                            key={col.key}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.75rem',
+                                                padding: '0.75rem 0.85rem',
+                                                borderRadius: 'var(--radius-md)',
+                                                border: `1.5px solid ${isChecked ? (isHighlighted ? 'var(--primary, #7f1d1d)' : 'var(--gray-400)') : 'var(--gray-200)'}`,
+                                                background: isChecked ? (isHighlighted ? 'rgba(127, 29, 29, 0.04)' : '#f9fafb') : '#fff',
+                                                cursor: isRequired ? 'not-allowed' : 'pointer',
+                                                userSelect: 'none',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                disabled={isRequired}
+                                                onChange={() => toggleTempColumn(col.key)}
+                                                style={{ width: '17px', height: '17px', cursor: isRequired ? 'not-allowed' : 'pointer' }}
+                                            />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--gray-800)', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                                    {col.label}
+                                                    {isRequired && (
+                                                        <span style={{ fontSize: '0.65rem', color: 'var(--gray-500)', fontWeight: 400 }}>(Wajib)</span>
+                                                    )}
+                                                    {isHighlighted && (
+                                                        <span className="badge badge-warning" style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem' }}>
+                                                            Pilihan Baru
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>
+                                                    Kategori: {col.category}
+                                                </div>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--gray-100)', background: 'var(--gray-50, #f9fafb)' }}>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() => setShowColumnModal(false)}
+                                disabled={savingColumns}
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleSaveColumns}
+                                disabled={savingColumns}
+                                style={{ minWidth: '130px' }}
+                            >
+                                {savingColumns ? 'Menyimpan...' : 'Simpan Pengaturan'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -40,6 +40,47 @@ pool.query('ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS appreciation_allo
 pool.query(`ALTER TABLE employee_loans ADD COLUMN IF NOT EXISTS installment_period VARCHAR(10) NOT NULL DEFAULT 'monthly'`)
   .catch((err) => console.warn('DB patch installment_period:', err.message));
 pool.query(`
+  ALTER TABLE leave_settings 
+    ADD COLUMN IF NOT EXISTS leave_calculation_mode VARCHAR(20) DEFAULT 'both',
+    ADD COLUMN IF NOT EXISTS hours_per_leave_day NUMERIC(4,2) DEFAULT 8.0;
+  ALTER TABLE leave_requests
+    ADD COLUMN IF NOT EXISTS is_hourly BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS start_time TIME,
+    ADD COLUMN IF NOT EXISTS end_time TIME,
+    ADD COLUMN IF NOT EXISTS duration_hours NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS duration_days NUMERIC(5,2);
+`).catch((err) => console.warn('DB patch hourly leave:', err.message));
+pool.query(`
+  ALTER TABLE attendance_locations
+    ADD COLUMN IF NOT EXISTS location_type VARCHAR(20) DEFAULT 'all';
+  INSERT INTO settings (key, value) VALUES ('checkout_location_rule_mode', 'specific') ON CONFLICT (key) DO NOTHING;
+  INSERT INTO settings (key, value) VALUES ('require_different_location_checkout', 'false') ON CONFLICT (key) DO NOTHING;
+  INSERT INTO settings (key, value) VALUES ('min_checkout_distance_meters', '0') ON CONFLICT (key) DO NOTHING;
+  ALTER TABLE employee_details
+    ADD COLUMN IF NOT EXISTS require_different_checkout BOOLEAN DEFAULT FALSE;
+
+  CREATE TABLE IF NOT EXISTS shift_change_requests (
+    id SERIAL PRIMARY KEY,
+    request_type VARCHAR(20) NOT NULL DEFAULT 'change',
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    request_date DATE NOT NULL,
+    current_shift_id INTEGER REFERENCES work_shifts(id) ON DELETE SET NULL,
+    target_shift_id INTEGER REFERENCES work_shifts(id) ON DELETE SET NULL,
+    target_user_date DATE,
+    target_user_shift_id INTEGER REFERENCES work_shifts(id) ON DELETE SET NULL,
+    reason TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    approval_notes TEXT,
+    approved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_shift_change_user ON shift_change_requests(user_id, request_date);
+  CREATE INDEX IF NOT EXISTS idx_shift_change_status ON shift_change_requests(status);
+`).catch((err) => console.warn('DB patch location_type and checkout diff settings:', err.message));
+pool.query(`
   ALTER TABLE employee_details 
     ADD COLUMN IF NOT EXISTS driver_subuh_allowance DECIMAL(15,2) DEFAULT 0,
     ADD COLUMN IF NOT EXISTS driver_rit_allowance DECIMAL(15,2) DEFAULT 0,

@@ -70,15 +70,57 @@ function resolveReportRange(query, maxDays = 62) {
 
 function attendanceStatusLabel(row) {
     if (row.is_off_day) return 'OFF';
+    if (row.check_in_time && row.check_out_time) {
+        if (row.leave_type === 'leave' && row.leave_is_hourly && row.leave_duration_hours) {
+            return `Lengkap (Cuti ${row.leave_duration_hours} Jam)`;
+        }
+        return 'Lengkap';
+    }
+    if (row.check_in_time) {
+        if (row.leave_type === 'leave' && row.leave_is_hourly && row.leave_duration_hours) {
+            return `Belum Pulang (Cuti ${row.leave_duration_hours} Jam)`;
+        }
+        return 'Belum Pulang';
+    }
     if (row.leave_type === 'late') return 'Izin Terlambat';
-    if (row.leave_type === 'leave') return 'Cuti';
+    if (row.leave_type === 'leave') {
+        if (row.leave_is_hourly && row.leave_duration_hours) {
+            return `Cuti (${row.leave_duration_hours} Jam)`;
+        }
+        return 'Cuti';
+    }
     if (row.leave_type === 'sick') return 'Sakit';
     if (row.leave_type === 'permission') return 'Izin Tidak Masuk';
     if (row.leave_type === 'change_off') return 'Tukar Libur';
-    if (row.check_in_time && row.check_out_time) return 'Lengkap';
-    if (row.check_in_time) return 'Belum Pulang';
     if (row.manual_id) return 'Pengajuan Absensi';
     return 'Tidak Hadir';
+}
+
+function computeOvertimeCategory(otStart, otEnd, shiftStart, shiftEnd, isOffDay) {
+    if (!otStart || !otEnd) return '';
+    if (isOffDay) return 'Lembur Libur';
+    if (!shiftStart || !shiftEnd) return 'Lembur Bebas';
+    const toM = (t) => {
+        const parts = String(t).substring(0, 5).split(':').map(Number);
+        return parts[0] * 60 + parts[1];
+    };
+    const os = toM(otStart);
+    const oe = toM(otEnd);
+    const ss = toM(shiftStart);
+    const se = toM(shiftEnd);
+
+    if (ss < se) {
+        if (oe <= ss || (os < ss && oe <= ss + 60)) return 'Lembur Awal';
+        if (os >= se || (os >= se - 60 && oe > se)) return 'Lembur Akhir';
+        if (os < ss) return 'Lembur Awal';
+        if (os >= se) return 'Lembur Akhir';
+        return 'Lembur';
+    } else {
+        const midpoint = (se + ss) / 2;
+        if (os >= midpoint && os < ss) return 'Lembur Awal';
+        if (os >= se && os < midpoint) return 'Lembur Akhir';
+        return 'Lembur';
+    }
 }
 
 async function fetchAttendanceRows(start, end, userId = null) {
@@ -102,9 +144,21 @@ async function fetchAttendanceRows(start, end, userId = null) {
             co.is_valid AS check_out_valid,
             al.name AS location_name,
             lr.type AS leave_type,
+            lr.is_hourly AS leave_is_hourly,
+            COALESCE(LEFT(lr.start_time::text, 5), '') AS leave_start_time,
+            COALESCE(LEFT(lr.end_time::text, 5), '') AS leave_end_time,
+            lr.duration_hours AS leave_duration_hours,
+            lr.duration_days AS leave_duration_days,
             CASE WHEN uod.id IS NOT NULL THEN true ELSE false END AS is_off_day,
             ma.id AS manual_id,
-            ma.status AS manual_status
+            ma.status AS manual_status,
+            COALESCE(LEFT(ot_req.overtime_start::text, 5), '') AS overtime_start,
+            COALESCE(LEFT(ot_req.overtime_end::text, 5), '') AS overtime_end,
+            COALESCE(ot_req.hours, ot_rec.hours, 0)::numeric AS overtime_hours,
+            COALESCE(NULLIF(ot_req.reason, ''), ot_rec.description, '') AS overtime_reason,
+            COALESCE(ot_req.shift_name, esa_shift.shift_name, '') AS overtime_shift_name,
+            COALESCE(ot_req.shift_start, esa_shift.shift_start) AS overtime_shift_start,
+            COALESCE(ot_req.shift_end, esa_shift.shift_end) AS overtime_shift_end
         FROM users u
         CROSS JOIN generate_series($1::date, $2::date, '1 day') AS d(day)
         LEFT JOIN LATERAL (
@@ -130,7 +184,7 @@ async function fetchAttendanceRows(start, end, userId = null) {
         ) co ON true
         LEFT JOIN attendance_locations al ON al.id = COALESCE(ci.location_id, co.location_id)
         LEFT JOIN LATERAL (
-            SELECT type
+            SELECT type, is_hourly, start_time, end_time, duration_hours, duration_days
             FROM leave_requests
             WHERE user_id = u.id
               AND status = 'approved'
@@ -148,6 +202,42 @@ async function fetchAttendanceRows(start, end, userId = null) {
             ORDER BY id DESC
             LIMIT 1
         ) ma ON true
+        LEFT JOIN LATERAL (
+            SELECT 
+                otr.overtime_start,
+                otr.overtime_end,
+                COALESCE(ore.actual_hours, otr.estimated_hours, 0) AS hours,
+                otr.reason,
+                ws.name AS shift_name,
+                ws.start_time AS shift_start,
+                ws.end_time AS shift_end
+            FROM overtime_request_employees ore
+            JOIN overtime_requests otr ON ore.overtime_request_id = otr.id
+            LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+            WHERE ore.user_id = u.id
+              AND otr.date = d.day::date
+              AND otr.status IN ('approved', 'completed')
+            ORDER BY otr.id DESC
+            LIMIT 1
+        ) ot_req ON true
+        LEFT JOIN LATERAL (
+            SELECT ws.name AS shift_name, ws.start_time AS shift_start, ws.end_time AS shift_end
+            FROM employee_shift_assignments esa
+            JOIN work_shifts ws ON ws.id = esa.shift_id
+            WHERE esa.user_id = u.id AND esa.assignment_date = d.day::date
+            LIMIT 1
+        ) esa_shift ON true
+        LEFT JOIN LATERAL (
+            SELECT 
+                hours,
+                description
+            FROM overtime_records
+            WHERE user_id = u.id
+              AND date = d.day::date
+              AND status = 'approved'
+            ORDER BY id DESC
+            LIMIT 1
+        ) ot_rec ON true
         WHERE u.role IN ('employee', 'manager') ${userFilter}
         ORDER BY d.day, u.name`,
         params
@@ -159,11 +249,18 @@ async function fetchAttendanceRows(start, end, userId = null) {
         department: row.department || '',
         division: row.division || '',
         is_off_day: row.is_off_day === true || row.is_off_day === 't',
-        manual_id: row.manual_id || null
+        manual_id: row.manual_id || null,
+        overtime_hours: parseFloat(row.overtime_hours) || 0,
+        overtime_start: row.overtime_start || '',
+        overtime_end: row.overtime_end || '',
+        overtime_reason: row.overtime_reason || '',
+        overtime_category: computeOvertimeCategory(row.overtime_start, row.overtime_end, row.overtime_shift_start, row.overtime_shift_end, row.is_off_day)
     }));
 }
 
 function summarizeAttendance(records, start, end) {
+    const otRecords = records.filter((row) => (parseFloat(row.overtime_hours) || 0) > 0);
+    const totalOtHours = otRecords.reduce((sum, row) => sum + (parseFloat(row.overtime_hours) || 0), 0);
     return {
         start_date: start,
         end_date: end,
@@ -175,7 +272,9 @@ function summarizeAttendance(records, start, end) {
         on_leave: records.filter((row) => row.leave_type === 'leave').length,
         on_manual: records.filter((row) => row.manual_id).length,
         on_off: records.filter((row) => row.is_off_day).length,
-        on_sick: records.filter((row) => row.leave_type === 'sick').length
+        on_sick: records.filter((row) => row.leave_type === 'sick').length,
+        total_overtime_hours: Math.round(totalOtHours * 10) / 10,
+        on_overtime: otRecords.length
     };
 }
 
@@ -356,18 +455,18 @@ router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, r
         doc.moveDown(2);
 
         const summary = summarizeAttendance(rows, range.start, range.end);
-        doc.fontSize(11);
+        doc.fontSize(10);
         doc.text(`Karyawan: ${summary.total_employees}   Hadir: ${summary.present}   Tidak Hadir: ${summary.absent}   Lengkap: ${summary.completed}`);
-        doc.text(`Izin Terlambat: ${summary.on_late}   Cuti: ${summary.on_leave}   Pengajuan Absensi: ${summary.on_manual}`);
+        doc.text(`Izin Terlambat: ${summary.on_late}   Cuti: ${summary.on_leave}   Pengajuan Absensi: ${summary.on_manual}   Lembur: ${summary.on_overtime || 0} (${summary.total_overtime_hours || 0} jam)`);
         doc.moveDown(1);
 
         const tableTop = doc.y;
-        const columns = [36, 60, 150, 250, 340, 430, 520, 600, 680];
+        const columns = [36, 56, 126, 216, 296, 366, 426, 476, 526, 616, 686];
         doc.font('Helvetica-Bold').fontSize(8);
-        ['No', 'ID', 'Nama', 'Departemen', 'Divisi', 'Tanggal', 'Masuk', 'Pulang', 'Status'].forEach((label, index) => {
-            doc.text(label, columns[index], tableTop, { width: 80 });
+        ['No', 'ID', 'Nama', 'Departemen', 'Divisi', 'Tanggal', 'Masuk', 'Pulang', 'Waktu Lembur', 'Durasi', 'Status'].forEach((label, index) => {
+            doc.text(label, columns[index], tableTop, { width: index === 8 ? 85 : 68 });
         });
-        doc.moveTo(36, tableTop + 14).lineTo(800, tableTop + 14).stroke();
+        doc.moveTo(36, tableTop + 14).lineTo(770, tableTop + 14).stroke();
 
         doc.font('Helvetica').fontSize(8);
         let yPosition = tableTop + 22;
@@ -376,6 +475,11 @@ router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, r
                 doc.addPage();
                 yPosition = 40;
             }
+            const otCat = row.overtime_category ? ` (${row.overtime_category === 'Lembur Awal' ? 'Awal' : row.overtime_category === 'Lembur Akhir' ? 'Akhir' : row.overtime_category})` : '';
+            const otTime = row.overtime_start && row.overtime_end
+                ? `${row.overtime_start} - ${row.overtime_end}${otCat}`
+                : (row.overtime_hours > 0 ? 'Lembur' : '-');
+            const otDuration = row.overtime_hours > 0 ? `${row.overtime_hours} jam` : '-';
             const values = [
                 String(index + 1),
                 row.employee_id || '-',
@@ -385,10 +489,12 @@ router.get('/export/daily/pdf', authenticateToken, canViewReports, async (req, r
                 row.report_date || '-',
                 row.check_in_time ? formatTimeID(row.check_in_time) : '-',
                 row.check_out_time ? formatTimeID(row.check_out_time) : '-',
+                otTime,
+                otDuration,
                 attendanceStatusLabel(row)
             ];
             values.forEach((value, col) => {
-                doc.text(String(value), columns[col], yPosition, { width: col === 2 ? 95 : 80 });
+                doc.text(String(value), columns[col], yPosition, { width: col === 2 ? 88 : col === 8 ? 85 : 68 });
             });
             yPosition += 16;
         });
@@ -417,16 +523,16 @@ router.get('/export/daily/excel', authenticateToken, canViewReports, async (req,
         const worksheet = workbook.addWorksheet('Laporan Absensi');
 
         // Title
-        worksheet.mergeCells('A1:J1');
+        worksheet.mergeCells('A1:L1');
         worksheet.getCell('A1').value = 'LAPORAN ABSENSI HARIAN';
         worksheet.getCell('A1').font = { bold: true, size: 16 };
         worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-        worksheet.mergeCells('A2:J2');
+        worksheet.mergeCells('A2:L2');
         worksheet.getCell('A2').value = `Periode: ${formatDateID(range.start)} - ${formatDateID(range.end)}`;
         worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-        worksheet.getRow(4).values = ['No', 'ID Karyawan', 'Nama', 'Departemen', 'Divisi', 'Tanggal', 'Check-in', 'Check-out', 'Lokasi', 'Status'];
+        worksheet.getRow(4).values = ['No', 'ID Karyawan', 'Nama', 'Departemen', 'Divisi', 'Tanggal', 'Check-in', 'Check-out', 'Waktu Lembur', 'Durasi Lembur (Jam)', 'Lokasi', 'Status'];
         worksheet.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         worksheet.getRow(4).fill = {
             type: 'pattern',
@@ -435,6 +541,11 @@ router.get('/export/daily/excel', authenticateToken, canViewReports, async (req,
         };
 
         rows.forEach((row, index) => {
+            const otCat = row.overtime_category ? ` (${row.overtime_category === 'Lembur Awal' ? 'Awal' : row.overtime_category === 'Lembur Akhir' ? 'Akhir' : row.overtime_category})` : '';
+            const otTime = row.overtime_start && row.overtime_end
+                ? `${row.overtime_start} - ${row.overtime_end}${otCat}`
+                : (row.overtime_hours > 0 ? 'Lembur' : '-');
+            const otDuration = row.overtime_hours > 0 ? `${row.overtime_hours} jam` : '-';
             worksheet.addRow([
                 index + 1,
                 row.employee_id || '-',
@@ -444,6 +555,8 @@ router.get('/export/daily/excel', authenticateToken, canViewReports, async (req,
                 row.report_date || '-',
                 row.check_in_time ? formatTimeID(row.check_in_time) : '-',
                 row.check_out_time ? formatTimeID(row.check_out_time) : '-',
+                otTime,
+                otDuration,
                 row.location_name || '-',
                 attendanceStatusLabel(row)
             ]);
@@ -451,12 +564,13 @@ router.get('/export/daily/excel', authenticateToken, canViewReports, async (req,
 
         worksheet.columns = [
             { width: 5 }, { width: 14 }, { width: 24 }, { width: 16 }, { width: 16 },
-            { width: 14 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 18 }
+            { width: 14 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 18 },
+            { width: 18 }, { width: 18 }
         ];
 
         const excelSummary = summarizeAttendance(rows, range.start, range.end);
         const summaryRow = worksheet.rowCount + 2;
-        worksheet.getCell(`A${summaryRow}`).value = `Hadir: ${excelSummary.present} | Tidak Hadir: ${excelSummary.absent} | Lengkap: ${excelSummary.completed} | Izin Terlambat: ${excelSummary.on_late} | Cuti: ${excelSummary.on_leave} | Pengajuan Absensi: ${excelSummary.on_manual}`;
+        worksheet.getCell(`A${summaryRow}`).value = `Hadir: ${excelSummary.present} | Tidak Hadir: ${excelSummary.absent} | Lengkap: ${excelSummary.completed} | Izin Terlambat: ${excelSummary.on_late} | Cuti: ${excelSummary.on_leave} | Pengajuan Absensi: ${excelSummary.on_manual} | Lembur: ${excelSummary.on_overtime || 0} (${excelSummary.total_overtime_hours || 0} jam)`;
         worksheet.getCell(`A${summaryRow}`).font = { bold: true };
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -992,7 +1106,14 @@ router.get('/history', authenticateToken, canViewReports, async (req, res) => {
                 al.name as location_name,
                 lr.type as leave_type,
                 lr.reason as leave_reason,
-                CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
+                CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day,
+                COALESCE(LEFT(ot_req.overtime_start::text, 5), '') AS overtime_start,
+                COALESCE(LEFT(ot_req.overtime_end::text, 5), '') AS overtime_end,
+                COALESCE(ot_req.hours, ot_rec.hours, 0)::numeric AS overtime_hours,
+                COALESCE(NULLIF(ot_req.reason, ''), ot_rec.description, '') AS overtime_reason,
+                COALESCE(ot_req.shift_name, esa_shift.shift_name, '') AS overtime_shift_name,
+                COALESCE(ot_req.shift_start, esa_shift.shift_start) AS overtime_shift_start,
+                COALESCE(ot_req.shift_end, esa_shift.shift_end) AS overtime_shift_end
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
             LEFT JOIN LATERAL (
@@ -1010,15 +1131,56 @@ router.get('/history', authenticateToken, canViewReports, async (req, res) => {
                 AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
+            LEFT JOIN LATERAL (
+                SELECT 
+                    otr.overtime_start,
+                    otr.overtime_end,
+                    COALESCE(ore.actual_hours, otr.estimated_hours, 0) AS hours,
+                    otr.reason,
+                    ws.name AS shift_name,
+                    ws.start_time AS shift_start,
+                    ws.end_time AS shift_end
+                FROM overtime_request_employees ore
+                JOIN overtime_requests otr ON ore.overtime_request_id = otr.id
+                LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+                WHERE ore.user_id = u.id
+                  AND otr.date = d.date::date
+                  AND otr.status IN ('approved', 'completed')
+                ORDER BY otr.id DESC
+                LIMIT 1
+            ) ot_req ON true
+            LEFT JOIN LATERAL (
+                SELECT ws.name AS shift_name, ws.start_time AS shift_start, ws.end_time AS shift_end
+                FROM employee_shift_assignments esa
+                JOIN work_shifts ws ON ws.id = esa.shift_id
+                WHERE esa.user_id = u.id AND esa.assignment_date = d.date::date
+                LIMIT 1
+            ) esa_shift ON true
+            LEFT JOIN LATERAL (
+                SELECT 
+                    hours,
+                    description
+                FROM overtime_records
+                WHERE user_id = u.id
+                  AND date = d.date::date
+                  AND status = 'approved'
+                ORDER BY id DESC
+                LIMIT 1
+            ) ot_rec ON true
             WHERE u.role IN ('employee', 'manager') ${userFilter}
-                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
+                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL OR ot_req.hours IS NOT NULL OR ot_rec.hours IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
         );
 
         const records = result.rows.map(r => ({
             ...r,
-            attendance_date: r.attendance_date || r.check_in_time || r.check_out_time
+            attendance_date: r.attendance_date || r.check_in_time || r.check_out_time,
+            overtime_hours: parseFloat(r.overtime_hours) || 0,
+            overtime_start: r.overtime_start || '',
+            overtime_end: r.overtime_end || '',
+            overtime_reason: r.overtime_reason || '',
+            overtime_category: computeOvertimeCategory(r.overtime_start, r.overtime_end, r.overtime_shift_start, r.overtime_shift_end, r.is_off_day)
         }));
 
         res.json({
@@ -1060,7 +1222,12 @@ router.get('/export/history/pdf', authenticateToken, canViewReports, async (req,
                 al.name as location_name,
                 lr.type as leave_type,
                 lr.reason as leave_reason,
-                CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
+                CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day,
+                COALESCE(LEFT(ot_req.overtime_start::text, 5), '') AS overtime_start,
+                COALESCE(LEFT(ot_req.overtime_end::text, 5), '') AS overtime_end,
+                COALESCE(ot_req.hours, ot_rec.hours, 0)::numeric AS overtime_hours,
+                COALESCE(ot_req.shift_start, esa_shift.shift_start) AS overtime_shift_start,
+                COALESCE(ot_req.shift_end, esa_shift.shift_end) AS overtime_shift_end
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
             LEFT JOIN attendance_records ci ON u.id = ci.user_id 
@@ -1075,13 +1242,46 @@ router.get('/export/history/pdf', authenticateToken, canViewReports, async (req,
                 AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
+            LEFT JOIN LATERAL (
+                SELECT 
+                    otr.overtime_start,
+                    otr.overtime_end,
+                    COALESCE(ore.actual_hours, otr.estimated_hours, 0) AS hours,
+                    ws.start_time AS shift_start,
+                    ws.end_time AS shift_end
+                FROM overtime_request_employees ore
+                JOIN overtime_requests otr ON ore.overtime_request_id = otr.id
+                LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+                WHERE ore.user_id = u.id
+                  AND otr.date = d.date::date
+                  AND otr.status IN ('approved', 'completed')
+                ORDER BY otr.id DESC
+                LIMIT 1
+            ) ot_req ON true
+            LEFT JOIN LATERAL (
+                SELECT ws.start_time AS shift_start, ws.end_time AS shift_end
+                FROM employee_shift_assignments esa
+                JOIN work_shifts ws ON ws.id = esa.shift_id
+                WHERE esa.user_id = u.id AND esa.assignment_date = d.date::date
+                LIMIT 1
+            ) esa_shift ON true
+            LEFT JOIN LATERAL (
+                SELECT 
+                    hours
+                FROM overtime_records
+                WHERE user_id = u.id
+                  AND date = d.date::date
+                  AND status = 'approved'
+                ORDER BY id DESC
+                LIMIT 1
+            ) ot_rec ON true
             WHERE u.role IN ('employee', 'manager') ${userFilter}
-                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
+                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL OR ot_req.hours IS NOT NULL OR ot_rec.hours IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
         );
 
-        const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+        const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=riwayat-absensi-${targetStart}-to-${targetEnd}.pdf`);
@@ -1098,29 +1298,33 @@ router.get('/export/history/pdf', authenticateToken, canViewReports, async (req,
         const totalPresent = result.rows.filter(r => r.check_in_time).length;
         const totalOff = result.rows.filter(r => r.is_off_day).length;
         const totalLeave = result.rows.filter(r => r.leave_type).length;
+        const otCount = result.rows.filter(r => (parseFloat(r.overtime_hours) || 0) > 0).length;
+        const totalOtHours = Math.round(result.rows.reduce((sum, r) => sum + (parseFloat(r.overtime_hours) || 0), 0) * 10) / 10;
         doc.fontSize(10);
-        doc.text(`Total Record: ${totalRecords}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}  |  Izin/Cuti: ${totalLeave}`);
+        doc.text(`Total Record: ${totalRecords}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}  |  Izin/Cuti: ${totalLeave}  |  Lembur: ${otCount} (${totalOtHours} jam)`);
         doc.moveDown(1);
 
         // Table Header
         const tableTop = doc.y;
-        const col1 = 40, col2 = 70, col3 = 170, col4 = 290, col5 = 420, col6 = 510, col7 = 610, col8 = 710;
+        const col1 = 36, col2 = 60, col3 = 135, col4 = 230, col5 = 330, col6 = 390, col7 = 450, col8 = 540, col9 = 620, col10 = 700;
 
-        doc.font('Helvetica-Bold').fontSize(9);
+        doc.font('Helvetica-Bold').fontSize(8);
         doc.text('No', col1, tableTop);
         doc.text('ID', col2, tableTop);
         doc.text('Nama', col3, tableTop);
         doc.text('Tanggal', col4, tableTop);
-        doc.text('Check-in', col5, tableTop);
-        doc.text('Check-out', col6, tableTop);
-        doc.text('Lokasi', col7, tableTop);
-        doc.text('Status', col8, tableTop);
+        doc.text('Masuk', col5, tableTop);
+        doc.text('Pulang', col6, tableTop);
+        doc.text('Waktu Lembur', col7, tableTop);
+        doc.text('Durasi', col8, tableTop);
+        doc.text('Lokasi', col9, tableTop);
+        doc.text('Status', col10, tableTop);
 
-        doc.moveTo(col1, tableTop + 15).lineTo(790, tableTop + 15).stroke();
+        doc.moveTo(col1, tableTop + 14).lineTo(770, tableTop + 14).stroke();
 
         // Table Rows
         doc.font('Helvetica').fontSize(8);
-        let yPosition = tableTop + 25;
+        let yPosition = tableTop + 22;
 
         result.rows.forEach((row, index) => {
             if (yPosition > 540) {
@@ -1147,21 +1351,31 @@ router.get('/export/history/pdf', authenticateToken, canViewReports, async (req,
                 status = 'Belum Pulang';
             }
 
+            const otCategory = computeOvertimeCategory(row.overtime_start, row.overtime_end, row.overtime_shift_start, row.overtime_shift_end, row.is_off_day);
+            const otCat = otCategory ? ` (${otCategory === 'Lembur Awal' ? 'Awal' : otCategory === 'Lembur Akhir' ? 'Akhir' : otCategory})` : '';
+            const otHours = parseFloat(row.overtime_hours) || 0;
+            const otTime = row.overtime_start && row.overtime_end
+                ? `${row.overtime_start} - ${row.overtime_end}${otCat}`
+                : (otHours > 0 ? 'Lembur' : '-');
+            const otDuration = otHours > 0 ? `${otHours} jam` : '-';
+
             doc.text(String(index + 1), col1, yPosition);
             doc.text(row.employee_id || '-', col2, yPosition);
-            doc.text(row.name || '-', col3, yPosition, { width: 115 });
-            doc.text(row.attendance_date ? formatDateID(row.attendance_date) : '-', col4, yPosition, { width: 125 });
+            doc.text(row.name || '-', col3, yPosition, { width: 90 });
+            doc.text(row.attendance_date ? formatDateID(row.attendance_date) : '-', col4, yPosition, { width: 95 });
             doc.text(row.is_off_day ? 'OFF' : (row.check_in_time ? formatTimeID(row.check_in_time) : '-'), col5, yPosition);
             doc.text(row.is_off_day ? 'OFF' : (row.check_out_time ? formatTimeID(row.check_out_time) : '-'), col6, yPosition);
-            doc.text(row.location_name || '-', col7, yPosition, { width: 95 });
-            doc.text(status, col8, yPosition);
+            doc.text(otTime, col7, yPosition, { width: 85 });
+            doc.text(otDuration, col8, yPosition, { width: 75 });
+            doc.text(row.location_name || '-', col9, yPosition, { width: 75 });
+            doc.text(status, col10, yPosition);
 
-            yPosition += 18;
+            yPosition += 16;
         });
 
         // Footer
         const footerY = doc.page.height - 30;
-        doc.fontSize(7).text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 40, footerY);
+        doc.fontSize(7).text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 36, footerY);
 
         doc.end();
     } catch (error) {
@@ -1198,7 +1412,12 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
                 al.name as location_name,
                 lr.type as leave_type,
                 lr.reason as leave_reason,
-                CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day
+                CASE WHEN uod.id IS NOT NULL THEN true ELSE false END as is_off_day,
+                COALESCE(LEFT(ot_req.overtime_start::text, 5), '') AS overtime_start,
+                COALESCE(LEFT(ot_req.overtime_end::text, 5), '') AS overtime_end,
+                COALESCE(ot_req.hours, ot_rec.hours, 0)::numeric AS overtime_hours,
+                COALESCE(ot_req.shift_start, esa_shift.shift_start) AS overtime_shift_start,
+                COALESCE(ot_req.shift_end, esa_shift.shift_end) AS overtime_shift_end
             FROM users u
             CROSS JOIN generate_series($1::date, $2::date, '1 day'::interval) AS d(date)
             LEFT JOIN attendance_records ci ON u.id = ci.user_id 
@@ -1213,8 +1432,41 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
                 AND d.date::date BETWEEN lr.start_date AND lr.end_date
             LEFT JOIN user_off_days uod ON u.id = uod.user_id
                 AND uod.off_date = d.date::date
+            LEFT JOIN LATERAL (
+                SELECT 
+                    otr.overtime_start,
+                    otr.overtime_end,
+                    COALESCE(ore.actual_hours, otr.estimated_hours, 0) AS hours,
+                    ws.start_time AS shift_start,
+                    ws.end_time AS shift_end
+                FROM overtime_request_employees ore
+                JOIN overtime_requests otr ON ore.overtime_request_id = otr.id
+                LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
+                WHERE ore.user_id = u.id
+                  AND otr.date = d.date::date
+                  AND otr.status IN ('approved', 'completed')
+                ORDER BY otr.id DESC
+                LIMIT 1
+            ) ot_req ON true
+            LEFT JOIN LATERAL (
+                SELECT ws.start_time AS shift_start, ws.end_time AS shift_end
+                FROM employee_shift_assignments esa
+                JOIN work_shifts ws ON ws.id = esa.shift_id
+                WHERE esa.user_id = u.id AND esa.assignment_date = d.date::date
+                LIMIT 1
+            ) esa_shift ON true
+            LEFT JOIN LATERAL (
+                SELECT 
+                    hours
+                FROM overtime_records
+                WHERE user_id = u.id
+                  AND date = d.date::date
+                  AND status = 'approved'
+                ORDER BY id DESC
+                LIMIT 1
+            ) ot_rec ON true
             WHERE u.role IN ('employee', 'manager') ${userFilter}
-                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL)
+                AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL OR ot_req.hours IS NOT NULL OR ot_rec.hours IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
         );
@@ -1223,17 +1475,17 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
         const worksheet = workbook.addWorksheet('Riwayat Absensi');
 
         // Title
-        worksheet.mergeCells('A1:H1');
+        worksheet.mergeCells('A1:J1');
         worksheet.getCell('A1').value = 'LAPORAN RIWAYAT ABSENSI';
         worksheet.getCell('A1').font = { bold: true, size: 16 };
         worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
-        worksheet.mergeCells('A2:H2');
+        worksheet.mergeCells('A2:J2');
         worksheet.getCell('A2').value = `Periode: ${formatDateID(targetStart)} - ${formatDateID(targetEnd)}`;
         worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
         // Header
-        worksheet.getRow(4).values = ['No', 'ID Karyawan', 'Nama', 'Tanggal', 'Check-in', 'Check-out', 'Lokasi', 'Status'];
+        worksheet.getRow(4).values = ['No', 'ID Karyawan', 'Nama', 'Tanggal', 'Check-in', 'Check-out', 'Waktu Lembur', 'Durasi Lembur (Jam)', 'Lokasi', 'Status'];
         worksheet.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         worksheet.getRow(4).fill = {
             type: 'pattern',
@@ -1262,6 +1514,14 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
                 status = 'Belum Pulang';
             }
 
+            const otCategory = computeOvertimeCategory(row.overtime_start, row.overtime_end, row.overtime_shift_start, row.overtime_shift_end, row.is_off_day);
+            const otCat = otCategory ? ` (${otCategory === 'Lembur Awal' ? 'Awal' : otCategory === 'Lembur Akhir' ? 'Akhir' : otCategory})` : '';
+            const otHours = parseFloat(row.overtime_hours) || 0;
+            const otTime = row.overtime_start && row.overtime_end
+                ? `${row.overtime_start} - ${row.overtime_end}${otCat}`
+                : (otHours > 0 ? 'Lembur' : '-');
+            const otDuration = otHours > 0 ? `${otHours} jam` : '-';
+
             worksheet.addRow([
                 index + 1,
                 row.employee_id || '-',
@@ -1269,6 +1529,8 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
                 row.attendance_date ? formatDateID(row.attendance_date) : '-',
                 row.is_off_day ? 'OFF' : (row.check_in_time ? formatTimeID(row.check_in_time) : '-'),
                 row.is_off_day ? 'OFF' : (row.check_out_time ? formatTimeID(row.check_out_time) : '-'),
+                otTime,
+                otDuration,
                 row.location_name || '-',
                 status
             ]);
@@ -1279,9 +1541,11 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
             { width: 5 },
             { width: 15 },
             { width: 25 },
-            { width: 30 },
+            { width: 26 },
             { width: 12 },
             { width: 12 },
+            { width: 16 },
+            { width: 18 },
             { width: 20 },
             { width: 15 }
         ];
@@ -1291,7 +1555,9 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
         const totalPresent = result.rows.filter(r => r.check_in_time).length;
         const totalOff = result.rows.filter(r => r.is_off_day).length;
         const totalLeave = result.rows.filter(r => r.leave_type).length;
-        worksheet.getCell(`A${summaryRow}`).value = `Total Record: ${result.rows.length}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}  |  Izin/Cuti: ${totalLeave}`;
+        const otCount = result.rows.filter(r => (parseFloat(r.overtime_hours) || 0) > 0).length;
+        const totalOtHours = Math.round(result.rows.reduce((sum, r) => sum + (parseFloat(r.overtime_hours) || 0), 0) * 10) / 10;
+        worksheet.getCell(`A${summaryRow}`).value = `Total Record: ${result.rows.length}  |  Hadir: ${totalPresent}  |  OFF: ${totalOff}  |  Izin/Cuti: ${totalLeave}  |  Lembur: ${otCount} (${totalOtHours} jam)`;
         worksheet.getCell(`A${summaryRow}`).font = { bold: true };
 
         // Footer

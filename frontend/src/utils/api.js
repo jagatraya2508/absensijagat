@@ -241,7 +241,7 @@ export const attendanceAPI = {
 export const locationsAPI = {
     getAll: () => request('/locations'),
 
-    getActive: () => request('/locations/active'),
+    getActive: (type) => request('/locations/active' + (type ? `?type=${type}` : '')),
 
     getById: (id) => request(`/locations/${id}`),
 
@@ -566,6 +566,16 @@ export const settingsAPI = {
     updateFaceMatch: (percent) => request('/settings/face-match', {
         method: 'PUT',
         body: JSON.stringify({ percent }),
+    }),
+    getAttendanceLocation: () => request('/settings/attendance-location'),
+    updateAttendanceLocation: (data) => request('/settings/attendance-location', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    getEmployeeColumns: () => request('/settings/employee-columns'),
+    updateEmployeeColumns: (columns) => request('/settings/employee-columns', {
+        method: 'PUT',
+        body: JSON.stringify({ columns }),
     }),
 };
 
@@ -1129,6 +1139,35 @@ export const dailyWorkReportAPI = {
     }),
 };
 
+export const shiftChangeRequestsAPI = {
+    getMy: (params = {}) => {
+        const q = new URLSearchParams(params).toString();
+        return request(`/shift-change-requests/my${q ? `?${q}` : ''}`);
+    },
+    getList: (params = {}) => {
+        const q = new URLSearchParams(params).toString();
+        return request(`/shift-change-requests/list${q ? `?${q}` : ''}`);
+    },
+    getUserShift: (userId, date) => {
+        const params = new URLSearchParams();
+        if (userId) params.set('user_id', userId);
+        if (date) params.set('date', date);
+        return request(`/shift-change-requests/user-shift?${params.toString()}`);
+    },
+    getColleagues: () => request('/shift-change-requests/colleagues'),
+    create: (data) => request('/shift-change-requests', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    }),
+    updateStatus: (id, status, approvalNotes) => request(`/shift-change-requests/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status, approval_notes: approvalNotes })
+    }),
+    delete: (id) => request(`/shift-change-requests/${id}`, {
+        method: 'DELETE'
+    })
+};
+
 export const notificationsAPI = {
     list: () => request('/notifications'),
     markRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
@@ -1165,5 +1204,6 @@ export default {
     manualAttendanceAPI,
     rolesAPI,
     dailyWorkReportAPI,
-    notificationsAPI
+    notificationsAPI,
+    shiftChangeRequestsAPI
 };

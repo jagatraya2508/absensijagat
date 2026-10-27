@@ -60,6 +60,7 @@ app.use('/api/tuang', require('./routes/tuang'));
 app.use('/api/assessments', require('./routes/assessments'));
 app.use('/api/recruitment', require('./routes/recruitment'));
 app.use('/api/work-schedules', require('./routes/workSchedules'));
+app.use('/api/shift-change-requests', require('./routes/shiftChangeRequests'));
 app.use('/api/driver-activities', require('./routes/driverActivities'));
 app.use('/api/driver-tracking', require('./routes/driverTracking'));
 app.use('/api/customers', require('./routes/customers'));

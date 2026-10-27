@@ -122,9 +122,14 @@ export default function ManagerApprovals() {
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
                                     <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                                             <span className="badge badge-warning">Menunggu</span>
                                             <span style={{ fontFamily: 'monospace', color: 'var(--gray-300)', fontSize: '0.9rem' }}>{req.spl_number}</span>
+                                            {req.overtime_category && (
+                                                <span className={`badge ${req.overtime_category === 'Lembur Awal' ? 'badge-info' : req.overtime_category === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`}>
+                                                    {req.overtime_category === 'Lembur Awal' ? '🌅 Lembur Awal' : req.overtime_category === 'Lembur Akhir' ? '🌆 Lembur Akhir' : req.overtime_category}
+                                                </span>
+                                            )}
                                         </div>
                                         <h3 style={{ margin: '0 0 0.25rem 0', color: 'white' }}>
                                             Lembur {new Date(req.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -133,6 +138,11 @@ export default function ManagerApprovals() {
                                             Mulai pkl. <strong>{formatTime(req.overtime_start)}</strong> s/d <strong>{formatTime(req.overtime_end)}</strong> 
                                             <span style={{ margin: '0 0.5rem' }}>•</span> 
                                             Estimasi: <strong>{req.estimated_hours} jam</strong>
+                                            {req.shift_name && (
+                                                <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: 'var(--primary-400)' }}>
+                                                    • Shift: {req.shift_name}
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
