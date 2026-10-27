@@ -618,6 +618,103 @@ router.put('/attendance-location', authenticateToken, hasPermission('admin.setti
     }
 });
 
+// ========== HOLIDAY OVERTIME SETTINGS ==========
+router.get('/holiday-overtime', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT key, value FROM settings WHERE key IN (
+                'holiday_overtime_enabled',
+                'holiday_overtime_allow_checkin',
+                'holiday_overtime_calc_mode',
+                'holiday_overtime_rate_sunday',
+                'holiday_overtime_rate_national',
+                'holiday_overtime_rate_offday',
+                'holiday_overtime_fixed_sunday',
+                'holiday_overtime_fixed_national',
+                'holiday_overtime_fixed_offday'
+            )`
+        );
+        const config = {
+            holiday_overtime_enabled: true,
+            holiday_overtime_allow_checkin: true,
+            holiday_overtime_calc_mode: 'multiplier',
+            holiday_overtime_rate_sunday: 2.0,
+            holiday_overtime_rate_national: 3.0,
+            holiday_overtime_rate_offday: 2.0,
+            holiday_overtime_fixed_sunday: 50000,
+            holiday_overtime_fixed_national: 75000,
+            holiday_overtime_fixed_offday: 50000
+        };
+        result.rows.forEach(r => {
+            if (r.key === 'holiday_overtime_enabled') config.holiday_overtime_enabled = r.value === 'true';
+            else if (r.key === 'holiday_overtime_allow_checkin') config.holiday_overtime_allow_checkin = r.value === 'true';
+            else if (r.key === 'holiday_overtime_calc_mode') config.holiday_overtime_calc_mode = r.value || 'multiplier';
+            else if (r.key === 'holiday_overtime_rate_sunday') config.holiday_overtime_rate_sunday = parseFloat(r.value) || 2.0;
+            else if (r.key === 'holiday_overtime_rate_national') config.holiday_overtime_rate_national = parseFloat(r.value) || 3.0;
+            else if (r.key === 'holiday_overtime_rate_offday') config.holiday_overtime_rate_offday = parseFloat(r.value) || 2.0;
+            else if (r.key === 'holiday_overtime_fixed_sunday') config.holiday_overtime_fixed_sunday = parseFloat(r.value) || 50000;
+            else if (r.key === 'holiday_overtime_fixed_national') config.holiday_overtime_fixed_national = parseFloat(r.value) || 75000;
+            else if (r.key === 'holiday_overtime_fixed_offday') config.holiday_overtime_fixed_offday = parseFloat(r.value) || 50000;
+        });
+        res.json(config);
+    } catch (error) {
+        console.error('Get holiday overtime settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.put('/holiday-overtime', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const {
+            holiday_overtime_enabled,
+            holiday_overtime_allow_checkin,
+            holiday_overtime_calc_mode,
+            holiday_overtime_rate_sunday,
+            holiday_overtime_rate_national,
+            holiday_overtime_rate_offday,
+            holiday_overtime_fixed_sunday,
+            holiday_overtime_fixed_national,
+            holiday_overtime_fixed_offday
+        } = req.body;
+
+        const upsert = async (key, value) => {
+            await pool.query(
+                `INSERT INTO settings (key, value) VALUES ($1, $2)
+                 ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+                [key, String(value)]
+            );
+        };
+
+        const calcMode = holiday_overtime_calc_mode === 'fixed' ? 'fixed' : 'multiplier';
+
+        await upsert('holiday_overtime_enabled', holiday_overtime_enabled !== false ? 'true' : 'false');
+        await upsert('holiday_overtime_allow_checkin', holiday_overtime_allow_checkin !== false ? 'true' : 'false');
+        await upsert('holiday_overtime_calc_mode', calcMode);
+        await upsert('holiday_overtime_rate_sunday', Math.max(0.1, parseFloat(holiday_overtime_rate_sunday) || 2.0));
+        await upsert('holiday_overtime_rate_national', Math.max(0.1, parseFloat(holiday_overtime_rate_national) || 3.0));
+        await upsert('holiday_overtime_rate_offday', Math.max(0.1, parseFloat(holiday_overtime_rate_offday) || 2.0));
+        await upsert('holiday_overtime_fixed_sunday', Math.max(0, parseFloat(holiday_overtime_fixed_sunday) || 50000));
+        await upsert('holiday_overtime_fixed_national', Math.max(0, parseFloat(holiday_overtime_fixed_national) || 75000));
+        await upsert('holiday_overtime_fixed_offday', Math.max(0, parseFloat(holiday_overtime_fixed_offday) || 50000));
+
+        res.json({
+            message: 'Pengaturan lembur hari libur berhasil disimpan',
+            holiday_overtime_enabled: holiday_overtime_enabled !== false,
+            holiday_overtime_allow_checkin: holiday_overtime_allow_checkin !== false,
+            holiday_overtime_calc_mode: calcMode,
+            holiday_overtime_rate_sunday: Math.max(0.1, parseFloat(holiday_overtime_rate_sunday) || 2.0),
+            holiday_overtime_rate_national: Math.max(0.1, parseFloat(holiday_overtime_rate_national) || 3.0),
+            holiday_overtime_rate_offday: Math.max(0.1, parseFloat(holiday_overtime_rate_offday) || 2.0),
+            holiday_overtime_fixed_sunday: Math.max(0, parseFloat(holiday_overtime_fixed_sunday) || 50000),
+            holiday_overtime_fixed_national: Math.max(0, parseFloat(holiday_overtime_fixed_national) || 75000),
+            holiday_overtime_fixed_offday: Math.max(0, parseFloat(holiday_overtime_fixed_offday) || 50000)
+        });
+    } catch (error) {
+        console.error('Update holiday overtime settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 // Employee table column configuration (accessible by users with admin.employees or admin.settings)
 const canConfigEmployeeColumns = async (req, res, next) => {
     try {

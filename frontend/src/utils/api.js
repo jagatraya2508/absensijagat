@@ -577,6 +577,11 @@ export const settingsAPI = {
         method: 'PUT',
         body: JSON.stringify({ columns }),
     }),
+    getHolidayOvertime: () => request('/settings/holiday-overtime'),
+    updateHolidayOvertime: (data) => request('/settings/holiday-overtime', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
 };
 
 // Database backup & restore (admin only)

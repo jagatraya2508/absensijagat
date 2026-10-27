@@ -6,6 +6,8 @@ const fs = require('fs');
 const { pool } = require('../db');
 const { authenticateToken, isAdmin, hasPermission } = require('../middleware/auth');
 const { calculateDistance } = require('../utils/distance');
+const Holidays = require('date-holidays');
+const hd = new Holidays('ID');
 
 // Configure multer for photo uploads
 const storage = multer.diskStorage({
@@ -37,6 +39,150 @@ const upload = multer({
     }
 });
 
+// Helper to detect holiday for a user on a given date (YYYY-MM-DD)
+async function detectHoliday(userId, today) {
+    const todayDate = new Date(today + 'T12:00:00');
+    const dayOfWeek = todayDate.getDay();
+
+    let holidayType = null;
+    let holidayName = '';
+
+    // 1. Off Day for this user
+    const offDayCheck = await pool.query(
+        'SELECT * FROM user_off_days WHERE user_id = $1 AND off_date = $2',
+        [userId, today]
+    );
+    if (offDayCheck.rows.length > 0) {
+        holidayType = 'offday';
+        holidayName = 'Hari Libur Karyawan';
+    }
+
+    // 2. Sunday
+    if (dayOfWeek === 0) {
+        holidayType = 'sunday';
+        holidayName = 'Hari Minggu';
+    }
+
+    // 3. National Public Holiday (takes highest priority)
+    const natMatch = hd.isHoliday(today);
+    if (natMatch && Array.isArray(natMatch)) {
+        const pub = natMatch.find(h => h.type === 'public');
+        if (pub) {
+            holidayType = 'national';
+            holidayName = pub.name;
+        }
+    }
+
+    return { holidayType, holidayName };
+}
+
+// Helper to calculate and record automatic holiday overtime on check-out
+async function handleAutoHolidayOvertime({ userId, today, checkinRecord, checkoutTime, approverId }) {
+    if (!checkinRecord || !(checkinRecord.notes || '').includes('[LEMBUR LIBUR:')) {
+        return null;
+    }
+
+    const matchHoliday = (checkinRecord.notes || '').match(/\[LEMBUR LIBUR: (.+?)\]/);
+    const holidayName = matchHoliday ? matchHoliday[1] : 'Hari Libur';
+
+    let holidayType = 'offday';
+    if (holidayName === 'Hari Minggu') {
+        holidayType = 'sunday';
+    } else if (holidayName !== 'Hari Libur Karyawan') {
+        holidayType = 'national';
+    }
+
+    const checkInTime = new Date(checkinRecord.recorded_at);
+    const checkOutTime = new Date(checkoutTime);
+    const hoursWorked = Math.max(0.1, Math.round(((checkOutTime - checkInTime) / (1000 * 60 * 60)) * 10) / 10);
+
+    if (hoursWorked <= 0) return null;
+
+    // Load holiday overtime settings
+    const hoSettingsRes = await pool.query(
+        `SELECT key, value FROM settings WHERE key IN (
+            'holiday_overtime_enabled',
+            'holiday_overtime_calc_mode',
+            'holiday_overtime_rate_sunday',
+            'holiday_overtime_rate_national',
+            'holiday_overtime_rate_offday',
+            'holiday_overtime_fixed_sunday',
+            'holiday_overtime_fixed_national',
+            'holiday_overtime_fixed_offday'
+        )`
+    );
+    const hoMap = {};
+    hoSettingsRes.rows.forEach(r => { hoMap[r.key] = r.value; });
+
+    if (hoMap.holiday_overtime_enabled === 'false') {
+        return null;
+    }
+
+    const calcMode = hoMap.holiday_overtime_calc_mode || 'multiplier';
+    let effectiveRate = 0;
+    let rateMultiplier = null;
+    let rateLabel = '';
+
+    if (calcMode === 'fixed') {
+        const fixedSunday = parseFloat(hoMap.holiday_overtime_fixed_sunday) || 50000;
+        const fixedNational = parseFloat(hoMap.holiday_overtime_fixed_national) || 75000;
+        const fixedOffday = parseFloat(hoMap.holiday_overtime_fixed_offday) || 50000;
+
+        effectiveRate = holidayType === 'sunday' ? fixedSunday
+            : holidayType === 'national' ? fixedNational
+            : fixedOffday;
+        rateLabel = `Rp ${effectiveRate.toLocaleString('id-ID')}/jam`;
+    } else {
+        const rateSunday = parseFloat(hoMap.holiday_overtime_rate_sunday) || 2.0;
+        const rateNational = parseFloat(hoMap.holiday_overtime_rate_national) || 3.0;
+        const rateOffday = parseFloat(hoMap.holiday_overtime_rate_offday) || 2.0;
+
+        rateMultiplier = holidayType === 'sunday' ? rateSunday
+            : holidayType === 'national' ? rateNational
+            : rateOffday;
+
+        const empDetail = await pool.query(
+            'SELECT overtime_rate FROM employee_details WHERE user_id = $1',
+            [userId]
+        );
+        const baseRate = empDetail.rows.length > 0 ? (parseFloat(empDetail.rows[0].overtime_rate) || 50000) : 50000;
+        effectiveRate = Math.round(baseRate * rateMultiplier);
+        rateLabel = `${rateMultiplier}x tarif dasar (Rp ${baseRate.toLocaleString('id-ID')}/jam)`;
+    }
+
+    const totalAmount = Math.round(hoursWorked * effectiveRate);
+    const overtimeDesc = `Lembur otomatis - ${holidayName} (${rateLabel})`;
+
+    // Check if auto overtime already recorded for this user and date
+    const existingOt = await pool.query(
+        `SELECT id FROM overtime_records WHERE user_id = $1 AND date = $2 AND description LIKE 'Lembur otomatis%'`,
+        [userId, today]
+    );
+
+    if (existingOt.rows.length > 0) {
+        await pool.query(
+            `UPDATE overtime_records SET hours = $1, rate_per_hour = $2, total_amount = $3, description = $4, status = 'approved', approved_by = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6`,
+            [hoursWorked, effectiveRate, totalAmount, overtimeDesc, approverId, existingOt.rows[0].id]
+        );
+    } else {
+        await pool.query(
+            `INSERT INTO overtime_records (user_id, date, hours, rate_per_hour, total_amount, description, status, approved_by) VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7)`,
+            [userId, today, hoursWorked, effectiveRate, totalAmount, overtimeDesc, approverId]
+        );
+    }
+
+    return {
+        holiday_name: holidayName,
+        holiday_type: holidayType,
+        hours_worked: hoursWorked,
+        calc_mode: calcMode,
+        rate_multiplier: rateMultiplier,
+        effective_rate: effectiveRate,
+        rate_label: rateLabel,
+        total_amount: totalAmount
+    };
+}
+
 // Check-in
 router.post('/check-in', authenticateToken, upload.single('photo'), async (req, res) => {
     try {
@@ -53,14 +199,24 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
         // Check if already checked in today
         const today = new Date().toISOString().split('T')[0];
 
-        // Check if today is an off day
-        const offDayCheck = await pool.query(
-            'SELECT * FROM user_off_days WHERE user_id = $1 AND off_date = $2',
-            [req.user.id, today]
-        );
+        // Detect holiday type
+        const { holidayType, holidayName } = await detectHoliday(req.user.id, today);
 
-        if (offDayCheck.rows.length > 0) {
-            return res.status(400).json({ error: 'Anda sedang libur hari ini, tidak dapat melakukan absen.' });
+        // If it's a holiday, check if holiday overtime is enabled
+        if (holidayType) {
+            const holidaySettings = await pool.query(
+                `SELECT key, value FROM settings WHERE key IN ('holiday_overtime_enabled', 'holiday_overtime_allow_checkin')`
+            );
+            let hoEnabled = true;
+            let hoAllowCheckin = true;
+            holidaySettings.rows.forEach(r => {
+                if (r.key === 'holiday_overtime_enabled') hoEnabled = r.value === 'true';
+                if (r.key === 'holiday_overtime_allow_checkin') hoAllowCheckin = r.value === 'true';
+            });
+
+            if (!hoEnabled || !hoAllowCheckin) {
+                return res.status(400).json({ error: `Anda sedang libur hari ini (${holidayName}), tidak dapat melakukan absen.` });
+            }
         }
 
         const existingCheckin = await pool.query(
@@ -152,6 +308,13 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
 
         const photoPath = `/uploads/attendance/${req.file.filename}`;
 
+        // Enhance notes with holiday info
+        let attendanceNotes = notes || null;
+        if (holidayType) {
+            const holidayPrefix = `[LEMBUR LIBUR: ${holidayName}]`;
+            attendanceNotes = attendanceNotes ? `${holidayPrefix} ${attendanceNotes}` : holidayPrefix;
+        }
+
         const result = await pool.query(
             `INSERT INTO attendance_records 
        (user_id, location_id, type, photo_path, latitude, longitude, distance_meters, is_valid, notes)
@@ -165,15 +328,25 @@ router.post('/check-in', authenticateToken, upload.single('photo'), async (req, 
                 longitude,
                 distance,
                 isValid,
-                notes || null
+                attendanceNotes
             ]
         );
 
-        res.status(201).json({
+        const responseData = {
             ...result.rows[0],
             location_name: nearestLocation?.name || null,
-            message: 'Check-in berhasil'
-        });
+            message: holidayType
+                ? `Check-in berhasil (Lembur Hari Libur: ${holidayName})`
+                : 'Check-in berhasil'
+        };
+
+        if (holidayType) {
+            responseData.holiday_type = holidayType;
+            responseData.holiday_name = holidayName;
+            responseData.is_holiday_overtime = true;
+        }
+
+        res.status(201).json(responseData);
     } catch (error) {
         console.error('Check-in error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
@@ -374,11 +547,37 @@ router.post('/check-out', authenticateToken, upload.single('photo'), async (req,
             ]
         );
 
-        res.status(201).json({
+        // Auto-create overtime record if check-in was on a holiday
+        let holidayOvertimeCreated = false;
+        let holidayOvertimeInfo = null;
+
+        if (existingCheckin.rows.length > 0) {
+            const otResult = await handleAutoHolidayOvertime({
+                userId: req.user.id,
+                today,
+                checkinRecord: existingCheckin.rows[0],
+                checkoutTime: result.rows[0].recorded_at,
+                approverId: req.user.id
+            });
+            if (otResult) {
+                holidayOvertimeCreated = true;
+                holidayOvertimeInfo = otResult;
+            }
+        }
+
+        const responseData = {
             ...result.rows[0],
             location_name: nearestLocation?.name || null,
-            message: 'Check-out berhasil'
-        });
+            message: holidayOvertimeCreated
+                ? `Check-out berhasil. Lembur otomatis tercatat: ${holidayOvertimeInfo.hours_worked} jam (${holidayOvertimeInfo.rate_label})`
+                : 'Check-out berhasil'
+        };
+
+        if (holidayOvertimeCreated) {
+            responseData.holiday_overtime = holidayOvertimeInfo;
+        }
+
+        res.status(201).json(responseData);
     } catch (error) {
         console.error('Check-out error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
@@ -396,14 +595,21 @@ router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.si
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Check user off day
-        const offDayCheck = await pool.query(
-            'SELECT * FROM user_off_days WHERE user_id = $1 AND off_date = $2',
-            [user_id, today]
-        );
+        // Detect holiday type for kiosk
+        const { holidayType: kioskHolidayType, holidayName: kioskHolidayName } = await detectHoliday(user_id, today);
 
-        if (offDayCheck.rows.length > 0) {
-            return res.status(400).json({ error: 'Sedang libur hari ini.' });
+        if (kioskHolidayType) {
+            const hoSettings = await pool.query(
+                `SELECT key, value FROM settings WHERE key IN ('holiday_overtime_enabled', 'holiday_overtime_allow_checkin')`
+            );
+            let hoEnabled = true, hoAllow = true;
+            hoSettings.rows.forEach(r => {
+                if (r.key === 'holiday_overtime_enabled') hoEnabled = r.value === 'true';
+                if (r.key === 'holiday_overtime_allow_checkin') hoAllow = r.value === 'true';
+            });
+            if (!hoEnabled || !hoAllow) {
+                return res.status(400).json({ error: `Sedang libur hari ini (${kioskHolidayName}).` });
+            }
         }
 
         // Get user details
@@ -415,7 +621,7 @@ router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.si
 
         // Check existing records today
         const existingRecords = await pool.query(
-            `SELECT type FROM attendance_records 
+            `SELECT type, notes, recorded_at FROM attendance_records 
              WHERE user_id = $1 AND DATE(recorded_at) = $2`,
             [user_id, today]
         );
@@ -430,19 +636,47 @@ router.post('/kiosk', authenticateToken, hasPermission('admin.kiosk'), upload.si
         const type = hasCheckIn ? 'check_out' : 'check_in';
         const photoPath = req.file ? `/uploads/attendance/${req.file.filename}` : null;
 
+        // Build kiosk notes with holiday tag
+        let kioskNotes = 'Absen via Kiosk';
+        if (kioskHolidayType && type === 'check_in') {
+            kioskNotes = `[LEMBUR LIBUR: ${kioskHolidayName}] ${kioskNotes}`;
+        }
+
         // Note: Kiosk mode automatically assumes valid location
         const result = await pool.query(
             `INSERT INTO attendance_records 
              (user_id, location_id, type, photo_path, latitude, longitude, distance_meters, is_valid, notes)
-             VALUES ($1, $2, $3, $4, 0, 0, 0, true, 'Absen via Kiosk')
+             VALUES ($1, $2, $3, $4, 0, 0, 0, true, $5)
              RETURNING *`,
-            [user_id, location_id || null, type, photoPath]
+            [user_id, location_id || null, type, photoPath, kioskNotes]
         );
+
+        // Auto-create overtime for kiosk checkout on holiday
+        let kioskOvertimeMsg = '';
+        if (type === 'check_out') {
+            const checkinRow = existingRecords.rows.find(r => r.type === 'check_in');
+            if (checkinRow) {
+                const otResult = await handleAutoHolidayOvertime({
+                    userId: user_id,
+                    today,
+                    checkinRecord: checkinRow,
+                    checkoutTime: result.rows[0].recorded_at,
+                    approverId: req.user.id
+                });
+                if (otResult) {
+                    kioskOvertimeMsg = ` | Lembur ${otResult.hours_worked} jam (${otResult.rate_label})`;
+                }
+            }
+        }
+
+        const kioskMsg = type === 'check_in'
+            ? (kioskHolidayType ? `Check-in berhasil untuk ${userName} (Lembur: ${kioskHolidayName})` : `Check-in berhasil untuk ${userName}`)
+            : `Check-out berhasil untuk ${userName}${kioskOvertimeMsg}`;
 
         res.status(201).json({
             ...result.rows[0],
             user_name: userName,
-            message: `${type === 'check_in' ? 'Check-in' : 'Check-out'} berhasil untuk ${userName}`
+            message: kioskMsg
         });
 
     } catch (error) {

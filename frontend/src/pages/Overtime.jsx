@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from '../components/Icon';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
 export default function Overtime() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const token = localStorage.getItem('token');
     const isAdmin = user?.role === 'admin';
@@ -344,7 +346,17 @@ export default function Overtime() {
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">Riwayat Pengajuan Lembur</h2>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {isAdmin && (
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => navigate('/admin/settings')}
+                                title="Atur tarif dan kelipatan lembur hari libur & hari besar"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                            >
+                                <Icon name="CalendarCheck" size={16} inline /> Pengaturan Lembur Libur
+                            </button>
+                        )}
                         <button className="btn btn-outline" onClick={fetchRequests} disabled={loading}><Icon name="RefreshCw" size={16} inline /> Refresh</button>
                         <button className="btn btn-primary" onClick={openModal}>+ Ajukan Lembur</button>
                     </div>

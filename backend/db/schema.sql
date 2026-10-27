@@ -689,6 +689,15 @@ CREATE TABLE IF NOT EXISTS payslip_layouts (
     UNIQUE (scope_type, scope_key)
 );
 INSERT INTO settings (key, value) VALUES ('face_match_percent', '60') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_enabled', 'true') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_allow_checkin', 'true') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_calc_mode', 'multiplier') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_rate_sunday', '2.0') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_rate_national', '3.0') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_rate_offday', '2.0') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_fixed_sunday', '50000') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_fixed_national', '75000') ON CONFLICT DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('holiday_overtime_fixed_offday', '50000') ON CONFLICT DO NOTHING;
 
 -- Tabel License Info
 CREATE TABLE IF NOT EXISTS license_info (

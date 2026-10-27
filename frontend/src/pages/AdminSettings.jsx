@@ -216,6 +216,21 @@ export default function AdminSettings() {
     const [attLocLoading, setAttLocLoading] = useState(false);
     const [attLocMessage, setAttLocMessage] = useState({ type: '', text: '' });
 
+    // Holiday Overtime Settings state
+    const [holidayOtSettings, setHolidayOtSettings] = useState({
+        holiday_overtime_enabled: true,
+        holiday_overtime_allow_checkin: true,
+        holiday_overtime_calc_mode: 'multiplier',
+        holiday_overtime_rate_sunday: 2.0,
+        holiday_overtime_rate_national: 3.0,
+        holiday_overtime_rate_offday: 2.0,
+        holiday_overtime_fixed_sunday: 50000,
+        holiday_overtime_fixed_national: 75000,
+        holiday_overtime_fixed_offday: 50000
+    });
+    const [holidayOtLoading, setHolidayOtLoading] = useState(false);
+    const [holidayOtMessage, setHolidayOtMessage] = useState({ type: '', text: '' });
+
     // Employee Columns Configuration state
     const [empColumns, setEmpColumns] = useState(() => getInitialVisibleColumns());
     const [empColumnsLoading, setEmpColumnsLoading] = useState(false);
@@ -298,6 +313,7 @@ export default function AdminSettings() {
         fetchSmtpSettings();
         fetchBackupInfo();
         fetchAttendanceLocationSettings();
+        fetchHolidayOvertimeSettings();
     }, []);
 
     const fetchBackupInfo = async () => {
@@ -377,6 +393,41 @@ export default function AdminSettings() {
             setAttLocMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan lokasi absensi' });
         } finally {
             setAttLocLoading(false);
+        }
+    };
+
+    const fetchHolidayOvertimeSettings = async () => {
+        try {
+            const data = await settingsAPI.getHolidayOvertime();
+            if (data) {
+                setHolidayOtSettings({
+                    holiday_overtime_enabled: data.holiday_overtime_enabled !== false,
+                    holiday_overtime_allow_checkin: data.holiday_overtime_allow_checkin !== false,
+                    holiday_overtime_calc_mode: data.holiday_overtime_calc_mode || 'multiplier',
+                    holiday_overtime_rate_sunday: data.holiday_overtime_rate_sunday !== undefined ? data.holiday_overtime_rate_sunday : 2.0,
+                    holiday_overtime_rate_national: data.holiday_overtime_rate_national !== undefined ? data.holiday_overtime_rate_national : 3.0,
+                    holiday_overtime_rate_offday: data.holiday_overtime_rate_offday !== undefined ? data.holiday_overtime_rate_offday : 2.0,
+                    holiday_overtime_fixed_sunday: data.holiday_overtime_fixed_sunday !== undefined ? data.holiday_overtime_fixed_sunday : 50000,
+                    holiday_overtime_fixed_national: data.holiday_overtime_fixed_national !== undefined ? data.holiday_overtime_fixed_national : 75000,
+                    holiday_overtime_fixed_offday: data.holiday_overtime_fixed_offday !== undefined ? data.holiday_overtime_fixed_offday : 50000
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load holiday overtime settings:', error);
+        }
+    };
+
+    const handleHolidayOvertimeSave = async (e) => {
+        if (e) e.preventDefault();
+        setHolidayOtLoading(true);
+        setHolidayOtMessage({ type: '', text: '' });
+        try {
+            const res = await settingsAPI.updateHolidayOvertime(holidayOtSettings);
+            setHolidayOtMessage({ type: 'success', text: res.message || 'Pengaturan lembur hari libur berhasil disimpan!' });
+        } catch (error) {
+            setHolidayOtMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan lembur hari libur' });
+        } finally {
+            setHolidayOtLoading(false);
         }
     };
 
@@ -952,6 +1003,523 @@ export default function AdminSettings() {
                                     )}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ============ HOLIDAY OVERTIME SECTION ============ */}
+                <div className="card" style={{ marginBottom: '1.5rem', overflow: 'visible' }}>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Icon name="CalendarCheck" size={18} inline /> Lembur Otomatis Hari Libur & Tanggal Merah
+                            </h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.25rem', marginBottom: 0 }}>
+                                Otomatis hitung dan catat jam kerja sebagai lembur yang disetujui saat karyawan absen di Hari Minggu, Hari Libur Nasional, atau Hari Libur Kerja (Off Day)
+                            </p>
+                        </div>
+                        <span className={`badge ${holidayOtSettings.holiday_overtime_enabled ? 'badge-success' : 'badge-secondary'}`} style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                            {holidayOtSettings.holiday_overtime_enabled ? '● Lembur Otomatis Aktif' : '○ Nonaktif'}
+                        </span>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {holidayOtMessage.text && (
+                            <div className={`alert alert-${holidayOtMessage.type}`} style={{ marginBottom: '1.25rem' }}>
+                                <span className="alert-icon">{holidayOtMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {holidayOtMessage.text}
+                            </div>
+                        )}
+
+                        {/* Info Banner */}
+                        <div style={{
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            background: 'var(--gray-50, #f8fafc)',
+                            border: '1px solid var(--gray-200, #e2e8f0)',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            gap: '0.75rem',
+                            alignItems: 'flex-start'
+                        }}>
+                            <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>ℹ️</span>
+                            <div style={{ fontSize: '0.875rem', color: 'var(--gray-700, #334155)', lineHeight: 1.5 }}>
+                                <strong>Cara Kerja:</strong> Saat karyawan melakukan Check-In di hari libur, sistem menandai kehadiran sebagai lembur libur. Saat Check-Out, sistem secara otomatis menghitung durasi jam kerja, mengalikan dengan tarif lembur libur yang dikonfigurasi di bawah, dan mencatatkannya ke <strong>Catatan Lembur (Overtime Records)</strong> dengan status <em>Disetujui (Approved)</em> sehingga langsung terhitung di rekap penggajian (Payroll).
+                            </div>
+                        </div>
+
+                        {/* Main Switches Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            {/* Toggle 1: Enable Auto Overtime */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: `1.5px solid ${holidayOtSettings.holiday_overtime_enabled ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                background: holidayOtSettings.holiday_overtime_enabled ? 'rgba(79, 70, 229, 0.04)' : '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
+                                        Hitung Lembur Otomatis
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Otomatis catat kehadiran hari libur ke data lembur
+                                    </div>
+                                </div>
+                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={holidayOtSettings.holiday_overtime_enabled}
+                                        onChange={(e) => setHolidayOtSettings(prev => ({
+                                            ...prev,
+                                            holiday_overtime_enabled: e.target.checked
+                                        }))}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+
+                            {/* Toggle 2: Allow Check-in on Holidays */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: `1.5px solid ${holidayOtSettings.holiday_overtime_allow_checkin ? 'var(--success-500, #10b981)' : 'var(--gray-200, #e2e8f0)'}`,
+                                background: holidayOtSettings.holiday_overtime_allow_checkin ? 'rgba(16, 185, 129, 0.04)' : '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
+                                        Izinkan Absen di Hari Libur
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Jika nonaktif, absen masuk ditolak saat hari libur
+                                    </div>
+                                </div>
+                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={holidayOtSettings.holiday_overtime_allow_checkin}
+                                        onChange={(e) => setHolidayOtSettings(prev => ({
+                                            ...prev,
+                                            holiday_overtime_allow_checkin: e.target.checked
+                                        }))}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Calculation Mode Selector */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--gray-700)', marginBottom: '0.5rem' }}>
+                                Metode Nilai / Tarif Lembur Hari Libur
+                            </label>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                gap: '0.75rem'
+                            }}>
+                                <div
+                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_calc_mode: 'multiplier' }))}
+                                    style={{
+                                        padding: '0.85rem 1rem',
+                                        borderRadius: 'var(--radius-md, 8px)',
+                                        border: `2px solid ${holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                        background: holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-800)' }}>
+                                        <input
+                                            type="radio"
+                                            name="holiday_calc_mode"
+                                            checked={holidayOtSettings.holiday_overtime_calc_mode === 'multiplier'}
+                                            onChange={() => {}}
+                                            style={{ margin: 0 }}
+                                        />
+                                        <span>Kelipatan Tarif Karyawan (Multiplier)</span>
+                                    </div>
+                                    <p style={{ margin: '0.35rem 0 0 1.5rem', fontSize: '0.785rem', color: 'var(--gray-500)', lineHeight: 1.4 }}>
+                                        Nilai lembur dihitung dari tarif lembur dasar karyawan dikalikan faktor (contoh: 2x pada Minggu, 3x pada Hari Besar).
+                                    </p>
+                                </div>
+
+                                <div
+                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_calc_mode: 'fixed' }))}
+                                    style={{
+                                        padding: '0.85rem 1rem',
+                                        borderRadius: 'var(--radius-md, 8px)',
+                                        border: `2px solid ${holidayOtSettings.holiday_overtime_calc_mode === 'fixed' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                        background: holidayOtSettings.holiday_overtime_calc_mode === 'fixed' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: holidayOtSettings.holiday_overtime_calc_mode === 'fixed' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-800)' }}>
+                                        <input
+                                            type="radio"
+                                            name="holiday_calc_mode"
+                                            checked={holidayOtSettings.holiday_overtime_calc_mode === 'fixed'}
+                                            onChange={() => {}}
+                                            style={{ margin: 0 }}
+                                        />
+                                        <span>Tarif Tetap Nominal (Rp / Jam)</span>
+                                    </div>
+                                    <p style={{ margin: '0.35rem 0 0 1.5rem', fontSize: '0.785rem', color: 'var(--gray-500)', lineHeight: 1.4 }}>
+                                        Menetapkan besaran nominal rupiah tetap per jam lembur tanpa bergantung pada tarif dasar karyawan.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Rate Cards Inputs */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            {/* Card 1: Hari Minggu */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: '1px solid var(--gray-200, #e2e8f0)',
+                                background: '#fff'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>☀️</span>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>Hari Minggu</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Absensi setiap hari Minggu</div>
+                                    </div>
+                                </div>
+
+                                {holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? (
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.35rem', display: 'block' }}>
+                                            Kelipatan Tarif (x)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0.1"
+                                                className="form-input"
+                                                value={holidayOtSettings.holiday_overtime_rate_sunday}
+                                                onChange={(e) => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_rate_sunday: parseFloat(e.target.value) || 0 }))}
+                                                style={{ fontWeight: 600, fontSize: '1rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--gray-600)', whiteSpace: 'nowrap', fontWeight: 600 }}>x Tarif</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem' }}>
+                                            {[1.5, 2.0, 2.5, 3.0].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_rate_sunday: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: holidayOtSettings.holiday_overtime_rate_sunday === val ? 'var(--primary-color)' : 'var(--gray-200)',
+                                                        background: holidayOtSettings.holiday_overtime_rate_sunday === val ? 'var(--primary-color)' : 'transparent',
+                                                        color: holidayOtSettings.holiday_overtime_rate_sunday === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {val}x
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.35rem', display: 'block' }}>
+                                            Tarif Per Jam (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--gray-600)', fontWeight: 600 }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                step="1000"
+                                                min="0"
+                                                className="form-input"
+                                                value={holidayOtSettings.holiday_overtime_fixed_sunday}
+                                                onChange={(e) => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_fixed_sunday: parseFloat(e.target.value) || 0 }))}
+                                                style={{ fontWeight: 600, fontSize: '1rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>/ jam</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[35000, 50000, 75000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_fixed_sunday: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.4rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: holidayOtSettings.holiday_overtime_fixed_sunday === val ? 'var(--primary-color)' : 'var(--gray-200)',
+                                                        background: holidayOtSettings.holiday_overtime_fixed_sunday === val ? 'var(--primary-color)' : 'transparent',
+                                                        color: holidayOtSettings.holiday_overtime_fixed_sunday === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {(val / 1000)}rb
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Card 2: Hari Libur Nasional / Hari Besar */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: '1.5px solid rgba(239, 68, 68, 0.3)',
+                                background: '#fff'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>🇮🇩</span>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>Hari Besar / Libur Nasional</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Tanggal merah kalender resmi Indonesia</div>
+                                    </div>
+                                </div>
+
+                                {holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? (
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.35rem', display: 'block' }}>
+                                            Kelipatan Tarif (x)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0.1"
+                                                className="form-input"
+                                                value={holidayOtSettings.holiday_overtime_rate_national}
+                                                onChange={(e) => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_rate_national: parseFloat(e.target.value) || 0 }))}
+                                                style={{ fontWeight: 600, fontSize: '1rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--gray-600)', whiteSpace: 'nowrap', fontWeight: 600 }}>x Tarif</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem' }}>
+                                            {[2.0, 2.5, 3.0, 4.0].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_rate_national: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: holidayOtSettings.holiday_overtime_rate_national === val ? 'var(--primary-color)' : 'var(--gray-200)',
+                                                        background: holidayOtSettings.holiday_overtime_rate_national === val ? 'var(--primary-color)' : 'transparent',
+                                                        color: holidayOtSettings.holiday_overtime_rate_national === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {val}x
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.35rem', display: 'block' }}>
+                                            Tarif Per Jam (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--gray-600)', fontWeight: 600 }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                step="1000"
+                                                min="0"
+                                                className="form-input"
+                                                value={holidayOtSettings.holiday_overtime_fixed_national}
+                                                onChange={(e) => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_fixed_national: parseFloat(e.target.value) || 0 }))}
+                                                style={{ fontWeight: 600, fontSize: '1rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>/ jam</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[50000, 75000, 100000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_fixed_national: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.4rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: holidayOtSettings.holiday_overtime_fixed_national === val ? 'var(--primary-color)' : 'var(--gray-200)',
+                                                        background: holidayOtSettings.holiday_overtime_fixed_national === val ? 'var(--primary-color)' : 'transparent',
+                                                        color: holidayOtSettings.holiday_overtime_fixed_national === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {(val / 1000)}rb
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Card 3: Libur Jadwal / Off Day */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: '1px solid var(--gray-200, #e2e8f0)',
+                                background: '#fff'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>🏖️</span>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>Libur Jadwal (Off Day)</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Hari libur sesuai roster kerja karyawan</div>
+                                    </div>
+                                </div>
+
+                                {holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? (
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.35rem', display: 'block' }}>
+                                            Kelipatan Tarif (x)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0.1"
+                                                className="form-input"
+                                                value={holidayOtSettings.holiday_overtime_rate_offday}
+                                                onChange={(e) => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_rate_offday: parseFloat(e.target.value) || 0 }))}
+                                                style={{ fontWeight: 600, fontSize: '1rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--gray-600)', whiteSpace: 'nowrap', fontWeight: 600 }}>x Tarif</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem' }}>
+                                            {[1.5, 2.0, 2.5].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_rate_offday: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: holidayOtSettings.holiday_overtime_rate_offday === val ? 'var(--primary-color)' : 'var(--gray-200)',
+                                                        background: holidayOtSettings.holiday_overtime_rate_offday === val ? 'var(--primary-color)' : 'transparent',
+                                                        color: holidayOtSettings.holiday_overtime_rate_offday === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {val}x
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginBottom: '0.35rem', display: 'block' }}>
+                                            Tarif Per Jam (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--gray-600)', fontWeight: 600 }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                step="1000"
+                                                min="0"
+                                                className="form-input"
+                                                value={holidayOtSettings.holiday_overtime_fixed_offday}
+                                                onChange={(e) => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_fixed_offday: parseFloat(e.target.value) || 0 }))}
+                                                style={{ fontWeight: 600, fontSize: '1rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>/ jam</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[35000, 50000, 75000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setHolidayOtSettings(prev => ({ ...prev, holiday_overtime_fixed_offday: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.4rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: holidayOtSettings.holiday_overtime_fixed_offday === val ? 'var(--primary-color)' : 'var(--gray-200)',
+                                                        background: holidayOtSettings.holiday_overtime_fixed_offday === val ? 'var(--primary-color)' : 'transparent',
+                                                        color: holidayOtSettings.holiday_overtime_fixed_offday === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {(val / 1000)}rb
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Interactive Simulation Preview Box */}
+                        <div style={{
+                            padding: '1rem 1.25rem',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.06) 0%, rgba(147, 51, 234, 0.06) 100%)',
+                            border: '1px solid rgba(79, 70, 229, 0.2)',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--gray-800)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>📊</span> Simulasi Perhitungan Lembur Hari Libur (Bekerja 8 Jam):
+                            </div>
+                            <div style={{ fontSize: '0.825rem', color: 'var(--gray-700)', lineHeight: 1.6 }}>
+                                {holidayOtSettings.holiday_overtime_calc_mode === 'multiplier' ? (
+                                    <>
+                                        <div>• <strong>Hari Minggu:</strong> 8 jam × (Rp 25.000 × {holidayOtSettings.holiday_overtime_rate_sunday || 2}x) = <strong>Rp {Math.round(8 * 25000 * (holidayOtSettings.holiday_overtime_rate_sunday || 2)).toLocaleString('id-ID')}</strong> (asumsi tarif dasar karyawan Rp 25.000/jam)</div>
+                                        <div>• <strong>Hari Besar / Libur Nasional:</strong> 8 jam × (Rp 25.000 × {holidayOtSettings.holiday_overtime_rate_national || 3}x) = <strong>Rp {Math.round(8 * 25000 * (holidayOtSettings.holiday_overtime_rate_national || 3)).toLocaleString('id-ID')}</strong></div>
+                                        <div>• <strong>Off Day Karyawan:</strong> 8 jam × (Rp 25.000 × {holidayOtSettings.holiday_overtime_rate_offday || 2}x) = <strong>Rp {Math.round(8 * 25000 * (holidayOtSettings.holiday_overtime_rate_offday || 2)).toLocaleString('id-ID')}</strong></div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div>• <strong>Hari Minggu:</strong> 8 jam × Rp {(holidayOtSettings.holiday_overtime_fixed_sunday || 50000).toLocaleString('id-ID')}/jam = <strong>Rp {Math.round(8 * (holidayOtSettings.holiday_overtime_fixed_sunday || 50000)).toLocaleString('id-ID')}</strong></div>
+                                        <div>• <strong>Hari Besar / Libur Nasional:</strong> 8 jam × Rp {(holidayOtSettings.holiday_overtime_fixed_national || 75000).toLocaleString('id-ID')}/jam = <strong>Rp {Math.round(8 * (holidayOtSettings.holiday_overtime_fixed_national || 75000)).toLocaleString('id-ID')}</strong></div>
+                                        <div>• <strong>Off Day Karyawan:</strong> 8 jam × Rp {(holidayOtSettings.holiday_overtime_fixed_offday || 50000).toLocaleString('id-ID')}/jam = <strong>Rp {Math.round(8 * (holidayOtSettings.holiday_overtime_fixed_offday || 50000)).toLocaleString('id-ID')}</strong></div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Save Action */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleHolidayOvertimeSave}
+                                disabled={holidayOtLoading}
+                                style={{ minWidth: '180px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                {holidayOtLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icon name="Save" size={16} inline />
+                                        <span>Simpan Pengaturan Lembur</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
