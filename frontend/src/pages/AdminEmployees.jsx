@@ -1,5 +1,6 @@
 import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI, employmentStatusesAPI, divisionsAPI } from '../utils/api';
 import { AVAILABLE_EMPLOYEE_COLUMNS, DEFAULT_VISIBLE_COLUMNS, STORAGE_KEY_EMPLOYEE_COLUMNS, getInitialVisibleColumns } from '../utils/employeeColumns';
 import jsPDF from 'jspdf';
@@ -7,13 +8,13 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const TABS = [
-    { id: 'personal', label: 'Data Pribadi' },
-    { id: 'work', label: 'Data Kerja' },
-    { id: 'bank', label: 'Bank & Pajak' },
-    { id: 'salary', label: 'Gaji & Tunjangan' },
-    { id: 'bpjs', label: 'BPJS & PPh' },
-    { id: 'locations', label: 'Lokasi Absen' },
-    { id: 'documents', label: 'Dokumen' },
+    { id: 'personal', label: 'Data Pribadi', permission: 'employees.tab_personal' },
+    { id: 'work', label: 'Data Kerja', permission: 'employees.tab_work' },
+    { id: 'bank', label: 'Bank & Pajak', permission: 'employees.tab_bank' },
+    { id: 'salary', label: 'Gaji & Tunjangan', permission: 'employees.tab_salary' },
+    { id: 'bpjs', label: 'BPJS & PPh', permission: 'employees.tab_bpjs' },
+    { id: 'locations', label: 'Lokasi Absen', permission: 'employees.tab_locations' },
+    { id: 'documents', label: 'Dokumen', permission: 'employees.tab_documents' },
 ];
 
 const LEGACY_STATUS_LABELS = {
@@ -47,6 +48,17 @@ const DOC_TYPES = [
 ];
 
 export default function AdminEmployees() {
+    const { user, hasPermission } = useAuth();
+
+    // Tab yang diizinkan untuk role user saat ini
+    const visibleTabs = useMemo(() => {
+        if (!user) return [];
+        if (user.role === 'admin' || user.role === 'superadmin') {
+            return TABS;
+        }
+        return TABS.filter(t => hasPermission(t.permission));
+    }, [user, hasPermission]);
+
     const [employees, setEmployees] = useState([]);
     const [masterDepartments, setMasterDepartments] = useState([]);
     const [masterPositions, setMasterPositions] = useState([]);
@@ -60,6 +72,12 @@ export default function AdminEmployees() {
     const [showModal, setShowModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [activeTab, setActiveTab] = useState('personal');
+
+    useEffect(() => {
+        if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
+            setActiveTab(visibleTabs[0].id);
+        }
+    }, [visibleTabs, activeTab]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -276,15 +294,20 @@ export default function AdminEmployees() {
                 bpjs_jkk_rate: d.bpjs_jkk_rate ? (parseFloat(d.bpjs_jkk_rate) * 100).toString() : '',
                 bpjs_jkm_rate: d.bpjs_jkm_rate ? (parseFloat(d.bpjs_jkm_rate) * 100).toString() : ''
             });
-            setActiveTab('personal');
+            const initialTab = visibleTabs.length > 0 ? visibleTabs[0].id : 'personal';
+            setActiveTab(initialTab);
             setShowModal(true);
             setError('');
             setSuccess('');
-            // Load documents
-            try {
-                const docs = await employeesAPI.getDocuments(emp.id);
-                setDocuments(docs);
-            } catch (e) {
+            // Load documents only if documents tab is visible
+            if (visibleTabs.some(t => t.id === 'documents')) {
+                try {
+                    const docs = await employeesAPI.getDocuments(emp.id);
+                    setDocuments(docs);
+                } catch (e) {
+                    setDocuments([]);
+                }
+            } else {
                 setDocuments([]);
             }
         } catch (err) {
@@ -1220,27 +1243,43 @@ export default function AdminEmployees() {
                         </div>
 
                         {/* Tab Navigation */}
-                        <div style={{ display: 'flex', gap: '0.25rem', padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#000000' }}>
-                            {TABS.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    style={{
-                                        padding: '0.75rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
-                                        color: activeTab === tab.id ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
-                                        borderBottom: activeTab === tab.id ? '2px solid #ffffff' : '2px solid transparent',
-                                        fontWeight: activeTab === tab.id ? 600 : 400, fontSize: '0.85rem',
-                                        transition: 'all 0.2s'
-                                    }}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
+                        {visibleTabs.length > 0 && (
+                            <div style={{ display: 'flex', gap: '0.25rem', padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#000000', overflowX: 'auto' }}>
+                                {visibleTabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(tab.id)}
+                                        style={{
+                                            padding: '0.75rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
+                                            color: activeTab === tab.id ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
+                                            borderBottom: activeTab === tab.id ? '2px solid #ffffff' : '2px solid transparent',
+                                            fontWeight: activeTab === tab.id ? 600 : 400, fontSize: '0.85rem',
+                                            transition: 'all 0.2s',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         <form onSubmit={handleSave}>
                             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
+
+                                {visibleTabs.length === 0 && (
+                                    <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--gray-400)' }}>
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <Icon name="ShieldAlert" size={48} style={{ color: '#ef4444' }} />
+                                        </div>
+                                        <h4 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '1.1rem' }}>Akses Tab Dibatasi</h4>
+                                        <p style={{ fontSize: '0.875rem', maxWidth: '420px', margin: '0 auto', lineHeight: 1.5 }}>
+                                            Role Anda tidak memiliki izin untuk melihat/mengubah tab data karyawan ini. Hubungi Administrator untuk mengatur hak akses tab role Anda.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {/* Tab: Data Pribadi */}
                                 {activeTab === 'personal' && (
@@ -2046,10 +2085,14 @@ export default function AdminEmployees() {
                             </div>
 
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
-                                <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Menyimpan...' : 'Simpan'}
+                                <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>
+                                    {visibleTabs.length > 0 ? 'Batal' : 'Tutup'}
                                 </button>
+                                {visibleTabs.length > 0 && (
+                                    <button type="submit" className="btn btn-primary" disabled={saving}>
+                                        {saving ? 'Menyimpan...' : 'Simpan'}
+                                    </button>
+                                )}
                             </div>
                         </form>
                     </div>

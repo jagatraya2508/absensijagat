@@ -746,6 +746,20 @@ FROM roles r
 WHERE r.name = 'manager'
 ON CONFLICT (role_id, permission_key) DO NOTHING;
 
+INSERT INTO role_permissions (role_id, permission_key)
+SELECT r.id, p
+FROM roles r, UNNEST(ARRAY[
+    'employees.tab_personal',
+    'employees.tab_work',
+    'employees.tab_bank',
+    'employees.tab_salary',
+    'employees.tab_bpjs',
+    'employees.tab_locations',
+    'employees.tab_documents'
+]) AS p
+WHERE r.name = 'manager'
+ON CONFLICT (role_id, permission_key) DO NOTHING;
+
 -- Tabel Manual Attendances
 CREATE TABLE IF NOT EXISTS manual_attendances (
     id SERIAL PRIMARY KEY,
