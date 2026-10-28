@@ -161,6 +161,8 @@ export default function AdminPayroll() {
 
     function detailSortValue(item, key) {
         if (key === 'user_name') return (item.user_name || '').toLocaleLowerCase('id');
+        if (key === 'bank_name') return (item.bank_name || '').toLocaleLowerCase('id');
+        if (key === 'bank_account') return (item.bank_account || '').toLocaleLowerCase('id');
         if (key === 'tunjangan') {
             return parseFloat(item.transport_allowance || 0) + parseFloat(item.meal_allowance || 0) + parseFloat(item.appreciation_allowance || 0);
         }
@@ -311,6 +313,7 @@ export default function AdminPayroll() {
             ['bpjs_jht_employee', `BPJS JHT (${fmtPct(slip.bpjs_jht_employee)}%)`, slip.bpjs_jht_employee],
             ['bpjs_jp_employee', `BPJS JP (${fmtPct(slip.bpjs_jp_employee)}%)`, slip.bpjs_jp_employee],
             ['pph21', 'PPh 21', slip.pph21_amount],
+            ['late_deduction', `Potongan Terlambat (${slip.late_minutes || 0} mnt)`, slip.late_deduction],
             ['loan', 'Potongan Pinjaman', slip.loan_deduction],
         ].filter(([key, , amount]) => payslipShows(slipConfig, key, amount));
         const company = [
@@ -326,6 +329,8 @@ export default function AdminPayroll() {
             payslipShows(slipConfig, 'department') ? ['Departemen', slip.department || '-'] : null,
             payslipShows(slipConfig, 'position') ? ['Jabatan', slip.position || '-'] : null,
             payslipShows(slipConfig, 'npwp') && slip.npwp ? ['NPWP', slip.npwp] : null,
+            payslipShows(slipConfig, 'bank_name') ? ['Bank', slip.bank_name || '-'] : null,
+            payslipShows(slipConfig, 'bank_account') ? ['No. Rekening', slip.bank_account || '-'] : null,
         ].filter(Boolean);
         return { identity, income, deductions, company };
     }
@@ -483,6 +488,8 @@ export default function AdminPayroll() {
                                     <thead>
                                         <tr>
                                             <th className="sortable" onClick={() => requestDetailSort('user_name')}>Karyawan {sortMark('user_name')}</th>
+                                            <th className="sortable" onClick={() => requestDetailSort('bank_name')}>Bank {sortMark('bank_name')}</th>
+                                            <th className="sortable" onClick={() => requestDetailSort('bank_account')}>No. Rekening {sortMark('bank_account')}</th>
                                             <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('basic_salary')}>Gaji Pokok {sortMark('basic_salary')}</th>
                                             <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('tunjangan')}>Tunjangan {sortMark('tunjangan')}</th>
                                             <th className="sortable" style={{ textAlign: 'center' }} onClick={() => requestDetailSort('overtime_hours')}>Jam Lembur {sortMark('overtime_hours')}</th>
@@ -491,6 +498,7 @@ export default function AdminPayroll() {
                                             <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('gross_income')}>Gross {sortMark('gross_income')}</th>
                                             <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('bpjs')}>BPJS {sortMark('bpjs')}</th>
                                             <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('pph21_amount')}>PPh 21 {sortMark('pph21_amount')}</th>
+                                            <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('late_deduction')}>Pot. Telat {sortMark('late_deduction')}</th>
                                             <th className="sortable" style={{ textAlign: 'right' }} onClick={() => requestDetailSort('loan_deduction')}>Pot. Pinjaman {sortMark('loan_deduction')}</th>
                                             <th className="sortable" style={{ textAlign: 'right', fontWeight: 700 }} onClick={() => requestDetailSort('net_salary')}>Gaji Bersih {sortMark('net_salary')}</th>
                                             <th>Aksi</th>
@@ -508,6 +516,8 @@ export default function AdminPayroll() {
                                                             {item.salary_type === 'daily' ? `Harian (${item.working_days}hr)` : item.salary_type === 'weekly' ? 'Mingguan' : 'Bulanan'}
                                                         </span>
                                                     </td>
+                                                    <td style={{ whiteSpace: 'nowrap' }}>{item.bank_name || '-'}</td>
+                                                    <td style={{ whiteSpace: 'nowrap' }}>{item.bank_account || '-'}</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.basic_salary)}</td>
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(tunjangan)}</td>
                                                     <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{parseFloat(item.overtime_hours)} jam</td>
@@ -516,6 +526,10 @@ export default function AdminPayroll() {
                                                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatCurrency(item.gross_income)}</td>
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(bpjsTotal)}</td>
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(item.pph21_amount)}</td>
+                                                    <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>
+                                                        {parseFloat(item.late_deduction) > 0 ? `-${formatCurrency(item.late_deduction)}` : '-'}
+                                                        {parseFloat(item.late_minutes) > 0 && <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--gray-400)' }}>{item.late_minutes} mnt</span>}
+                                                    </td>
                                                     <td style={{ textAlign: 'right', color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(item.loan_deduction)}</td>
                                                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)', whiteSpace: 'nowrap' }}>{formatCurrency(item.net_salary)}</td>
                                                     <td>
@@ -528,6 +542,8 @@ export default function AdminPayroll() {
                                     <tfoot>
                                         <tr style={{ borderTop: '2px solid rgba(255,255,255,0.2)' }}>
                                             <td style={{ fontWeight: 700 }}>TOTAL</td>
+                                            <td></td>
+                                            <td></td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.basic_salary), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.transport_allowance) + parseFloat(i.meal_allowance) + parseFloat(i.appreciation_allowance || 0), 0))}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>{selectedRun.items.reduce((s, i) => s + parseFloat(i.overtime_hours), 0)} jam</td>
@@ -536,6 +552,7 @@ export default function AdminPayroll() {
                                             <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.gross_income), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.bpjs_kes_employee) + parseFloat(i.bpjs_jht_employee) + parseFloat(i.bpjs_jp_employee), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.pph21_amount), 0))}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.late_deduction || 0), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-500)', whiteSpace: 'nowrap' }}>-{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.loan_deduction), 0))}</td>
                                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-500)', whiteSpace: 'nowrap' }}>{formatCurrency(selectedRun.items.reduce((s, i) => s + parseFloat(i.net_salary), 0))}</td>
                                             <td></td>
@@ -693,9 +710,9 @@ export default function AdminPayroll() {
                                             <div style={{ background: 'rgba(16,185,129,0.15)', padding: '1rem', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
                                                 <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>GAJI BERSIH (Take Home Pay)</p>
                                                 <p style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success-500)' }}>{formatCurrency(selectedSlip.net_salary)}</p>
-                                                {payslipShows(slipConfig, 'bank') && selectedSlip.bank_name && (
+                                                {payslipShows(slipConfig, 'bank') && (
                                                     <p style={{ color: 'var(--gray-400)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                                                        Transfer ke: {selectedSlip.bank_name} - {selectedSlip.bank_account}
+                                                        Transfer ke: {selectedSlip.bank_name || '-'} - {selectedSlip.bank_account || '-'}
                                                     </p>
                                                 )}
                                             </div>

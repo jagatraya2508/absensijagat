@@ -17,14 +17,14 @@ router.get('/', authenticateToken, async (req, res) => {
 
 // Create new vehicle type
 router.post('/', authenticateToken, canManageVehicles, async (req, res) => {
-    const { name, description } = req.body;
+    const { name, description, daily_rate } = req.body;
     if (!name) {
         return res.status(400).json({ error: 'Name is required' });
     }
     try {
         const result = await pool.query(
-            'INSERT INTO vehicle_types (name, description, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP) RETURNING *',
-            [name, description]
+            'INSERT INTO vehicle_types (name, description, daily_rate, updated_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *',
+            [name, description, parseFloat(daily_rate) || 0]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -39,14 +39,14 @@ router.post('/', authenticateToken, canManageVehicles, async (req, res) => {
 // Update vehicle type
 router.put('/:id', authenticateToken, canManageVehicles, async (req, res) => {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, daily_rate } = req.body;
     if (!name) {
         return res.status(400).json({ error: 'Name is required' });
     }
     try {
         const result = await pool.query(
-            'UPDATE vehicle_types SET name = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-            [name, description, id]
+            'UPDATE vehicle_types SET name = $1, description = $2, daily_rate = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+            [name, description, parseFloat(daily_rate) || 0, id]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Vehicle type not found' });

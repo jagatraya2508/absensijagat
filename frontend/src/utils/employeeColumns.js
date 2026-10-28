@@ -15,6 +15,8 @@ export const AVAILABLE_EMPLOYEE_COLUMNS = [
     { key: 'phone', label: 'No. Telepon', defaultVisible: false, sortable: false, category: 'Kontak' },
     { key: 'nik', label: 'NIK', defaultVisible: false, sortable: false, category: 'Identitas' },
     { key: 'join_date', label: 'Tanggal Masuk', defaultVisible: false, sortable: true, category: 'Pekerjaan' },
+    { key: 'contract_start_date', label: 'Tgl Mulai Kontrak', defaultVisible: false, sortable: true, category: 'Pekerjaan' },
+    { key: 'contract_end_date', label: 'Tgl Habis Kontrak', defaultVisible: false, sortable: true, category: 'Pekerjaan' },
     { key: 'gender', label: 'Jenis Kelamin', defaultVisible: false, sortable: true, category: 'Identitas' },
     { key: 'actions', label: 'Aksi', defaultVisible: true, sortable: false, category: 'Aksi', required: true }
 ];

@@ -767,6 +767,92 @@ router.put('/employee-columns', authenticateToken, canConfigEmployeeColumns, asy
     }
 });
 
+// ========== LATE DEDUCTION SETTINGS ==========
+router.get('/late-deduction', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT key, value FROM settings WHERE key IN (
+                'late_deduction_enabled',
+                'late_deduction_mode',
+                'late_deduction_rate_per_minute',
+                'late_deduction_rate_per_hour',
+                'late_deduction_hour_round',
+                'late_grace_period_minutes',
+                'late_deduct_grace_period',
+                'late_exempt_approved_leave',
+                'late_fallback_start_time'
+            )`
+        );
+        const config = {
+            late_deduction_enabled: false,
+            late_deduction_mode: 'per_minute',
+            late_deduction_rate_per_minute: 1000,
+            late_deduction_rate_per_hour: 25000,
+            late_deduction_hour_round: 'round_up',
+            late_grace_period_minutes: 0,
+            late_deduct_grace_period: false,
+            late_exempt_approved_leave: true,
+            late_fallback_start_time: '08:00'
+        };
+        result.rows.forEach(r => {
+            if (r.key === 'late_deduction_enabled') config.late_deduction_enabled = r.value === 'true';
+            else if (r.key === 'late_deduction_mode') config.late_deduction_mode = r.value || 'per_minute';
+            else if (r.key === 'late_deduction_rate_per_minute') config.late_deduction_rate_per_minute = parseFloat(r.value) || 0;
+            else if (r.key === 'late_deduction_rate_per_hour') config.late_deduction_rate_per_hour = parseFloat(r.value) || 0;
+            else if (r.key === 'late_deduction_hour_round') config.late_deduction_hour_round = r.value || 'round_up';
+            else if (r.key === 'late_grace_period_minutes') config.late_grace_period_minutes = parseInt(r.value, 10) || 0;
+            else if (r.key === 'late_deduct_grace_period') config.late_deduct_grace_period = r.value === 'true';
+            else if (r.key === 'late_exempt_approved_leave') config.late_exempt_approved_leave = r.value !== 'false';
+            else if (r.key === 'late_fallback_start_time') config.late_fallback_start_time = r.value || '08:00';
+        });
+        res.json(config);
+    } catch (error) {
+        console.error('Get late deduction settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.put('/late-deduction', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const {
+            late_deduction_enabled,
+            late_deduction_mode,
+            late_deduction_rate_per_minute,
+            late_deduction_rate_per_hour,
+            late_deduction_hour_round,
+            late_grace_period_minutes,
+            late_deduct_grace_period,
+            late_exempt_approved_leave,
+            late_fallback_start_time
+        } = req.body;
+
+        const entries = [
+            ['late_deduction_enabled', String(!!late_deduction_enabled)],
+            ['late_deduction_mode', ['per_minute', 'per_hour'].includes(late_deduction_mode) ? late_deduction_mode : 'per_minute'],
+            ['late_deduction_rate_per_minute', String(Math.max(0, parseFloat(late_deduction_rate_per_minute) || 0))],
+            ['late_deduction_rate_per_hour', String(Math.max(0, parseFloat(late_deduction_rate_per_hour) || 0))],
+            ['late_deduction_hour_round', ['round_up', 'prorated', 'exact_hour', 'round_up_daily'].includes(late_deduction_hour_round) ? late_deduction_hour_round : 'round_up'],
+            ['late_grace_period_minutes', String(Math.max(0, parseInt(late_grace_period_minutes, 10) || 0))],
+            ['late_deduct_grace_period', String(!!late_deduct_grace_period)],
+            ['late_exempt_approved_leave', String(late_exempt_approved_leave !== false)],
+            ['late_fallback_start_time', late_fallback_start_time ? String(late_fallback_start_time).trim() : '08:00']
+        ];
+
+        for (const [key, val] of entries) {
+            await pool.query(
+                `INSERT INTO settings (key, value) VALUES ($1, $2)
+                 ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+                [key, val]
+            );
+        }
+
+        res.json({ message: 'Pengaturan potongan keterlambatan berhasil disimpan' });
+    } catch (error) {
+        console.error('Update late deduction settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 module.exports = router;
 
 

@@ -11,7 +11,11 @@ export default function AdminVehicleTypes() {
     const [success, setSuccess] = useState('');
     const [search, setSearch] = useState('');
     
-    const [formData, setFormData] = useState({ id: null, name: '', description: '' });
+    const [formData, setFormData] = useState({ id: null, name: '', description: '', daily_rate: '' });
+
+    function formatCurrency(val) {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
+    }
 
     useEffect(() => {
         fetchVehicleTypes();
@@ -31,9 +35,9 @@ export default function AdminVehicleTypes() {
 
     function openModal(vt = null) {
         if (vt) {
-            setFormData({ id: vt.id, name: vt.name, description: vt.description || '' });
+            setFormData({ id: vt.id, name: vt.name, description: vt.description || '', daily_rate: vt.daily_rate || 0 });
         } else {
-            setFormData({ id: null, name: '', description: '' });
+            setFormData({ id: null, name: '', description: '', daily_rate: '' });
         }
         setError('');
         setSuccess('');
@@ -51,11 +55,16 @@ export default function AdminVehicleTypes() {
         setError('');
         
         try {
+            const payload = {
+                name: formData.name,
+                description: formData.description,
+                daily_rate: parseFloat(formData.daily_rate) || 0
+            };
             if (formData.id) {
-                await vehicleTypesAPI.update(formData.id, { name: formData.name, description: formData.description });
+                await vehicleTypesAPI.update(formData.id, payload);
                 setSuccess('Berhasil memperbarui jenis kendaraan');
             } else {
-                await vehicleTypesAPI.create({ name: formData.name, description: formData.description });
+                await vehicleTypesAPI.create(payload);
                 setSuccess('Berhasil menambahkan jenis kendaraan baru');
             }
             setShowModal(false);
@@ -138,6 +147,7 @@ export default function AdminVehicleTypes() {
                                 <tr>
                                     <th style={{ width: '80px' }}>ID</th>
                                     <th>Jenis Kendaraan</th>
+                                    <th style={{ width: '180px' }}>Tarif Harian (Rp)</th>
                                     <th>Keterangan</th>
                                     <th style={{ width: '150px', textAlign: 'center' }}>Aksi</th>
                                 </tr>
@@ -146,7 +156,8 @@ export default function AdminVehicleTypes() {
                                 {filteredData.map(vt => (
                                     <tr key={vt.id}>
                                         <td style={{ color: 'var(--gray-400)' }}>#{vt.id}</td>
-                                        <td style={{ fontWeight: 500 }}>{vt.name}</td>
+                                        <td style={{ fontWeight: 600 }}>{vt.name}</td>
+                                        <td style={{ fontWeight: 600, color: '#10b981' }}>{formatCurrency(vt.daily_rate)}</td>
                                         <td style={{ color: 'var(--gray-300)' }}>{vt.description || '-'}</td>
                                         <td style={{ textAlign: 'center' }}>
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
@@ -196,10 +207,24 @@ export default function AdminVehicleTypes() {
                                         className="form-input" 
                                         value={formData.name} 
                                         onChange={e => setFormData({...formData, name: e.target.value})} 
-                                        placeholder="Contoh: Motor, Mobil Box, Truk Engkel"
+                                        placeholder="Contoh: Fuso, Tronton, Engkel"
                                         required 
                                         autoFocus
                                     />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Tarif Gaji Harian Supir (Rp)</label>
+                                    <input 
+                                        type="number" 
+                                        className="form-input" 
+                                        value={formData.daily_rate} 
+                                        onChange={e => setFormData({...formData, daily_rate: e.target.value})} 
+                                        placeholder="Contoh: 150000"
+                                        min="0"
+                                    />
+                                    <small style={{ color: 'var(--gray-400)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                                        Tarif harian standar supir jika membawa kendaraan jenis ini (misal: Fuso Rp 150.000, Tronton Rp 200.000).
+                                    </small>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Keterangan (Opsional)</label>

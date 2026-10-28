@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { driverActivitiesAPI } from '../utils/api';
+import { driverActivitiesAPI, vehicleTypesAPI } from '../utils/api';
 import Icon from '../components/Icon';
 
 const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -15,6 +15,7 @@ export default function AdminDriverActivities() {
     const [selectedDriver, setSelectedDriver] = useState('');
     const [activities, setActivities] = useState([]);
     const [summary, setSummary] = useState([]);
+    const [vehicleTypes, setVehicleTypes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editData, setEditData] = useState(null);
@@ -26,12 +27,23 @@ export default function AdminDriverActivities() {
     const [formData, setFormData] = useState({
         user_id: '', activity_date: '', is_subuh: false,
         departure_time: '', rit_count: 1, rit_notes: '',
-        is_overnight: false, notes: '', ritase_dekat: 0, ritase_jauh: 0
+        is_overnight: false, notes: '', ritase_dekat: 0, ritase_jauh: 0,
+        vehicle_type_id: ''
     });
 
     useEffect(() => {
         fetchDrivers();
+        fetchVehicleTypes();
     }, []);
+
+    async function fetchVehicleTypes() {
+        try {
+            const data = await vehicleTypesAPI.getAll();
+            setVehicleTypes(data);
+        } catch (e) {
+            console.error('Failed to fetch vehicle types:', e);
+        }
+    }
 
     useEffect(() => {
         fetchActivities();
@@ -74,12 +86,15 @@ export default function AdminDriverActivities() {
     function openAddModal(date) {
         if (!canManage) return alert('Anda tidak memiliki akses untuk menambah data.');
         setEditData(null);
+        const dId = selectedDriver || (drivers[0]?.id || '');
+        const dObj = drivers.find(d => String(d.id) === String(dId));
         setFormData({
-            user_id: selectedDriver || (drivers[0]?.id || ''),
+            user_id: dId,
             activity_date: date || '',
             is_subuh: false, departure_time: '', rit_count: 1,
             rit_notes: '', is_overnight: false, notes: '',
-            ritase_dekat: 0, ritase_jauh: 0
+            ritase_dekat: 0, ritase_jauh: 0,
+            vehicle_type_id: dObj?.vehicle_type_id || ''
         });
         setShowModal(true);
         setError('');
@@ -98,10 +113,20 @@ export default function AdminDriverActivities() {
             is_overnight: act.is_overnight,
             notes: act.notes || '',
             ritase_dekat: act.ritase_dekat || 0,
-            ritase_jauh: act.ritase_jauh || 0
+            ritase_jauh: act.ritase_jauh || 0,
+            vehicle_type_id: act.vehicle_type_id || act.driver_default_vehicle_id || ''
         });
         setShowModal(true);
         setError('');
+    }
+
+    function handleDriverSelect(userId) {
+        const dObj = drivers.find(d => String(d.id) === String(userId));
+        setFormData(prev => ({
+            ...prev,
+            user_id: userId,
+            vehicle_type_id: dObj?.vehicle_type_id || ''
+        }));
     }
 
     async function handleSave(e) {
@@ -339,6 +364,22 @@ export default function AdminDriverActivities() {
                                             }}>{day.date}</div>
                                             {hasData && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                    {act.vehicle_type_name && (
+                                                        <span style={{ 
+                                                            fontSize: '0.6rem', 
+                                                            background: act.vehicle_type_id && act.driver_default_vehicle_id && String(act.vehicle_type_id) !== String(act.driver_default_vehicle_id) 
+                                                                ? 'rgba(16,185,129,0.3)' 
+                                                                : 'rgba(255,255,255,0.08)', 
+                                                            padding: '1px 4px', 
+                                                            borderRadius: 4, 
+                                                            color: act.vehicle_type_id && act.driver_default_vehicle_id && String(act.vehicle_type_id) !== String(act.driver_default_vehicle_id) 
+                                                                ? '#6ee7b7' 
+                                                                : 'var(--gray-300)',
+                                                            display: 'flex', alignItems: 'center', gap: '2px'
+                                                        }}>
+                                                            <Icon name="Truck" size={10} inline /> {act.vehicle_type_name}
+                                                        </span>
+                                                    )}
                                                     {act.is_subuh && (
                                                         <span style={{ fontSize: '0.6rem', background: 'rgba(99,102,241,0.3)', padding: '1px 4px', borderRadius: 4, color: '#a5b4fc' }}><Icon name="Moon" size={16} inline /> Subuh</span>
                                                     )}
@@ -477,6 +518,7 @@ export default function AdminDriverActivities() {
                                     <tr>
                                         <th>Tanggal</th>
                                         <th>Driver</th>
+                                        <th>Kendaraan</th>
                                         <th style={{ textAlign: 'center' }}>Subuh</th>
                                         <th style={{ textAlign: 'center' }}>RIT</th>
                                         <th style={{ textAlign: 'center' }}>Ritase Dekat</th>
@@ -493,6 +535,16 @@ export default function AdminDriverActivities() {
                                             <td>
                                                 <div style={{ fontWeight: 600 }}>{act.user_name}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{act.employee_id}</div>
+                                            </td>
+                                            <td>
+                                                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                    <Icon name="Truck" size={14} inline /> {act.vehicle_type_name || act.driver_default_vehicle_name || 'Standar'}
+                                                </div>
+                                                {act.vehicle_type_id && act.driver_default_vehicle_id && String(act.vehicle_type_id) !== String(act.driver_default_vehicle_id) && (
+                                                    <span className="badge badge-success" style={{ fontSize: '0.65rem', marginTop: '2px', display: 'inline-block' }}>
+                                                        Unit Khusus ({formatCurrency(act.vehicle_daily_rate)})
+                                                    </span>
+                                                )}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {act.is_subuh ? <span style={{ color: '#6366f1' }}><Icon name="Moon" size={16} inline /> Ya {act.departure_time && `(${act.departure_time})`}</span> : '-'}
@@ -543,10 +595,10 @@ export default function AdminDriverActivities() {
                                     <div className="form-group">
                                         <label className="form-label">Driver</label>
                                         <select className="form-input form-select" value={formData.user_id}
-                                            onChange={e => setFormData(prev => ({ ...prev, user_id: parseInt(e.target.value) }))}
+                                            onChange={e => handleDriverSelect(parseInt(e.target.value))}
                                             disabled={!!editData} required>
                                             <option value="">Pilih Driver...</option>
-                                            {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                            {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle_type_name ? `(${d.vehicle_type_name})` : ''}</option>)}
                                         </select>
                                     </div>
                                     <div className="form-group">
@@ -556,6 +608,54 @@ export default function AdminDriverActivities() {
                                             disabled={!!editData} required />
                                     </div>
                                 </div>
+
+                                {/* Vehicle selection for today */}
+                                {(() => {
+                                    const modalDriver = drivers.find(d => String(d.id) === String(formData.user_id));
+                                    const defaultVeh = vehicleTypes.find(v => String(v.id) === String(modalDriver?.vehicle_type_id));
+                                    const currentVeh = vehicleTypes.find(v => String(v.id) === String(formData.vehicle_type_id));
+                                    const defaultRate = parseFloat(defaultVeh?.daily_rate) || parseFloat(modalDriver?.vehicle_daily_rate) || parseFloat(modalDriver?.basic_salary) || 0;
+                                    const currentRate = parseFloat(currentVeh?.daily_rate) || defaultRate;
+                                    const isUpgraded = currentVeh && defaultVeh && currentRate > defaultRate;
+                                    const isLowered = currentVeh && defaultVeh && currentRate < defaultRate;
+
+                                    return (
+                                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span>Kendaraan yang Dibawa Hari Ini</span>
+                                                {defaultVeh && (
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>
+                                                        Standar: <strong style={{ color: 'var(--gray-200)' }}>{defaultVeh.name}</strong> ({formatCurrency(defaultRate)}/hari)
+                                                    </span>
+                                                )}
+                                            </label>
+                                            <select 
+                                                className="form-input form-select" 
+                                                value={formData.vehicle_type_id || ''}
+                                                onChange={e => setFormData(prev => ({ ...prev, vehicle_type_id: e.target.value ? parseInt(e.target.value) : '' }))}
+                                            >
+                                                <option value="">Ikuti Kendaraan Standar Driver</option>
+                                                {vehicleTypes.map(vt => (
+                                                    <option key={vt.id} value={vt.id}>
+                                                        {vt.name} — {formatCurrency(vt.daily_rate)} / hari
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {isUpgraded && (
+                                                <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(16,185,129,0.1)', padding: '0.4rem 0.6rem', borderRadius: 6 }}>
+                                                    <Icon name="CheckCircle2" size={14} inline /> 
+                                                    <span><strong>Penyesuaian Armada:</strong> Bawa {currentVeh.name}, gaji harian naik menjadi <strong>{formatCurrency(currentRate)}</strong> untuk hari ini.</span>
+                                                </div>
+                                            )}
+                                            {isLowered && (
+                                                <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(56,189,248,0.1)', padding: '0.4rem 0.6rem', borderRadius: 6 }}>
+                                                    <Icon name="Info" size={14} inline /> 
+                                                    <span><strong>Jaminan Tarif Minimum:</strong> Bawa {currentVeh.name}, gaji tetap mengikuti standar {defaultVeh.name} (<strong>{formatCurrency(defaultRate)}</strong>). Tidak dipotong!</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Driver options */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', margin: '1rem 0' }}>

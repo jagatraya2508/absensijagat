@@ -427,6 +427,52 @@ export const reportsAPI = {
                 link.click();
             });
     },
+
+    // Contract Expiry Report
+    getContractExpiry: (parameter, department, division, search) => {
+        const params = new URLSearchParams();
+        if (parameter) params.set('parameter', parameter);
+        if (department) params.set('department', department);
+        if (division) params.set('division', division);
+        if (search) params.set('search', search);
+        return request(`/reports/contracts/expiring?${params}`);
+    },
+
+    exportContractPDF: (parameter, department, division, search) => {
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams();
+        if (parameter) params.set('parameter', parameter);
+        if (department) params.set('department', department);
+        if (division) params.set('division', division);
+        if (search) params.set('search', search);
+        const url = `${API_BASE}/reports/export/contracts/pdf?${params}`;
+        return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.blob())
+            .then(blob => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `laporan-habis-kontrak-${parameter || '3_months'}.pdf`;
+                link.click();
+            });
+    },
+
+    exportContractExcel: (parameter, department, division, search) => {
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams();
+        if (parameter) params.set('parameter', parameter);
+        if (department) params.set('department', department);
+        if (division) params.set('division', division);
+        if (search) params.set('search', search);
+        const url = `${API_BASE}/reports/export/contracts/excel?${params}`;
+        return fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.blob())
+            .then(blob => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `laporan-habis-kontrak-${parameter || '3_months'}.xlsx`;
+                link.click();
+            });
+    },
 };
 
 
@@ -579,6 +625,11 @@ export const settingsAPI = {
     }),
     getHolidayOvertime: () => request('/settings/holiday-overtime'),
     updateHolidayOvertime: (data) => request('/settings/holiday-overtime', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    getLateDeduction: () => request('/settings/late-deduction'),
+    updateLateDeduction: (data) => request('/settings/late-deduction', {
         method: 'PUT',
         body: JSON.stringify(data),
     }),

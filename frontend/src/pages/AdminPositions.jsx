@@ -11,7 +11,21 @@ export default function AdminPositions() {
     const [success, setSuccess] = useState('');
     const [search, setSearch] = useState('');
     
-    const [formData, setFormData] = useState({ id: null, name: '', description: '' });
+    const defaultFormData = {
+        id: null,
+        name: '',
+        description: '',
+        use_custom_late_deduction: false,
+        late_deduction_enabled: true,
+        late_deduction_mode: 'per_minute',
+        late_deduction_rate_per_minute: 1000,
+        late_deduction_rate_per_hour: 25000,
+        late_deduction_hour_round: 'round_up',
+        late_grace_period_minutes: 0,
+        late_deduct_grace_period: false
+    };
+
+    const [formData, setFormData] = useState(defaultFormData);
 
     const [showImportModal, setShowImportModal] = useState(false);
     const [importFile, setImportFile] = useState(null);
@@ -38,9 +52,21 @@ export default function AdminPositions() {
 
     function openModal(pos = null) {
         if (pos) {
-            setFormData({ id: pos.id, name: pos.name, description: pos.description || '' });
+            setFormData({
+                id: pos.id,
+                name: pos.name,
+                description: pos.description || '',
+                use_custom_late_deduction: pos.use_custom_late_deduction === true,
+                late_deduction_enabled: pos.late_deduction_enabled !== false,
+                late_deduction_mode: pos.late_deduction_mode || 'per_minute',
+                late_deduction_rate_per_minute: parseFloat(pos.late_deduction_rate_per_minute) || 1000,
+                late_deduction_rate_per_hour: parseFloat(pos.late_deduction_rate_per_hour) || 25000,
+                late_deduction_hour_round: pos.late_deduction_hour_round || 'round_up',
+                late_grace_period_minutes: parseInt(pos.late_grace_period_minutes, 10) || 0,
+                late_deduct_grace_period: pos.late_deduct_grace_period === true
+            });
         } else {
-            setFormData({ id: null, name: '', description: '' });
+            setFormData({ ...defaultFormData });
         }
         setError('');
         setSuccess('');
@@ -58,11 +84,24 @@ export default function AdminPositions() {
         setError('');
         
         try {
+            const payload = {
+                name: formData.name,
+                description: formData.description,
+                use_custom_late_deduction: formData.use_custom_late_deduction === true,
+                late_deduction_enabled: formData.late_deduction_enabled !== false,
+                late_deduction_mode: formData.late_deduction_mode || 'per_minute',
+                late_deduction_rate_per_minute: parseFloat(formData.late_deduction_rate_per_minute) || 0,
+                late_deduction_rate_per_hour: parseFloat(formData.late_deduction_rate_per_hour) || 0,
+                late_deduction_hour_round: formData.late_deduction_hour_round || 'round_up',
+                late_grace_period_minutes: parseInt(formData.late_grace_period_minutes, 10) || 0,
+                late_deduct_grace_period: formData.late_deduct_grace_period === true
+            };
+
             if (formData.id) {
-                await positionsAPI.update(formData.id, { name: formData.name, description: formData.description });
+                await positionsAPI.update(formData.id, payload);
                 setSuccess('Berhasil memperbarui jabatan');
             } else {
-                await positionsAPI.create({ name: formData.name, description: formData.description });
+                await positionsAPI.create(payload);
                 setSuccess('Berhasil menambahkan jabatan baru');
             }
             setShowModal(false);
@@ -218,9 +257,10 @@ export default function AdminPositions() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th style={{ width: '80px' }}>ID</th>
+                                    <th style={{ width: '70px' }}>ID</th>
                                     <th>Nama Jabatan</th>
                                     <th>Keterangan</th>
+                                    <th>Aturan Pot. Telat</th>
                                     <th style={{ width: '150px', textAlign: 'center' }}>Aksi</th>
                                 </tr>
                             </thead>
@@ -230,6 +270,54 @@ export default function AdminPositions() {
                                         <td style={{ color: 'var(--gray-400)' }}>#{pos.id}</td>
                                         <td style={{ fontWeight: 500 }}>{pos.name}</td>
                                         <td style={{ color: 'var(--gray-300)' }}>{pos.description || '-'}</td>
+                                        <td>
+                                            {!pos.use_custom_late_deduction ? (
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem',
+                                                    padding: '0.2rem 0.55rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 500,
+                                                    background: 'rgba(100, 116, 139, 0.12)',
+                                                    color: 'var(--gray-400, #94a3b8)',
+                                                    border: '1px solid rgba(100, 116, 139, 0.25)'
+                                                }}>
+                                                    🌐 Ikut Global
+                                                </span>
+                                            ) : !pos.late_deduction_enabled ? (
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem',
+                                                    padding: '0.2rem 0.55rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    background: 'rgba(16, 185, 129, 0.15)',
+                                                    color: '#10b981',
+                                                    border: '1px solid rgba(16, 185, 129, 0.3)'
+                                                }}>
+                                                    🛡️ Bebas Potongan
+                                                </span>
+                                            ) : (
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.3rem',
+                                                    padding: '0.2rem 0.55rem',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    background: 'rgba(59, 130, 246, 0.15)',
+                                                    color: '#3b82f6',
+                                                    border: '1px solid rgba(59, 130, 246, 0.3)'
+                                                }}>
+                                                    ⚡ Rp {Number(pos.late_deduction_mode === 'per_minute' ? (pos.late_deduction_rate_per_minute || 0) : (pos.late_deduction_rate_per_hour || 0)).toLocaleString('id-ID')} / {pos.late_deduction_mode === 'per_minute' ? 'menit' : 'jam'}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td style={{ textAlign: 'center' }}>
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                                                 <button 
@@ -400,9 +488,153 @@ export default function AdminPositions() {
                                         className="form-input" 
                                         value={formData.description} 
                                         onChange={e => setFormData({...formData, description: e.target.value})} 
-                                        rows="3"
+                                        rows="2"
                                         placeholder="Penjelasan singkat mengenai jabatan..."
                                     ></textarea>
+                                </div>
+
+                                {/* Custom Late Deduction Section */}
+                                <div style={{
+                                    marginTop: '1rem',
+                                    padding: '0.9rem',
+                                    borderRadius: 'var(--radius-md, 8px)',
+                                    border: '1px solid var(--border-color, #334155)',
+                                    background: 'var(--bg-card, rgba(30, 41, 59, 0.5))'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ fontWeight: 600, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                <Icon name="Calculator" size={15} inline /> Aturan Potongan Keterlambatan
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-400, #94a3b8)', marginTop: '0.15rem' }}>
+                                                {formData.use_custom_late_deduction 
+                                                    ? 'Jabatan ini memakai aturan keterlambatan khusus' 
+                                                    : 'Mengikuti aturan global di menu Pengaturan'}
+                                            </div>
+                                        </div>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.use_custom_late_deduction}
+                                                onChange={e => setFormData({ ...formData, use_custom_late_deduction: e.target.checked })}
+                                                style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                            />
+                                            Aturan Khusus
+                                        </label>
+                                    </div>
+
+                                    {formData.use_custom_late_deduction && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--border-color, rgba(148, 163, 184, 0.2))' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 0.75rem', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '6px', border: '1px solid var(--border-color, #334155)' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>Status Pemotongan</div>
+                                                    <div style={{ fontSize: '0.72rem', color: 'var(--gray-400, #94a3b8)' }}>
+                                                        {formData.late_deduction_enabled 
+                                                            ? 'Karyawan jabatan ini akan dipotong gajinya jika telat' 
+                                                            : 'Bebaskan jabatan ini dari potongan keterlambatan (Exempt)'}
+                                                    </div>
+                                                </div>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: formData.late_deduction_enabled ? '#3b82f6' : '#10b981' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.late_deduction_enabled}
+                                                        onChange={e => setFormData({ ...formData, late_deduction_enabled: e.target.checked })}
+                                                        style={{ width: 15, height: 15, cursor: 'pointer' }}
+                                                    />
+                                                    {formData.late_deduction_enabled ? 'Dipicu Potongan' : 'Bebas Potongan'}
+                                                </label>
+                                            </div>
+
+                                            {formData.late_deduction_enabled && (
+                                                <>
+                                                    <div>
+                                                        <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: '0.3rem' }}>Mode Perhitungan</label>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                                                            <button
+                                                                type="button"
+                                                                className={`btn ${formData.late_deduction_mode === 'per_minute' ? 'btn-primary' : 'btn-outline'}`}
+                                                                style={{ padding: '0.4rem', fontSize: '0.78rem', justifyContent: 'center' }}
+                                                                onClick={() => setFormData({ ...formData, late_deduction_mode: 'per_minute' })}
+                                                            >
+                                                                Per Menit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`btn ${formData.late_deduction_mode === 'per_hour' ? 'btn-primary' : 'btn-outline'}`}
+                                                                style={{ padding: '0.4rem', fontSize: '0.78rem', justifyContent: 'center' }}
+                                                                onClick={() => setFormData({ ...formData, late_deduction_mode: 'per_hour' })}
+                                                            >
+                                                                Per Jam
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                                            <label className="form-label" style={{ fontSize: '0.78rem' }}>
+                                                                Tarif {formData.late_deduction_mode === 'per_minute' ? 'per Menit (Rp)' : 'per Jam (Rp)'}
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="100"
+                                                                className="form-input"
+                                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                                                value={formData.late_deduction_mode === 'per_minute' ? formData.late_deduction_rate_per_minute : formData.late_deduction_rate_per_hour}
+                                                                onChange={e => {
+                                                                    const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                                                    if (formData.late_deduction_mode === 'per_minute') {
+                                                                        setFormData({ ...formData, late_deduction_rate_per_minute: val });
+                                                                    } else {
+                                                                        setFormData({ ...formData, late_deduction_rate_per_hour: val });
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                                            <label className="form-label" style={{ fontSize: '0.78rem' }}>Toleransi (Menit)</label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="1"
+                                                                className="form-input"
+                                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
+                                                                value={formData.late_grace_period_minutes}
+                                                                onChange={e => setFormData({ ...formData, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {formData.late_deduction_mode === 'per_hour' && (
+                                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                                            <label className="form-label" style={{ fontSize: '0.78rem' }}>Pembulatan Jam</label>
+                                                            <select
+                                                                className="form-input"
+                                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.82rem' }}
+                                                                value={formData.late_deduction_hour_round}
+                                                                onChange={e => setFormData({ ...formData, late_deduction_hour_round: e.target.value })}
+                                                            >
+                                                                <option value="round_up">Bulat Ke Atas per Periode (15 mnt = 1 jam)</option>
+                                                                <option value="round_up_daily">Bulat Ke Atas per Hari (Harian dibulatkan ke atas)</option>
+                                                                <option value="prorated">Prorata Menit (menit / 60 * tarif)</option>
+                                                                <option value="exact_hour">Jam Penuh Saja (hanya kelipatan 60 menit)</option>
+                                                            </select>
+                                                        </div>
+                                                    )}
+
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--gray-300, #cbd5e1)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={formData.late_deduct_grace_period}
+                                                            onChange={e => setFormData({ ...formData, late_deduct_grace_period: e.target.checked })}
+                                                            style={{ width: 14, height: 14, cursor: 'pointer' }}
+                                                        />
+                                                        Potong seluruh menit jika lewat toleransi
+                                                    </label>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="modal-footer">

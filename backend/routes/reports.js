@@ -1576,4 +1576,406 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
     }
 });
 
+// ============================================
+// CONTRACT EXPIRATION REPORT ENDPOINTS
+// ============================================
+
+const CONTRACT_PARAMETER_LABELS = {
+    '1_month': 'Sisa Kontrak ≤ 1 Bulan (≤ 30 Hari)',
+    '2_months': 'Sisa Kontrak ≤ 2 Bulan (≤ 60 Hari)',
+    '3_months': 'Sisa Kontrak ≤ 3 Bulan (≤ 90 Hari)',
+    'all_expiring': 'Semua Kontrak Akan Habis (≤ 3 Bulan)',
+    'expired': 'Kontrak Sudah Habis / Lewat',
+    'all': 'Semua Karyawan Kontrak',
+    'no_date': 'Karyawan Kontrak Belum Ada Tanggal'
+};
+
+function formatRemainingContract(daysLeft) {
+    if (daysLeft === null || daysLeft === undefined) {
+        return {
+            days_left: null,
+            status: 'unset',
+            label: 'Belum Diatur',
+            badge: 'secondary',
+            color: '#6b7280'
+        };
+    }
+    const num = parseInt(daysLeft, 10);
+    if (num < 0) {
+        const absDays = Math.abs(num);
+        return {
+            days_left: num,
+            status: 'expired',
+            label: `Lewat ${absDays} hari`,
+            badge: 'danger',
+            color: '#dc2626'
+        };
+    }
+    if (num === 0) {
+        return {
+            days_left: 0,
+            status: 'today',
+            label: 'Habis Hari Ini',
+            badge: 'danger',
+            color: '#dc2626'
+        };
+    }
+    if (num <= 30) {
+        return {
+            days_left: num,
+            status: 'urgent',
+            label: `${num} hari lagi (≤ 1 Bulan)`,
+            badge: 'danger',
+            color: '#ef4444'
+        };
+    }
+    if (num <= 60) {
+        const m = Math.floor(num / 30);
+        const d = num % 30;
+        const txt = d > 0 ? `${m} bln ${d} hr lagi` : `${m} bulan lagi`;
+        return {
+            days_left: num,
+            status: 'warning',
+            label: `${txt} (≤ 2 Bulan)`,
+            badge: 'warning',
+            color: '#f59e0b'
+        };
+    }
+    if (num <= 90) {
+        const m = Math.floor(num / 30);
+        const d = num % 30;
+        const txt = d > 0 ? `${m} bln ${d} hr lagi` : `${m} bulan lagi`;
+        return {
+            days_left: num,
+            status: 'monitoring',
+            label: `${txt} (≤ 3 Bulan)`,
+            badge: 'info',
+            color: '#3b82f6'
+        };
+    }
+    const m = Math.floor(num / 30);
+    return {
+        days_left: num,
+        status: 'safe',
+        label: `> ${m} bulan lagi`,
+        badge: 'success',
+        color: '#10b981'
+    };
+}
+
+async function fetchExpiringContracts(options = {}) {
+    const { parameter = '3_months', department, division, search } = options;
+    const conditions = [
+        "u.role != 'admin'",
+        "(ed.contract_end_date IS NOT NULL OR LOWER(COALESCE(ed.employment_status, '')) LIKE '%kontrak%')"
+    ];
+    const params = [];
+
+    if (department) {
+        params.push(department);
+        conditions.push(`ed.department = $${params.length}`);
+    }
+    if (division) {
+        params.push(division);
+        conditions.push(`ed.division = $${params.length}`);
+    }
+    if (search) {
+        params.push(`%${search}%`);
+        conditions.push(`(u.name ILIKE $${params.length} OR u.employee_id ILIKE $${params.length} OR ed.nik ILIKE $${params.length})`);
+    }
+
+    if (parameter === '1_month') {
+        conditions.push(`ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) >= 0 AND (ed.contract_end_date - CURRENT_DATE) <= 30`);
+    } else if (parameter === '2_months') {
+        conditions.push(`ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) >= 0 AND (ed.contract_end_date - CURRENT_DATE) <= 60`);
+    } else if (parameter === '3_months') {
+        conditions.push(`ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) >= 0 AND (ed.contract_end_date - CURRENT_DATE) <= 90`);
+    } else if (parameter === 'expired') {
+        conditions.push(`ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) < 0`);
+    } else if (parameter === 'all_expiring') {
+        conditions.push(`ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) <= 90`);
+    } else if (parameter === 'no_date') {
+        conditions.push(`ed.contract_end_date IS NULL`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const listQuery = `
+        SELECT 
+            u.id, 
+            u.employee_id, 
+            u.name, 
+            u.email, 
+            ed.phone, 
+            ed.nik,
+            ed.department, 
+            ed.division, 
+            ed.position, 
+            COALESCE(ed.employment_status, 'Kontrak') as employment_status, 
+            ed.join_date,
+            ed.contract_start_date, 
+            ed.contract_end_date,
+            CURRENT_DATE as today,
+            CASE 
+                WHEN ed.contract_end_date IS NOT NULL THEN (ed.contract_end_date - CURRENT_DATE) 
+                ELSE NULL 
+            END as days_left
+        FROM users u
+        LEFT JOIN employee_details ed ON u.id = ed.user_id
+        ${whereClause}
+        ORDER BY 
+            CASE WHEN ed.contract_end_date IS NULL THEN 1 ELSE 0 END ASC,
+            ed.contract_end_date ASC,
+            u.name ASC
+    `;
+
+    // Summary query across all contract employees respecting dept/div/search
+    const summaryConditions = [
+        "u.role != 'admin'",
+        "(ed.contract_end_date IS NOT NULL OR LOWER(COALESCE(ed.employment_status, '')) LIKE '%kontrak%')"
+    ];
+    const summaryParams = [];
+    if (department) {
+        summaryParams.push(department);
+        summaryConditions.push(`ed.department = $${summaryParams.length}`);
+    }
+    if (division) {
+        summaryParams.push(division);
+        summaryConditions.push(`ed.division = $${summaryParams.length}`);
+    }
+    if (search) {
+        summaryParams.push(`%${search}%`);
+        summaryConditions.push(`(u.name ILIKE $${summaryParams.length} OR u.employee_id ILIKE $${summaryParams.length} OR ed.nik ILIKE $${summaryParams.length})`);
+    }
+
+    const summaryQuery = `
+        SELECT
+            COUNT(*)::int as total_contracts,
+            COUNT(*) FILTER (WHERE ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) >= 0 AND (ed.contract_end_date - CURRENT_DATE) <= 30)::int as within_1_month,
+            COUNT(*) FILTER (WHERE ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) >= 0 AND (ed.contract_end_date - CURRENT_DATE) <= 60)::int as within_2_months,
+            COUNT(*) FILTER (WHERE ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) >= 0 AND (ed.contract_end_date - CURRENT_DATE) <= 90)::int as within_3_months,
+            COUNT(*) FILTER (WHERE ed.contract_end_date IS NOT NULL AND (ed.contract_end_date - CURRENT_DATE) < 0)::int as expired,
+            COUNT(*) FILTER (WHERE ed.contract_end_date IS NULL)::int as unset
+        FROM users u
+        LEFT JOIN employee_details ed ON u.id = ed.user_id
+        WHERE ${summaryConditions.join(' AND ')}
+    `;
+
+    const [listResult, summaryResult] = await Promise.all([
+        pool.query(listQuery, params),
+        pool.query(summaryQuery, summaryParams)
+    ]);
+
+    const records = listResult.rows.map(row => {
+        const remaining = formatRemainingContract(row.days_left);
+        return {
+            ...row,
+            contract_start_date: row.contract_start_date ? dateOnly(row.contract_start_date) : null,
+            contract_end_date: row.contract_end_date ? dateOnly(row.contract_end_date) : null,
+            join_date: row.join_date ? dateOnly(row.join_date) : null,
+            days_left: remaining.days_left,
+            remaining_label: remaining.label,
+            status_code: remaining.status,
+            badge_type: remaining.badge,
+            color: remaining.color
+        };
+    });
+
+    return {
+        records,
+        summary: summaryResult.rows[0] || {
+            total_contracts: 0,
+            within_1_month: 0,
+            within_2_months: 0,
+            within_3_months: 0,
+            expired: 0,
+            unset: 0
+        },
+        parameter,
+        parameter_label: CONTRACT_PARAMETER_LABELS[parameter] || 'Semua Karyawan Kontrak'
+    };
+}
+
+// Get expiring contract report JSON
+router.get('/contracts/expiring', authenticateToken, canViewReports, async (req, res) => {
+    try {
+        const { parameter = '3_months', department, division, search } = req.query;
+        const data = await fetchExpiringContracts({ parameter, department, division, search });
+        res.json(data);
+    } catch (error) {
+        console.error('Get contract expiring report error:', error);
+        res.status(500).json({ error: 'Gagal memuat laporan kontrak karyawan' });
+    }
+});
+
+// Export Contract Expiration Report as PDF
+router.get('/export/contracts/pdf', authenticateToken, canViewReports, async (req, res) => {
+    try {
+        const { parameter = '3_months', department, division, search } = req.query;
+        const data = await fetchExpiringContracts({ parameter, department, division, search });
+
+        const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=laporan-habis-kontrak-${parameter}.pdf`);
+
+        doc.pipe(res);
+
+        // Header Title
+        doc.fontSize(18).text('LAPORAN DATA KARYAWAN AKAN HABIS KONTRAK', { align: 'center' });
+        doc.fontSize(11).text(`Kriteria: ${data.parameter_label}${department ? ` | Departemen: ${department}` : ''}${division ? ` | Divisi: ${division}` : ''}`, { align: 'center' });
+        doc.moveDown(1.5);
+
+        // Summary Bar
+        doc.fontSize(9).font('Helvetica-Bold');
+        doc.text(
+            `Total Kontrak: ${data.summary.total_contracts}   |   ≤ 1 Bulan: ${data.summary.within_1_month}   |   ≤ 2 Bulan: ${data.summary.within_2_months}   |   ≤ 3 Bulan: ${data.summary.within_3_months}   |   Sudah Habis: ${data.summary.expired}   |   Belum Ada Tgl: ${data.summary.unset}`,
+            { align: 'center' }
+        );
+        doc.moveDown(1);
+
+        const tableTop = doc.y;
+        // 11 Columns: No, ID, Nama, Dept, Divisi, Jabatan, Status, Mulai, Habis, Sisa, Keterangan
+        const columns = [36, 60, 130, 230, 310, 390, 460, 520, 580, 640, 710];
+        doc.font('Helvetica-Bold').fontSize(8);
+        ['No', 'ID', 'Nama Karyawan', 'Departemen', 'Divisi', 'Jabatan', 'Status', 'Mulai', 'Habis Kontrak', 'Sisa Hari', 'Keterangan'].forEach((label, index) => {
+            doc.text(label, columns[index], tableTop, { width: index === 2 ? 95 : 65 });
+        });
+        doc.moveTo(36, tableTop + 14).lineTo(780, tableTop + 14).stroke();
+
+        doc.font('Helvetica').fontSize(8);
+        let yPosition = tableTop + 20;
+
+        if (data.records.length === 0) {
+            doc.text('Tidak ada data karyawan yang sesuai dengan kriteria filter.', 36, yPosition, { align: 'center', width: 740 });
+        } else {
+            data.records.forEach((row, index) => {
+                if (yPosition > 520) {
+                    doc.addPage();
+                    yPosition = 40;
+                }
+                const values = [
+                    String(index + 1),
+                    row.employee_id || '-',
+                    row.name || '-',
+                    row.department || '-',
+                    row.division || '-',
+                    row.position || '-',
+                    row.employment_status || 'Kontrak',
+                    row.contract_start_date ? row.contract_start_date : '-',
+                    row.contract_end_date ? row.contract_end_date : 'Belum Diatur',
+                    row.days_left !== null ? (row.days_left >= 0 ? `${row.days_left} hr` : `-${Math.abs(row.days_left)} hr`) : '-',
+                    row.remaining_label || '-'
+                ];
+
+                values.forEach((value, col) => {
+                    doc.text(String(value), columns[col], yPosition, { width: col === 2 ? 95 : col === 10 ? 70 : 65 });
+                });
+
+                yPosition += 16;
+            });
+        }
+
+        // Footer
+        doc.fontSize(8).text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 36, 560);
+        doc.end();
+    } catch (error) {
+        console.error('Export Contract PDF error:', error);
+        res.status(500).json({ error: 'Gagal membuat PDF laporan kontrak' });
+    }
+});
+
+// Export Contract Expiration Report as Excel
+router.get('/export/contracts/excel', authenticateToken, canViewReports, async (req, res) => {
+    try {
+        const { parameter = '3_months', department, division, search } = req.query;
+        const data = await fetchExpiringContracts({ parameter, department, division, search });
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Habis Kontrak');
+
+        // Title
+        worksheet.mergeCells('A1:K1');
+        worksheet.getCell('A1').value = 'LAPORAN DATA KARYAWAN AKAN HABIS KONTRAK';
+        worksheet.getCell('A1').font = { bold: true, size: 15, color: { argb: 'FF1E3A8A' } };
+        worksheet.getCell('A1').alignment = { horizontal: 'center' };
+
+        worksheet.mergeCells('A2:K2');
+        worksheet.getCell('A2').value = `Kriteria Parameter: ${data.parameter_label}${department ? ` | Departemen: ${department}` : ''}${division ? ` | Divisi: ${division}` : ''}`;
+        worksheet.getCell('A2').alignment = { horizontal: 'center' };
+
+        worksheet.mergeCells('A3:K3');
+        worksheet.getCell('A3').value = `Total Kontrak: ${data.summary.total_contracts}  |  ≤ 1 Bulan: ${data.summary.within_1_month}  |  ≤ 2 Bulan: ${data.summary.within_2_months}  |  ≤ 3 Bulan: ${data.summary.within_3_months}  |  Sudah Habis: ${data.summary.expired}  |  Belum Ada Tgl: ${data.summary.unset}`;
+        worksheet.getCell('A3').font = { italic: true, size: 10 };
+        worksheet.getCell('A3').alignment = { horizontal: 'center' };
+
+        // Headers
+        worksheet.getRow(5).values = [
+            'No', 'ID Karyawan', 'Nama Lengkap', 'Departemen', 'Divisi',
+            'Jabatan', 'Status Karyawan', 'Tgl Mulai Kontrak', 'Tgl Habis Kontrak',
+            'Sisa Hari', 'Keterangan Masa Kontrak'
+        ];
+        worksheet.getRow(5).height = 24;
+        worksheet.getRow(5).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        worksheet.getRow(5).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF1E3A8A' }
+        };
+
+        data.records.forEach((row, index) => {
+            const addedRow = worksheet.addRow([
+                index + 1,
+                row.employee_id || '-',
+                row.name || '-',
+                row.department || '-',
+                row.division || '-',
+                row.position || '-',
+                row.employment_status || 'Kontrak',
+                row.contract_start_date ? formatDateID(row.contract_start_date) : '-',
+                row.contract_end_date ? formatDateID(row.contract_end_date) : 'Belum Diatur',
+                row.days_left !== null ? row.days_left : '-',
+                row.remaining_label || '-'
+            ]);
+
+            // Light highlight if <= 30 days or expired
+            if (row.days_left !== null && row.days_left < 0) {
+                addedRow.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                addedRow.getCell(11).font = { color: { argb: 'FFDC2626' }, bold: true };
+            } else if (row.days_left !== null && row.days_left <= 30) {
+                addedRow.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEDD5' } };
+                addedRow.getCell(11).font = { color: { argb: 'FFEA580C' }, bold: true };
+            }
+        });
+
+        worksheet.columns = [
+            { width: 6 },
+            { width: 14 },
+            { width: 26 },
+            { width: 18 },
+            { width: 18 },
+            { width: 20 },
+            { width: 16 },
+            { width: 22 },
+            { width: 22 },
+            { width: 12 },
+            { width: 26 }
+        ];
+
+        const footerRow = worksheet.rowCount + 2;
+        worksheet.getCell(`A${footerRow}`).value = `Dicetak pada: ${new Date().toLocaleString('id-ID')}`;
+        worksheet.getCell(`A${footerRow}`).font = { italic: true, size: 9 };
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=laporan-habis-kontrak-${parameter}.xlsx`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Export Contract Excel error:', error);
+        res.status(500).json({ error: 'Gagal membuat Excel laporan kontrak' });
+    }
+});
+
 module.exports = router;
+

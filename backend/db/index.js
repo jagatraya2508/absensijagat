@@ -37,8 +37,31 @@ pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS appreciation_a
   .catch((err) => console.warn('DB patch appreciation_allowance:', err.message));
 pool.query('ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS appreciation_allowance DECIMAL(15,2) DEFAULT 0')
   .catch((err) => console.warn('DB patch payroll appreciation_allowance:', err.message));
+pool.query(`
+  ALTER TABLE payroll_items 
+    ADD COLUMN IF NOT EXISTS late_minutes INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS late_deduction DECIMAL(15,2) DEFAULT 0;
+  ALTER TABLE positions
+    ADD COLUMN IF NOT EXISTS use_custom_late_deduction BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS late_deduction_enabled BOOLEAN DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS late_deduction_mode VARCHAR(20) DEFAULT 'per_minute',
+    ADD COLUMN IF NOT EXISTS late_deduction_rate_per_minute DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS late_deduction_rate_per_hour DECIMAL(15,2) DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS late_deduction_hour_round VARCHAR(30) DEFAULT 'round_up',
+    ADD COLUMN IF NOT EXISTS late_grace_period_minutes INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS late_deduct_grace_period BOOLEAN DEFAULT FALSE;
+`).catch((err) => console.warn('DB patch payroll late deductions & position rules:', err.message));
 pool.query(`ALTER TABLE employee_loans ADD COLUMN IF NOT EXISTS installment_period VARCHAR(10) NOT NULL DEFAULT 'monthly'`)
   .catch((err) => console.warn('DB patch installment_period:', err.message));
+pool.query(`
+  ALTER TABLE employee_details 
+    ADD COLUMN IF NOT EXISTS contract_start_date DATE,
+    ADD COLUMN IF NOT EXISTS contract_end_date DATE;
+  ALTER TABLE vehicle_types
+    ADD COLUMN IF NOT EXISTS daily_rate DECIMAL(15,2) DEFAULT 0;
+  ALTER TABLE driver_activities
+    ADD COLUMN IF NOT EXISTS vehicle_type_id INTEGER REFERENCES vehicle_types(id) ON DELETE SET NULL;
+`).catch((err) => console.warn('DB patch vehicle rate & contracts:', err.message));
 pool.query(`
   ALTER TABLE leave_settings 
     ADD COLUMN IF NOT EXISTS leave_calculation_mode VARCHAR(20) DEFAULT 'both',

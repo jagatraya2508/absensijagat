@@ -100,6 +100,16 @@ const EXCEL_HEADER_MAP = {
     employment_status: 'employment_status',
     'tanggal masuk': 'join_date',
     'tgl masuk': 'join_date',
+    'tanggal mulai kontrak': 'contract_start_date',
+    'tgl mulai kontrak': 'contract_start_date',
+    'mulai kontrak': 'contract_start_date',
+    'contract_start_date': 'contract_start_date',
+    'tanggal habis kontrak': 'contract_end_date',
+    'tgl habis kontrak': 'contract_end_date',
+    'tanggal berakhir kontrak': 'contract_end_date',
+    'tgl berakhir kontrak': 'contract_end_date',
+    'habis kontrak': 'contract_end_date',
+    'contract_end_date': 'contract_end_date',
     'gaji pokok': 'basic_salary',
     gaji: 'basic_salary',
     'tipe gaji': 'salary_type',
@@ -257,6 +267,7 @@ router.get('/', authenticateToken, hasPermission('admin.employees'), async (req,
         const result = await pool.query(`
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
                    ed.nik, ed.phone, ed.department, ed.division, ed.position, ed.employment_status, ed.join_date,
+                   ed.contract_start_date, ed.contract_end_date,
                    ed.basic_salary, ed.salary_type, ed.gender, ed.bpjs_kesehatan_no, ed.npwp,
                    COALESCE(ed.appreciation_allowance, 0) as appreciation_allowance,
                    COALESCE(ed.transport_allowance, 0) as transport_allowance,
@@ -321,6 +332,8 @@ router.get('/template', authenticateToken, hasPermission('admin.employees'), asy
             { header: 'Jabatan', key: 'position', width: 18 },
             { header: 'Status Karyawan', key: 'employment_status', width: 18 },
             { header: 'Tanggal Masuk', key: 'join_date', width: 16 },
+            { header: 'Tanggal Mulai Kontrak', key: 'contract_start_date', width: 20 },
+            { header: 'Tanggal Habis Kontrak', key: 'contract_end_date', width: 20 },
             { header: 'Gaji Pokok', key: 'basic_salary', width: 14 },
             { header: 'Tipe Gaji', key: 'salary_type', width: 14 },
             { header: 'Tunjangan Apresiasi', key: 'appreciation_allowance', width: 20 },
@@ -332,15 +345,15 @@ router.get('/template', authenticateToken, hasPermission('admin.employees'), asy
             { header: 'Nama Rekening', key: 'bank_holder', width: 22 }
         ];
         sheet.columns = columns;
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 23, 24, 25, 26, 27, 28].forEach((col) => {
-            sheet.getColumn(col).numFmt = '@';
-        });
+        for (let colIdx = 1; colIdx <= columns.length; colIdx++) {
+            sheet.getColumn(colIdx).numFmt = '@';
+        }
         applyHeaderStyle(sheet.getRow(1));
         sheet.getRow(1).height = 28;
 
         const sampleRows = [
-            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', '3174010101900001', '', '081234567890', 'Jl. Merdeka No. 1', 'Jakarta', '1990-01-15', 'Laki-laki', 'Menikah', 'Islam', 'S1', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[0]?.name || 'Staff', empStatuses.rows[0]?.name || 'Permanen', '2024-01-02', '5000000', 'Bulanan', '0', '', '', '', 'BCA', '1234567890', 'Budi Santoso'],
-            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', '3174010202920002', '', '081298765432', 'Jl. Sudirman No. 2', 'Bandung', '1992-02-20', 'Perempuan', 'Belum Menikah', 'Islam', 'SMA', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[1]?.name || positions.rows[0]?.name || 'Staff', empStatuses.rows[1]?.name || empStatuses.rows[0]?.name || 'Kontrak', '2024-03-01', '4500000', 'Bulanan', '0', '', '', '', 'Mandiri', '0987654321', 'Siti Aminah']
+            ['EMP001', 'Budi Santoso', 'budi@company.com', 'password123', '3174010101900001', '', '081234567890', 'Jl. Merdeka No. 1', 'Jakarta', '1990-01-15', 'Laki-laki', 'Menikah', 'Islam', 'S1', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[0]?.name || 'Staff', empStatuses.rows[0]?.name || 'Permanen', '2024-01-02', '', '', '5000000', 'Bulanan', '0', '', '', '', 'BCA', '1234567890', 'Budi Santoso'],
+            ['EMP002', 'Siti Aminah', 'siti@company.com', 'password123', '3174010202920002', '', '081298765432', 'Jl. Sudirman No. 2', 'Bandung', '1992-02-20', 'Perempuan', 'Belum Menikah', 'Islam', 'SMA', depts.rows[0]?.name || 'Operasional', divisions.rows[0]?.name || '', positions.rows[1]?.name || positions.rows[0]?.name || 'Staff', empStatuses.rows[1]?.name || empStatuses.rows[0]?.name || 'Kontrak', '2024-03-01', '2024-03-01', '2025-03-01', '4500000', 'Bulanan', '0', '', '', '', 'Mandiri', '0987654321', 'Siti Aminah']
         ];
         sampleRows.forEach((values, idx) => {
             const row = sheet.addRow(values);
@@ -608,6 +621,8 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                 position: read(row, 'position') || null,
                 employment_status: employmentStatus,
                 join_date: readDate(row, 'join_date'),
+                contract_start_date: readDate(row, 'contract_start_date'),
+                contract_end_date: readDate(row, 'contract_end_date'),
                 basic_salary: readNum(row, 'basic_salary'),
                 salary_type: salaryType,
                 appreciation_allowance: readNum(row, 'appreciation_allowance'),
@@ -689,6 +704,17 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                         details.basic_salary, details.salary_type, details.no_kk, details.appreciation_allowance
                     ]);
 
+                    if (details.contract_start_date || details.contract_end_date) {
+                        await pool.query(
+                            `UPDATE employee_details SET 
+                                contract_start_date = COALESCE($1, contract_start_date), 
+                                contract_end_date = COALESCE($2, contract_end_date), 
+                                updated_at = CURRENT_TIMESTAMP 
+                             WHERE user_id = $3`,
+                            [details.contract_start_date || null, details.contract_end_date || null, existing.id]
+                        );
+                    }
+
                     updated++;
                     seenIds.add(empKey);
                     if (email) {
@@ -737,6 +763,17 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
                         details.npwp, details.bpjs_kesehatan_no, details.bpjs_ketenagakerjaan_no,
                         details.basic_salary, details.salary_type || 'monthly', details.no_kk, details.appreciation_allowance || 0
                     ]);
+
+                    if (details.contract_start_date || details.contract_end_date) {
+                        await pool.query(
+                            `UPDATE employee_details SET 
+                                contract_start_date = $1, 
+                                contract_end_date = $2, 
+                                updated_at = CURRENT_TIMESTAMP 
+                             WHERE user_id = $3`,
+                            [details.contract_start_date || null, details.contract_end_date || null, newUser.id]
+                        );
+                    }
 
                     usersByEmpId.set(empKey, newUser);
                     currentUsers++;
@@ -813,6 +850,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             nik, phone, address, birth_date, birth_place,
             gender, marital_status, religion, education,
             department, division, position, join_date, employment_status,
+            contract_start_date, contract_end_date,
             bank_name, bank_account, bank_holder,
             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
             basic_salary, salary_type, transport_allowance, meal_allowance, appreciation_allowance, overtime_rate,
@@ -1006,6 +1044,20 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             await pool.query(
                 `UPDATE employee_details SET receives_tuang = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
                 [receives_tuang !== false, id]
+            );
+        }
+
+        if (contract_start_date !== undefined) {
+            await pool.query(
+                `UPDATE employee_details SET contract_start_date = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [contract_start_date || null, id]
+            );
+        }
+
+        if (contract_end_date !== undefined) {
+            await pool.query(
+                `UPDATE employee_details SET contract_end_date = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [contract_end_date || null, id]
             );
         }
 

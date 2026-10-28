@@ -11,7 +11,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
     const location = useLocation();
     const [openMenus, setOpenMenus] = useState(() => {
         const phone = window.matchMedia('(max-width: 768px)').matches;
-        return { master: !phone, laporanKerja: !phone };
+        return { master: !phone, laporanKerja: !phone, standardReport: !phone };
     });
 
     function toggleMenu(key) {
@@ -82,8 +82,15 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/payroll', icon: 'Banknote', label: 'Payroll', permissionKey: 'admin.payroll' },
         { path: '/admin/assessments', icon: 'ClipboardList', label: 'Penilaian', permissionKey: 'admin.assessments' },
         { path: '/admin/recruitment', icon: 'Briefcase', label: 'Recruitment', permissionKey: 'admin.recruitment' },
-        { path: '/admin/reports', icon: 'BarChart3', label: 'Laporan', permissionKey: 'admin.reports', showIfManager: true },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor) || (item.showIfManager && (user?.role === 'manager' || user?.role === 'admin')));
+
+    // Standart Report submenu items
+    const standardReportItems = [
+        { path: '/admin/reports', icon: 'BarChart3', label: 'Laporan', permissionKey: 'admin.reports', showIfManager: true },
+        { path: '/admin/contract-report', icon: 'FileWarning', label: 'Laporan Habis Kontrak', permissionKey: 'admin.reports', showIfManager: true },
+    ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor) || (item.showIfManager && (user?.role === 'manager' || user?.role === 'admin')));
+
+    const isStandardReportActive = standardReportItems.some(item => location.pathname === item.path);
 
     // Other admin items (flat)
     const adminItems = [
@@ -100,6 +107,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         setOpenMenus({
             master: masterItems.some(item => item.path === location.pathname),
             laporanKerja: laporanKerjaItems.some(item => item.path === location.pathname),
+            standardReport: standardReportItems.some(item => item.path === location.pathname),
         });
     }, [location.pathname]);
 
@@ -189,7 +197,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                         </NavLink>
                     ))}
 
-                    {pimpinanItems.length > 0 && !kioskOnly && (
+                    {(pimpinanItems.length > 0 || standardReportItems.length > 0) && !kioskOnly && (
                         <>
                             <div className="sidebar-section">
                                 <span>Task Pimpinan</span>
@@ -209,6 +217,47 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                     {item.label}
                                 </NavLink>
                             ))}
+
+                            {/* Standart Report Submenu */}
+                            {standardReportItems.length > 0 && (
+                                <>
+                                    <div
+                                        onClick={() => toggleMenu('standardReport')}
+                                        className={`sidebar-group${isStandardReportActive ? ' is-active' : ''}`}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                            <span className="sidebar-link-icon"><Icon name="FileBarChart" size={18} /></span>
+                                            Standart Report
+                                        </div>
+                                        <span style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            width: '22px', height: '22px', borderRadius: '6px',
+                                            background: 'rgba(255,255,255,0.12)',
+                                            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease',
+                                            transform: openMenus.standardReport ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        }}><Icon name="ChevronDown" size={16} /></span>
+                                    </div>
+
+                                    <div
+                                        className={`sidebar-submenu${openMenus.standardReport ? ' is-open' : ''}`}
+                                        style={{ maxHeight: openMenus.standardReport ? '240px' : '0px' }}
+                                    >
+                                        {standardReportItems.map((item) => (
+                                            <NavLink
+                                                key={item.path}
+                                                to={item.path}
+                                                onClick={onNavigate}
+                                                className={({ isActive }) =>
+                                                    `sidebar-link ${isActive ? 'active' : ''}`
+                                                }
+                                            >
+                                                <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
+                                                {item.label}
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </>
                     )}
 

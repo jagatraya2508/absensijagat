@@ -13,10 +13,18 @@ router.get('/', authenticateToken, canManageDriverActivities, async (req, res) =
         let query = `
             SELECT da.*, u.name as user_name, u.employee_id,
                    ed.driver_subuh_allowance, ed.driver_rit_allowance, ed.driver_inap_allowance,
-                   ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance
+                   ed.driver_ritase_dekat_allowance, ed.driver_ritase_jauh_allowance,
+                   COALESCE(ed.basic_salary, 0) as driver_basic_salary,
+                   ed.vehicle_type_id as driver_default_vehicle_id,
+                   default_vt.name as driver_default_vehicle_name,
+                   COALESCE(default_vt.daily_rate, 0) as driver_default_vehicle_rate,
+                   COALESCE(vt.name, default_vt.name) as vehicle_type_name,
+                   COALESCE(vt.daily_rate, default_vt.daily_rate, 0) as vehicle_daily_rate
             FROM driver_activities da
             JOIN users u ON da.user_id = u.id
             LEFT JOIN employee_details ed ON da.user_id = ed.user_id
+            LEFT JOIN vehicle_types default_vt ON ed.vehicle_type_id = default_vt.id
+            LEFT JOIN vehicle_types vt ON da.vehicle_type_id = vt.id
             WHERE 1=1
         `;
         const params = [];
@@ -104,9 +112,12 @@ router.get('/summary', authenticateToken, canManageDriverActivities, async (req,
 router.get('/drivers', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT u.id, u.name, u.employee_id
+            SELECT u.id, u.name, u.employee_id, ed.vehicle_type_id,
+                   vt.name as vehicle_type_name, COALESCE(vt.daily_rate, 0) as vehicle_daily_rate,
+                   COALESCE(ed.basic_salary, 0) as basic_salary
             FROM users u
             JOIN employee_details ed ON u.id = ed.user_id
+            LEFT JOIN vehicle_types vt ON ed.vehicle_type_id = vt.id
             WHERE u.role = 'employee' AND ed.is_driver = true
             ORDER BY u.name ASC
         `);
@@ -120,24 +131,28 @@ router.get('/drivers', authenticateToken, canManageDriverActivities, async (req,
 // Create driver activity
 router.post('/', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
-        const { user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh } = req.body;
+        const { user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh, vehicle_type_id } = req.body;
 
         if (!user_id || !activity_date) {
             return res.status(400).json({ error: 'Driver dan tanggal harus diisi' });
         }
 
-        // Verify user is a driver
+        // Verify user is a driver and get default vehicle
         const driverCheck = await pool.query(
-            'SELECT ed.is_driver FROM employee_details ed WHERE ed.user_id = $1',
+            'SELECT ed.is_driver, ed.vehicle_type_id FROM employee_details ed WHERE ed.user_id = $1',
             [user_id]
         );
         if (driverCheck.rows.length === 0 || !driverCheck.rows[0].is_driver) {
             return res.status(400).json({ error: 'Karyawan ini bukan driver' });
         }
 
+        const effectiveVehicleTypeId = vehicle_type_id !== undefined && vehicle_type_id !== null && vehicle_type_id !== ''
+            ? vehicle_type_id
+            : (driverCheck.rows[0].vehicle_type_id || null);
+
         const result = await pool.query(`
-            INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh, vehicle_type_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (user_id, activity_date) DO UPDATE SET
                 is_subuh = EXCLUDED.is_subuh,
                 departure_time = EXCLUDED.departure_time,
@@ -147,6 +162,7 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
                 notes = EXCLUDED.notes,
                 ritase_dekat = EXCLUDED.ritase_dekat,
                 ritase_jauh = EXCLUDED.ritase_jauh,
+                vehicle_type_id = EXCLUDED.vehicle_type_id,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING *
         `, [
@@ -159,7 +175,8 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
             notes || null,
             req.user.id,
             ritase_dekat || 0,
-            ritase_jauh || 0
+            ritase_jauh || 0,
+            effectiveVehicleTypeId
         ]);
 
         res.status(201).json(result.rows[0]);
@@ -173,18 +190,19 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
 router.put('/:id', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { id } = req.params;
-        const { is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh } = req.body;
+        const { is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh, vehicle_type_id } = req.body;
 
         const result = await pool.query(`
             UPDATE driver_activities SET
                 is_subuh = $1, departure_time = $2, rit_count = $3, rit_notes = $4,
-                is_overnight = $5, notes = $6, ritase_dekat = $7, ritase_jauh = $8, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $9
+                is_overnight = $5, notes = $6, ritase_dekat = $7, ritase_jauh = $8,
+                vehicle_type_id = $9, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $10
             RETURNING *
         `, [
             is_subuh || false, departure_time || null, rit_count || 1,
             rit_notes || null, is_overnight || false, notes || null, 
-            ritase_dekat || 0, ritase_jauh || 0, id
+            ritase_dekat || 0, ritase_jauh || 0, vehicle_type_id || null, id
         ]);
 
         if (result.rows.length === 0) {
@@ -226,8 +244,8 @@ router.post('/bulk', authenticateToken, canManageDriverActivities, async (req, r
         const results = [];
         for (const act of activities) {
             const result = await client.query(`
-                INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh, vehicle_type_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 ON CONFLICT (user_id, activity_date) DO UPDATE SET
                     is_subuh = EXCLUDED.is_subuh,
                     departure_time = EXCLUDED.departure_time,
@@ -237,6 +255,7 @@ router.post('/bulk', authenticateToken, canManageDriverActivities, async (req, r
                     notes = EXCLUDED.notes,
                     ritase_dekat = EXCLUDED.ritase_dekat,
                     ritase_jauh = EXCLUDED.ritase_jauh,
+                    vehicle_type_id = EXCLUDED.vehicle_type_id,
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING *
             `, [
@@ -245,7 +264,8 @@ router.post('/bulk', authenticateToken, canManageDriverActivities, async (req, r
                 act.rit_count || 1, act.rit_notes || null,
                 act.is_overnight || false, act.notes || null,
                 req.user.id,
-                act.ritase_dekat || 0, act.ritase_jauh || 0
+                act.ritase_dekat || 0, act.ritase_jauh || 0,
+                act.vehicle_type_id || null
             ]);
             results.push(result.rows[0]);
         }

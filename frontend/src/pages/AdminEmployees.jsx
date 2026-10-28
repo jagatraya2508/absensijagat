@@ -107,6 +107,7 @@ export default function AdminEmployees() {
         nik: '', no_kk: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
         department: '', division: '', position: '', employment_status: '', join_date: '', supervisor_id: '',
+        contract_start_date: '', contract_end_date: '',
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0, overtime_rate: 50000,
@@ -254,6 +255,8 @@ export default function AdminEmployees() {
                 employment_status: d.employment_status || '',
                 supervisor_id: d.supervisor_id || '',
                 join_date: d.join_date ? d.join_date.split('T')[0] : '',
+                contract_start_date: d.contract_start_date ? d.contract_start_date.split('T')[0] : '',
+                contract_end_date: d.contract_end_date ? d.contract_end_date.split('T')[0] : '',
                 bank_name: d.bank_name || '', bank_account: d.bank_account || '',
                 bank_holder: d.bank_holder || '',
                 npwp: d.npwp || '', bpjs_kesehatan_no: d.bpjs_kesehatan_no || '',
@@ -550,6 +553,8 @@ export default function AdminEmployees() {
             if (visibleColumns.includes('phone')) row['No. Telepon'] = emp.phone || '-';
             if (visibleColumns.includes('nik')) row['NIK'] = emp.nik || '-';
             if (visibleColumns.includes('join_date')) row['Tanggal Masuk'] = emp.join_date ? emp.join_date.split('T')[0] : '-';
+            if (visibleColumns.includes('contract_start_date')) row['Tgl Mulai Kontrak'] = emp.contract_start_date ? emp.contract_start_date.split('T')[0] : '-';
+            if (visibleColumns.includes('contract_end_date')) row['Tgl Habis Kontrak'] = emp.contract_end_date ? emp.contract_end_date.split('T')[0] : '-';
             if (visibleColumns.includes('gender')) row['Jenis Kelamin'] = emp.gender || '-';
             return row;
         });
@@ -634,6 +639,8 @@ export default function AdminEmployees() {
         if (visibleColumns.includes('phone')) pdfHeaders.push('Telepon');
         if (visibleColumns.includes('nik')) pdfHeaders.push('NIK');
         if (visibleColumns.includes('join_date')) pdfHeaders.push('Tgl Masuk');
+        if (visibleColumns.includes('contract_start_date')) pdfHeaders.push('Mulai Kontrak');
+        if (visibleColumns.includes('contract_end_date')) pdfHeaders.push('Habis Kontrak');
         if (visibleColumns.includes('gender')) pdfHeaders.push('Gender');
 
         const tableData = filteredEmployees.map((emp, i) => {
@@ -653,6 +660,8 @@ export default function AdminEmployees() {
             if (visibleColumns.includes('phone')) row.push(emp.phone || '-');
             if (visibleColumns.includes('nik')) row.push(emp.nik || '-');
             if (visibleColumns.includes('join_date')) row.push(emp.join_date ? new Date(emp.join_date).toLocaleDateString('id-ID') : '-');
+            if (visibleColumns.includes('contract_start_date')) row.push(emp.contract_start_date ? new Date(emp.contract_start_date).toLocaleDateString('id-ID') : '-');
+            if (visibleColumns.includes('contract_end_date')) row.push(emp.contract_end_date ? new Date(emp.contract_end_date).toLocaleDateString('id-ID') : '-');
             if (visibleColumns.includes('gender')) row.push(emp.gender || '-');
             return row;
         });
@@ -692,6 +701,8 @@ export default function AdminEmployees() {
         if (visibleColumns.includes('phone')) printHeaders.push('<th>Telepon</th>');
         if (visibleColumns.includes('nik')) printHeaders.push('<th>NIK</th>');
         if (visibleColumns.includes('join_date')) printHeaders.push('<th>Tgl Masuk</th>');
+        if (visibleColumns.includes('contract_start_date')) printHeaders.push('<th>Mulai Kontrak</th>');
+        if (visibleColumns.includes('contract_end_date')) printHeaders.push('<th>Habis Kontrak</th>');
         if (visibleColumns.includes('gender')) printHeaders.push('<th>Gender</th>');
 
         const printRows = filteredEmployees.map((emp, i) => {
@@ -711,6 +722,8 @@ export default function AdminEmployees() {
             if (visibleColumns.includes('phone')) cols.push(`<td>${emp.phone || '-'}</td>`);
             if (visibleColumns.includes('nik')) cols.push(`<td>${emp.nik || '-'}</td>`);
             if (visibleColumns.includes('join_date')) cols.push(`<td>${emp.join_date ? new Date(emp.join_date).toLocaleDateString('id-ID') : '-'}</td>`);
+            if (visibleColumns.includes('contract_start_date')) cols.push(`<td>${emp.contract_start_date ? new Date(emp.contract_start_date).toLocaleDateString('id-ID') : '-'}</td>`);
+            if (visibleColumns.includes('contract_end_date')) cols.push(`<td>${emp.contract_end_date ? new Date(emp.contract_end_date).toLocaleDateString('id-ID') : '-'}</td>`);
             if (visibleColumns.includes('gender')) cols.push(`<td>${emp.gender || '-'}</td>`);
             return `<tr>${cols.join('')}</tr>`;
         }).join('');
@@ -977,6 +990,16 @@ export default function AdminEmployees() {
                                             Tgl Masuk <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'join_date' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('join_date')}</span>
                                         </th>
                                     )}
+                                    {visibleColumns.includes('contract_start_date') && (
+                                        <th onClick={() => handleSort('contract_start_date')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Mulai Kontrak <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'contract_start_date' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('contract_start_date')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('contract_end_date') && (
+                                        <th onClick={() => handleSort('contract_end_date')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Habis Kontrak <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'contract_end_date' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('contract_end_date')}</span>
+                                        </th>
+                                    )}
                                     {visibleColumns.includes('gender') && (
                                         <th onClick={() => handleSort('gender')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                             Gender <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'gender' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('gender')}</span>
@@ -1032,6 +1055,16 @@ export default function AdminEmployees() {
                                         {visibleColumns.includes('phone') && <td>{emp.phone || '-'}</td>}
                                         {visibleColumns.includes('nik') && <td>{emp.nik || '-'}</td>}
                                         {visibleColumns.includes('join_date') && <td>{emp.join_date ? new Date(emp.join_date).toLocaleDateString('id-ID') : '-'}</td>}
+                                        {visibleColumns.includes('contract_start_date') && <td>{emp.contract_start_date ? new Date(emp.contract_start_date).toLocaleDateString('id-ID') : '-'}</td>}
+                                        {visibleColumns.includes('contract_end_date') && (
+                                            <td>
+                                                {emp.contract_end_date ? (
+                                                    <span style={{ fontWeight: 500 }}>
+                                                        {new Date(emp.contract_end_date).toLocaleDateString('id-ID')}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                        )}
                                         {visibleColumns.includes('gender') && <td>{emp.gender || '-'}</td>}
                                         {visibleColumns.includes('actions') && (
                                             <td>
@@ -1414,6 +1447,36 @@ export default function AdminEmployees() {
                                         <div className="form-group">
                                             <label className="form-label">Tanggal Masuk</label>
                                             <input className="form-input" type="date" value={formData.join_date} onChange={e => updateField('join_date', e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Tanggal Mulai Kontrak</label>
+                                            <input className="form-input" type="date" value={formData.contract_start_date || ''} onChange={e => updateField('contract_start_date', e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span>Tanggal Habis Kontrak</span>
+                                                {(() => {
+                                                    if (!formData.contract_end_date) return null;
+                                                    const today = new Date();
+                                                    today.setHours(0,0,0,0);
+                                                    const end = new Date(formData.contract_end_date + 'T00:00:00');
+                                                    const diffDays = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+                                                    if (diffDays < 0) {
+                                                        return <span className="badge badge-danger" style={{ fontSize: '0.65rem' }}>Lewat {Math.abs(diffDays)} hari</span>;
+                                                    }
+                                                    if (diffDays === 0) {
+                                                        return <span className="badge badge-danger" style={{ fontSize: '0.65rem' }}>Habis Hari Ini</span>;
+                                                    }
+                                                    if (diffDays <= 30) {
+                                                        return <span className="badge badge-danger" style={{ fontSize: '0.65rem' }}>{diffDays} hari lagi</span>;
+                                                    }
+                                                    if (diffDays <= 90) {
+                                                        return <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>{diffDays} hari lagi</span>;
+                                                    }
+                                                    return <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>{diffDays} hari lagi</span>;
+                                                })()}
+                                            </label>
+                                            <input className="form-input" type="date" value={formData.contract_end_date || ''} onChange={e => updateField('contract_end_date', e.target.value)} />
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Atasan Langsung</label>

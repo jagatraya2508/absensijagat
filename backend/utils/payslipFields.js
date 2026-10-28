@@ -1,16 +1,16 @@
 const PAYSLIP_FIELD_KEYS = [
-    'name', 'employee_id', 'department', 'position', 'npwp',
+    'name', 'employee_id', 'department', 'position', 'npwp', 'bank_name', 'bank_account',
     'basic_salary', 'transport_allowance', 'meal_allowance', 'appreciation_allowance', 'overtime',
     'driver_subuh', 'driver_rit', 'driver_overnight', 'driver_ritase_dekat', 'driver_ritase_jauh', 'tuang',
     'gross_income',
-    'bpjs_kes_employee', 'bpjs_jht_employee', 'bpjs_jp_employee', 'pph21', 'loan', 'total_deductions',
+    'bpjs_kes_employee', 'bpjs_jht_employee', 'bpjs_jp_employee', 'pph21', 'loan', 'late_deduction', 'total_deductions',
     'bpjs_kes_company', 'bpjs_jht_company', 'bpjs_jp_company', 'bpjs_jkk', 'bpjs_jkm',
     'net_salary', 'bank',
 ];
 
 const POSITIVE_ONLY = new Set([
     'driver_subuh', 'driver_rit', 'driver_overnight', 'driver_ritase_dekat', 'driver_ritase_jauh', 'tuang',
-    'bpjs_kes_employee', 'bpjs_jht_employee', 'bpjs_jp_employee',
+    'bpjs_kes_employee', 'bpjs_jht_employee', 'bpjs_jp_employee', 'late_deduction',
     'bpjs_kes_company', 'bpjs_jht_company', 'bpjs_jp_company', 'bpjs_jkk', 'bpjs_jkm',
 ]);
 
@@ -131,6 +131,7 @@ function buildSlipSections(slip, vis) {
     pushLine(deductions, vis, 'bpjs_jp_employee', `BPJS JP (${slipPercent(base, slip.bpjs_jp_employee)}%)`, slip.bpjs_jp_employee);
     pushLine(deductions, vis, 'pph21', 'PPh 21', slip.pph21_amount);
     pushLine(deductions, vis, 'loan', 'Potongan Pinjaman', slip.loan_deduction);
+    pushLine(deductions, vis, 'late_deduction', `Potongan Terlambat (${slip.late_minutes || 0} mnt)`, slip.late_deduction);
 
     const company = [];
     pushLine(company, vis, 'bpjs_kes_company', `BPJS Kesehatan (${slipPercent(base, slip.bpjs_kes_company)}%)`, slip.bpjs_kes_company);
@@ -145,6 +146,8 @@ function buildSlipSections(slip, vis) {
     if (vis.show('department')) identity.push(['Departemen', slip.department || '-']);
     if (vis.show('position')) identity.push(['Jabatan', slip.position || '-']);
     if (vis.show('npwp') && slip.npwp) identity.push(['NPWP', slip.npwp]);
+    if (vis.show('bank_name')) identity.push(['Bank', slip.bank_name || '-']);
+    if (vis.show('bank_account')) identity.push(['No. Rekening', slip.bank_account || '-']);
 
     return {
         identity,
@@ -154,7 +157,7 @@ function buildSlipSections(slip, vis) {
         showGross: vis.show('gross_income'),
         showTotalDeduct: vis.show('total_deductions'),
         showNet: vis.show('net_salary'),
-        showBank: vis.show('bank') && !!slip.bank_name,
+        showBank: vis.show('bank') !== false,
     };
 }
 

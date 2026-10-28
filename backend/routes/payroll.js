@@ -221,9 +221,11 @@ router.get('/:id', authenticateToken, canManagePayroll, async (req, res) => {
         }
 
         const itemsResult = await pool.query(`
-            SELECT pi.*, u.name as user_name, u.employee_id
+            SELECT pi.*, u.name as user_name, u.employee_id,
+                   ed.bank_name, ed.bank_account
             FROM payroll_items pi
             JOIN users u ON pi.user_id = u.id
+            LEFT JOIN employee_details ed ON pi.user_id = ed.user_id
             WHERE pi.payroll_run_id = $1
             ORDER BY u.name ASC
         `, [id]);
@@ -324,19 +326,31 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                    ed.bpjs_kes_employee_rate, ed.bpjs_kes_company_rate,
                    ed.bpjs_jht_employee_rate, ed.bpjs_jht_company_rate,
                    ed.bpjs_jp_employee_rate, ed.bpjs_jp_company_rate,
-                   ed.bpjs_jkk_rate, ed.bpjs_jkm_rate
+                   ed.bpjs_jkk_rate, ed.bpjs_jkm_rate,
+                   ed.position,
+                   pos.use_custom_late_deduction,
+                   pos.late_deduction_enabled as pos_late_enabled,
+                   pos.late_deduction_mode as pos_late_mode,
+                   pos.late_deduction_rate_per_minute as pos_late_rate_per_minute,
+                   pos.late_deduction_rate_per_hour as pos_late_rate_per_hour,
+                   pos.late_deduction_hour_round as pos_late_hour_round,
+                   pos.late_grace_period_minutes as pos_late_grace_minutes,
+                   pos.late_deduct_grace_period as pos_late_deduct_grace
             FROM users u
             LEFT JOIN employee_details ed ON u.id = ed.user_id
+            LEFT JOIN positions pos ON LOWER(TRIM(COALESCE(ed.position, ''))) = LOWER(TRIM(pos.name))
             WHERE u.role = 'employee'
         `);
         const payrollEmployees = employees.rows.filter((emp) => (
-            periodType === 'weekly' ? emp.salary_type === 'weekly' : emp.salary_type !== 'weekly'
+            periodType === 'weekly' 
+                ? (emp.salary_type === 'weekly' || emp.salary_type === 'daily') 
+                : (emp.salary_type !== 'weekly' && emp.salary_type !== 'daily')
         ));
         if (payrollEmployees.length === 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({
                 error: periodType === 'weekly'
-                    ? 'Tidak ada karyawan dengan gaji mingguan.'
+                    ? 'Tidak ada karyawan dengan gaji mingguan atau harian.'
                     : 'Tidak ada karyawan untuk payroll bulanan.'
             });
         }
@@ -349,6 +363,43 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             if (dow !== 0 && dow !== 6) totalWorkingDays++;
         }
         const allowanceFactor = periodType === 'weekly' ? 0.25 : 1;
+
+        // Load late deduction settings
+        const lateSettingsRes = await client.query(
+            `SELECT key, value FROM settings WHERE key IN (
+                'late_deduction_enabled',
+                'late_deduction_mode',
+                'late_deduction_rate_per_minute',
+                'late_deduction_rate_per_hour',
+                'late_deduction_hour_round',
+                'late_grace_period_minutes',
+                'late_deduct_grace_period',
+                'late_exempt_approved_leave',
+                'late_fallback_start_time'
+            )`
+        );
+        const lateConfig = {
+            enabled: false,
+            mode: 'per_minute',
+            ratePerMinute: 1000,
+            ratePerHour: 25000,
+            hourRound: 'round_up',
+            graceMinutes: 0,
+            deductGrace: false,
+            exemptApprovedLeave: true,
+            fallbackStart: '08:00'
+        };
+        lateSettingsRes.rows.forEach(r => {
+            if (r.key === 'late_deduction_enabled') lateConfig.enabled = r.value === 'true';
+            else if (r.key === 'late_deduction_mode') lateConfig.mode = r.value || 'per_minute';
+            else if (r.key === 'late_deduction_rate_per_minute') lateConfig.ratePerMinute = parseFloat(r.value) || 0;
+            else if (r.key === 'late_deduction_rate_per_hour') lateConfig.ratePerHour = parseFloat(r.value) || 0;
+            else if (r.key === 'late_deduction_hour_round') lateConfig.hourRound = r.value || 'round_up';
+            else if (r.key === 'late_grace_period_minutes') lateConfig.graceMinutes = parseInt(r.value, 10) || 0;
+            else if (r.key === 'late_deduct_grace_period') lateConfig.deductGrace = r.value === 'true';
+            else if (r.key === 'late_exempt_approved_leave') lateConfig.exemptApprovedLeave = r.value !== 'false';
+            else if (r.key === 'late_fallback_start_time') lateConfig.fallbackStart = r.value || '08:00';
+        });
         for (const emp of payrollEmployees) {
             const salaryType = emp.salary_type || 'monthly';
             const baseSalaryRate = parseFloat(emp.basic_salary);
@@ -370,8 +421,50 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             let workingDays = 0;
             let basicSalary = 0;
             if (salaryType === 'daily') {
-                workingDays = daysWorked;
-                basicSalary = baseSalaryRate * daysWorked;
+                if (emp.is_driver) {
+                    // Ambil seluruh tanggal kerja (baik dari absensi check-in maupun aktivitas driver)
+                    const driverDays = await client.query(`
+                        SELECT 
+                            d.work_date,
+                            COALESCE(vt.daily_rate, 0) as vehicle_daily_rate,
+                            vt.name as vehicle_name
+                        FROM (
+                            SELECT DISTINCT DATE(recorded_at) as work_date
+                            FROM attendance_records
+                            WHERE user_id = $1
+                              AND type = 'check_in'
+                              AND recorded_at >= $2::date
+                              AND recorded_at < $3::date
+                            UNION
+                            SELECT DISTINCT activity_date as work_date
+                            FROM driver_activities
+                            WHERE user_id = $1
+                              AND activity_date >= $2::date
+                              AND activity_date < $3::date
+                        ) d
+                        LEFT JOIN driver_activities da ON da.user_id = $1 AND da.activity_date = d.work_date
+                        LEFT JOIN vehicle_types vt ON da.vehicle_type_id = vt.id
+                        ORDER BY d.work_date ASC
+                    `, [emp.id, rangeStart, rangeEnd]);
+
+                    const actualDays = driverDays.rows.length;
+                    workingDays = actualDays > 0 ? actualDays : daysWorked;
+                    if (actualDays > 0) {
+                        let totalDaily = 0;
+                        for (const row of driverDays.rows) {
+                            const vehicleRate = parseFloat(row.vehicle_daily_rate) || 0;
+                            // Asas tidak merugikan driver: ambil tarif tertinggi antara base supir vs tarif mobil yang dibawa
+                            const effectiveDayRate = Math.max(baseSalaryRate, vehicleRate);
+                            totalDaily += effectiveDayRate;
+                        }
+                        basicSalary = totalDaily;
+                    } else {
+                        basicSalary = baseSalaryRate * workingDays;
+                    }
+                } else {
+                    workingDays = daysWorked;
+                    basicSalary = baseSalaryRate * daysWorked;
+                }
             } else if (salaryType === 'weekly') {
                 const weeksWorked = periodType === 'weekly'
                     ? (attendedDays > 0 ? 1 : 0)
@@ -504,7 +597,131 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             }, 0);
 
             // Total deductions
-            const totalDeductions = bpjsKesEmployee + bpjsJhtEmployee + bpjsJpEmployee + monthlyPPh + loanDeduction;
+            // Calculate late deduction
+            // Hierarchy: Custom rule per position -> Global lateConfig fallback
+            const effectiveLate = { ...lateConfig };
+            if (emp.use_custom_late_deduction) {
+                effectiveLate.enabled = emp.pos_late_enabled !== false;
+                if (emp.pos_late_mode) effectiveLate.mode = emp.pos_late_mode;
+                effectiveLate.ratePerMinute = parseFloat(emp.pos_late_rate_per_minute) || 0;
+                effectiveLate.ratePerHour = parseFloat(emp.pos_late_rate_per_hour) || 0;
+                if (emp.pos_late_hour_round) effectiveLate.hourRound = emp.pos_late_hour_round;
+                if (emp.pos_late_grace_minutes !== null && emp.pos_late_grace_minutes !== undefined) {
+                    effectiveLate.graceMinutes = parseInt(emp.pos_late_grace_minutes, 10) || 0;
+                }
+                if (emp.pos_late_deduct_grace !== null && emp.pos_late_deduct_grace !== undefined) {
+                    effectiveLate.deductGrace = emp.pos_late_deduct_grace === true;
+                }
+            }
+
+            let totalEmpLateMinutes = 0;
+            let totalEmpLateDeduction = 0;
+
+            // Calculate if enabled either globally or via position custom rule
+            if (effectiveLate.enabled) {
+                const lateRecords = await client.query(`
+                    SELECT DISTINCT ON (DATE(ar.recorded_at))
+                        DATE(ar.recorded_at) as work_date,
+                        TO_CHAR(ar.recorded_at, 'HH24:MI:SS') as check_in_time,
+                        COALESCE(esa_ws.start_time::text, dept_ws.start_time::text, def_ws.start_time::text, $4::text) as scheduled_start_time,
+                        COALESCE(esa_ws.is_overnight, dept_ws.is_overnight, def_ws.is_overnight, false) as is_overnight,
+                        CASE WHEN lr.id IS NOT NULL THEN true ELSE false END as has_approved_late_leave
+                    FROM attendance_records ar
+                    LEFT JOIN LATERAL (
+                        SELECT ws.start_time, ws.is_overnight
+                        FROM employee_shift_assignments esa
+                        JOIN work_shifts ws ON ws.id = esa.shift_id
+                        WHERE esa.user_id = ar.user_id AND esa.assignment_date = DATE(ar.recorded_at)
+                        LIMIT 1
+                    ) esa_ws ON true
+                    LEFT JOIN LATERAL (
+                        SELECT ws.start_time, ws.is_overnight
+                        FROM employee_details ed
+                        LEFT JOIN departments d ON d.name = ed.department
+                        LEFT JOIN positions pos ON pos.name = ed.position
+                        JOIN work_schedule_types wst ON wst.is_active = TRUE
+                          AND (
+                            wst.department_id = d.id
+                            OR wst.position_id = pos.id
+                            OR EXISTS (SELECT 1 FROM work_schedule_departments wsd WHERE wsd.schedule_type_id = wst.id AND wsd.department_id = d.id)
+                            OR EXISTS (SELECT 1 FROM work_schedule_positions wsp WHERE wsp.schedule_type_id = wst.id AND wsp.position_id = pos.id)
+                          )
+                        JOIN work_shifts ws ON ws.schedule_type_id = wst.id
+                        WHERE ed.user_id = ar.user_id
+                        ORDER BY ws.shift_order ASC
+                        LIMIT 1
+                    ) dept_ws ON true
+                    LEFT JOIN LATERAL (
+                        SELECT ws.start_time, ws.is_overnight
+                        FROM work_schedule_types wst
+                        JOIN work_shifts ws ON ws.schedule_type_id = wst.id
+                        WHERE wst.is_active = TRUE AND wst.is_default = TRUE
+                        ORDER BY ws.shift_order ASC
+                        LIMIT 1
+                    ) def_ws ON true
+                    LEFT JOIN LATERAL (
+                        SELECT id
+                        FROM leave_requests
+                        WHERE user_id = ar.user_id
+                          AND type = 'late'
+                          AND status = 'approved'
+                          AND DATE(ar.recorded_at) BETWEEN start_date AND end_date
+                        LIMIT 1
+                    ) lr ON true
+                    WHERE ar.user_id = $1
+                      AND ar.type = 'check_in'
+                      AND ar.recorded_at >= $2::date
+                      AND ar.recorded_at < $3::date
+                    ORDER BY DATE(ar.recorded_at), ar.recorded_at ASC
+                `, [emp.id, rangeStart, rangeEnd, lateConfig.fallbackStart]);
+
+                for (const att of lateRecords.rows) {
+                    if (att.has_approved_late_leave && effectiveLate.exemptApprovedLeave) {
+                        continue;
+                    }
+                    const ciTime = att.check_in_time || '00:00:00';
+                    const schedTime = att.scheduled_start_time || effectiveLate.fallbackStart;
+
+                    const [ciH, ciM, ciS] = ciTime.split(':').map(Number);
+                    const [shH, shM, shS] = schedTime.split(':').map(Number);
+
+                    let ciMins = (ciH || 0) * 60 + (ciM || 0) + ((ciS || 0) / 60);
+                    let shMins = (shH || 0) * 60 + (shM || 0) + ((shS || 0) / 60);
+
+                    if (att.is_overnight && ciMins < shMins && ciMins < 720) {
+                        ciMins += 1440;
+                    }
+
+                    const rawLateMins = Math.floor(ciMins - shMins);
+                    if (rawLateMins > effectiveLate.graceMinutes) {
+                        const chargedMins = effectiveLate.deductGrace ? (rawLateMins - effectiveLate.graceMinutes) : rawLateMins;
+                        totalEmpLateMinutes += chargedMins;
+
+                        if (effectiveLate.mode === 'per_hour' && effectiveLate.hourRound === 'round_up_daily') {
+                            const dayHours = Math.ceil(chargedMins / 60);
+                            totalEmpLateDeduction += dayHours * effectiveLate.ratePerHour;
+                        }
+                    }
+                }
+
+                if (effectiveLate.mode === 'per_minute') {
+                    totalEmpLateDeduction = Math.round(totalEmpLateMinutes * effectiveLate.ratePerMinute);
+                } else if (effectiveLate.mode === 'per_hour' && effectiveLate.hourRound !== 'round_up_daily') {
+                    if (effectiveLate.hourRound === 'round_up') {
+                        const totalHours = Math.ceil(totalEmpLateMinutes / 60);
+                        totalEmpLateDeduction = Math.round(totalHours * effectiveLate.ratePerHour);
+                    } else if (effectiveLate.hourRound === 'prorated') {
+                        const totalHours = totalEmpLateMinutes / 60;
+                        totalEmpLateDeduction = Math.round(totalHours * effectiveLate.ratePerHour);
+                    } else if (effectiveLate.hourRound === 'exact_hour') {
+                        const totalHours = Math.floor(totalEmpLateMinutes / 60);
+                        totalEmpLateDeduction = Math.round(totalHours * effectiveLate.ratePerHour);
+                    }
+                }
+            }
+
+            // Total deductions
+            const totalDeductions = bpjsKesEmployee + bpjsJhtEmployee + bpjsJpEmployee + monthlyPPh + loanDeduction + totalEmpLateDeduction;
 
             // Net salary
             const netSalary = grossIncome - totalDeductions;
@@ -521,8 +738,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                     driver_subuh_days, driver_subuh_amount, driver_rit_total, driver_rit_amount,
                     driver_overnight_days, driver_overnight_amount, driver_total_allowance,
                     driver_extra_rit_dekat, driver_extra_rit_jauh, driver_ritase_dekat_amount, driver_ritase_jauh_amount,
-                    tuang_amount, tuang_days, appreciation_allowance
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+                    tuang_amount, tuang_days, appreciation_allowance,
+                    late_minutes, late_deduction
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)
             `, [
                 payrollRunId, emp.id, basicSalary, transportAllowance, mealAllowance,
                 overtimeHours, overtimeAmount,
@@ -533,7 +751,8 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                 driverSubuhDays, driverSubuhAmount, driverRitTotal, driverRitAmount,
                 driverOvernightDays, driverOvernightAmount, driverTotalAllowance,
                 driverExtraRitDekat, driverExtraRitJauh, driverRitaseDekatAmount, driverRitaseJauhAmount,
-                tuangAmount, tuangDays, appreciationAllowance
+                tuangAmount, tuangDays, appreciationAllowance,
+                totalEmpLateMinutes, totalEmpLateDeduction
             ]);
         }
 
@@ -764,7 +983,7 @@ router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, r
 
         const itemsResult = await pool.query(`
             SELECT pi.*, u.name as user_name, u.employee_id,
-                   ed.department, ed.position
+                   ed.department, ed.position, ed.bank_name, ed.bank_account
             FROM payroll_items pi
             JOIN users u ON pi.user_id = u.id
             LEFT JOIN employee_details ed ON pi.user_id = ed.user_id
@@ -787,30 +1006,33 @@ router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, r
 
         // Table columns
         const cols = [
-            { x: 30, w: 30, label: 'No' },
-            { x: 60, w: 110, label: 'Nama Karyawan' },
-            { x: 170, w: 75, label: 'Gaji Pokok' },
-            { x: 245, w: 70, label: 'Tunjangan' },
-            { x: 315, w: 60, label: 'Jam Lembur' },
-            { x: 375, w: 65, label: 'Nilai Lembur' },
-            { x: 440, w: 75, label: 'Gross' },
-            { x: 515, w: 65, label: 'BPJS' },
-            { x: 580, w: 65, label: 'PPh 21' },
-            { x: 645, w: 65, label: 'Pot.Pinjaman' },
-            { x: 710, w: 80, label: 'Gaji Bersih' },
+            { x: 30, w: 25, label: 'No' },
+            { x: 55, w: 90, label: 'Nama Karyawan' },
+            { x: 145, w: 65, label: 'Bank' },
+            { x: 210, w: 75, label: 'No. Rekening' },
+            { x: 285, w: 65, label: 'Gaji Pokok' },
+            { x: 350, w: 55, label: 'Tunjangan' },
+            { x: 405, w: 45, label: 'Jam Lembur' },
+            { x: 450, w: 55, label: 'Nilai Lembur' },
+            { x: 505, w: 60, label: 'Gross' },
+            { x: 565, w: 55, label: 'BPJS' },
+            { x: 620, w: 55, label: 'PPh 21' },
+            { x: 670, w: 48, label: 'Pot.Telat' },
+            { x: 720, w: 50, label: 'Pot.Pinjam' },
+            { x: 772, w: 55, label: 'Gaji Bersih' },
         ];
 
         // Header
         let y = doc.y;
         doc.font('Helvetica-Bold').fontSize(7);
-        cols.forEach(c => doc.text(c.label, c.x, y, { width: c.w, align: c.x > 160 ? 'right' : 'left' }));
+        cols.forEach(c => doc.text(c.label, c.x, y, { width: c.w, align: c.x > 250 ? 'right' : 'left' }));
         y += 14;
-        doc.moveTo(30, y).lineTo(790, y).stroke();
+        doc.moveTo(30, y).lineTo(795, y).stroke();
         y += 5;
 
         // Rows
         doc.font('Helvetica').fontSize(7);
-        let totalBasic = 0, totalTunj = 0, totalOT = 0, totalGross = 0, totalBPJS = 0, totalPPh = 0, totalLoan = 0, totalNet = 0;
+        let totalBasic = 0, totalTunj = 0, totalOT = 0, totalGross = 0, totalBPJS = 0, totalPPh = 0, totalLate = 0, totalLoan = 0, totalNet = 0;
 
         itemsResult.rows.forEach((item, idx) => {
             if (y > 530) { doc.addPage(); y = 30; }
@@ -819,15 +1041,18 @@ router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, r
 
             doc.text(String(idx + 1), cols[0].x, y, { width: cols[0].w });
             doc.text(item.user_name, cols[1].x, y, { width: cols[1].w });
-            doc.text(fmtCurrency(item.basic_salary), cols[2].x, y, { width: cols[2].w, align: 'right' });
-            doc.text(fmtCurrency(tunj), cols[3].x, y, { width: cols[3].w, align: 'right' });
-            doc.text(item.overtime_hours + ' jam', cols[4].x, y, { width: cols[4].w, align: 'right' });
-            doc.text(fmtCurrency(item.overtime_amount), cols[5].x, y, { width: cols[5].w, align: 'right' });
-            doc.text(fmtCurrency(item.gross_income), cols[6].x, y, { width: cols[6].w, align: 'right' });
-            doc.text(fmtCurrency(bpjs), cols[7].x, y, { width: cols[7].w, align: 'right' });
-            doc.text(fmtCurrency(item.pph21_amount), cols[8].x, y, { width: cols[8].w, align: 'right' });
-            doc.text(fmtCurrency(item.loan_deduction), cols[9].x, y, { width: cols[9].w, align: 'right' });
-            doc.text(fmtCurrency(item.net_salary), cols[10].x, y, { width: cols[10].w, align: 'right' });
+            doc.text(item.bank_name || '-', cols[2].x, y, { width: cols[2].w });
+            doc.text(item.bank_account || '-', cols[3].x, y, { width: cols[3].w });
+            doc.text(fmtCurrency(item.basic_salary), cols[4].x, y, { width: cols[4].w, align: 'right' });
+            doc.text(fmtCurrency(tunj), cols[5].x, y, { width: cols[5].w, align: 'right' });
+            doc.text(item.overtime_hours + ' jam', cols[6].x, y, { width: cols[6].w, align: 'right' });
+            doc.text(fmtCurrency(item.overtime_amount), cols[7].x, y, { width: cols[7].w, align: 'right' });
+            doc.text(fmtCurrency(item.gross_income), cols[8].x, y, { width: cols[8].w, align: 'right' });
+            doc.text(fmtCurrency(bpjs), cols[9].x, y, { width: cols[9].w, align: 'right' });
+            doc.text(fmtCurrency(item.pph21_amount), cols[10].x, y, { width: cols[10].w, align: 'right' });
+            doc.text(fmtCurrency(item.late_deduction), cols[11].x, y, { width: cols[11].w, align: 'right' });
+            doc.text(fmtCurrency(item.loan_deduction), cols[12].x, y, { width: cols[12].w, align: 'right' });
+            doc.text(fmtCurrency(item.net_salary), cols[13].x, y, { width: cols[13].w, align: 'right' });
 
             totalBasic += parseFloat(item.basic_salary);
             totalTunj += tunj;
@@ -835,6 +1060,7 @@ router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, r
             totalGross += parseFloat(item.gross_income);
             totalBPJS += bpjs;
             totalPPh += parseFloat(item.pph21_amount);
+            totalLate += parseFloat(item.late_deduction || 0);
             totalLoan += parseFloat(item.loan_deduction);
             totalNet += parseFloat(item.net_salary);
             y += 16;
@@ -842,19 +1068,20 @@ router.get('/:id/export/pdf', authenticateToken, canManagePayroll, async (req, r
 
         // Total row
         y += 5;
-        doc.moveTo(30, y).lineTo(790, y).stroke();
+        doc.moveTo(30, y).lineTo(795, y).stroke();
         y += 5;
         doc.font('Helvetica-Bold').fontSize(7);
         doc.text('TOTAL', cols[1].x, y, { width: cols[1].w });
-        doc.text(fmtCurrency(totalBasic), cols[2].x, y, { width: cols[2].w, align: 'right' });
-        doc.text(fmtCurrency(totalTunj), cols[3].x, y, { width: cols[3].w, align: 'right' });
-        doc.text('', cols[4].x, y, { width: cols[4].w, align: 'right' });
-        doc.text(fmtCurrency(totalOT), cols[5].x, y, { width: cols[5].w, align: 'right' });
-        doc.text(fmtCurrency(totalGross), cols[6].x, y, { width: cols[6].w, align: 'right' });
-        doc.text(fmtCurrency(totalBPJS), cols[7].x, y, { width: cols[7].w, align: 'right' });
-        doc.text(fmtCurrency(totalPPh), cols[8].x, y, { width: cols[8].w, align: 'right' });
-        doc.text(fmtCurrency(totalLoan), cols[9].x, y, { width: cols[9].w, align: 'right' });
-        doc.text(fmtCurrency(totalNet), cols[10].x, y, { width: cols[10].w, align: 'right' });
+        doc.text(fmtCurrency(totalBasic), cols[4].x, y, { width: cols[4].w, align: 'right' });
+        doc.text(fmtCurrency(totalTunj), cols[5].x, y, { width: cols[5].w, align: 'right' });
+        doc.text('', cols[6].x, y, { width: cols[6].w, align: 'right' });
+        doc.text(fmtCurrency(totalOT), cols[7].x, y, { width: cols[7].w, align: 'right' });
+        doc.text(fmtCurrency(totalGross), cols[8].x, y, { width: cols[8].w, align: 'right' });
+        doc.text(fmtCurrency(totalBPJS), cols[9].x, y, { width: cols[9].w, align: 'right' });
+        doc.text(fmtCurrency(totalPPh), cols[10].x, y, { width: cols[10].w, align: 'right' });
+        doc.text(fmtCurrency(totalLate), cols[11].x, y, { width: cols[11].w, align: 'right' });
+        doc.text(fmtCurrency(totalLoan), cols[12].x, y, { width: cols[12].w, align: 'right' });
+        doc.text(fmtCurrency(totalNet), cols[13].x, y, { width: cols[13].w, align: 'right' });
 
         doc.fontSize(7).font('Helvetica').text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 30, 560);
         doc.end();
@@ -874,7 +1101,7 @@ router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req,
 
         const itemsResult = await pool.query(`
             SELECT pi.*, u.name as user_name, u.employee_id,
-                   ed.department, ed.position
+                   ed.department, ed.position, ed.bank_name, ed.bank_account
             FROM payroll_items pi
             JOIN users u ON pi.user_id = u.id
             LEFT JOIN employee_details ed ON pi.user_id = ed.user_id
@@ -887,17 +1114,17 @@ router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req,
         const ws = workbook.addWorksheet('Payroll');
 
         // Title
-        ws.mergeCells('A1:P1');
+        ws.mergeCells('A1:S1');
         ws.getCell('A1').value = 'LAPORAN PAYROLL';
         ws.getCell('A1').font = { bold: true, size: 16 };
         ws.getCell('A1').alignment = { horizontal: 'center' };
 
-        ws.mergeCells('A2:P2');
+        ws.mergeCells('A2:S2');
         ws.getCell('A2').value = `Periode: ${formatPayrollPeriod(run)} | Status: ${run.status === 'finalized' ? 'Final' : 'Draft'}`;
         ws.getCell('A2').alignment = { horizontal: 'center' };
 
         // Header
-        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'T. Apresiasi', 'Jam Lembur', 'Nilai Lembur', 'Tuang', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Pinjaman', 'Gaji Bersih'];
+        const headers = ['No', 'ID', 'Nama', 'Departemen', 'Nama Bank', 'No. Rekening', 'Gaji Pokok', 'T. Transport', 'T. Makan', 'T. Apresiasi', 'Jam Lembur', 'Nilai Lembur', 'Tuang', 'Gross', 'BPJS (Karyawan)', 'PPh 21', 'Pot. Telat', 'Pot. Pinjaman', 'Gaji Bersih'];
         ws.getRow(4).values = headers;
         ws.getRow(4).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         ws.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
@@ -912,6 +1139,8 @@ router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req,
                 item.employee_id,
                 item.user_name,
                 item.department || '-',
+                item.bank_name || '-',
+                item.bank_account || '-',
                 parseFloat(item.basic_salary),
                 parseFloat(item.transport_allowance),
                 parseFloat(item.meal_allowance),
@@ -922,19 +1151,20 @@ router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req,
                 parseFloat(item.gross_income),
                 bpjsEmp,
                 parseFloat(item.pph21_amount),
+                parseFloat(item.late_deduction || 0),
                 parseFloat(item.loan_deduction),
                 parseFloat(item.net_salary)
             ]);
         });
 
         // Total row
-        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', '', '', totalNet]);
+        const totalRow = ws.addRow(['', '', 'TOTAL', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', totalNet]);
         totalRow.font = { bold: true };
-        totalRow.getCell(16).numFmt = '#,##0';
+        totalRow.getCell(19).numFmt = '#,##0';
 
         // Format currency columns
-        for (let col = 5; col <= 16; col++) {
-            if (col === 9) {
+        for (let col = 7; col <= 19; col++) {
+            if (col === 11) {
                 // Jam Lembur
                 ws.getColumn(col).numFmt = '0';
                 ws.getColumn(col).width = 12;
@@ -947,6 +1177,8 @@ router.get('/:id/export/excel', authenticateToken, canManagePayroll, async (req,
         ws.getColumn(2).width = 12;
         ws.getColumn(3).width = 22;
         ws.getColumn(4).width = 15;
+        ws.getColumn(5).width = 18;
+        ws.getColumn(6).width = 20;
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=payroll-${run.period_year}-${run.period_month}.xlsx`);

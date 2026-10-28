@@ -231,6 +231,21 @@ export default function AdminSettings() {
     const [holidayOtLoading, setHolidayOtLoading] = useState(false);
     const [holidayOtMessage, setHolidayOtMessage] = useState({ type: '', text: '' });
 
+    // Late Deduction Settings state
+    const [lateDeductionSettings, setLateDeductionSettings] = useState({
+        late_deduction_enabled: false,
+        late_deduction_mode: 'per_minute',
+        late_deduction_rate_per_minute: 1000,
+        late_deduction_rate_per_hour: 25000,
+        late_deduction_hour_round: 'round_up',
+        late_grace_period_minutes: 0,
+        late_deduct_grace_period: false,
+        late_exempt_approved_leave: true,
+        late_fallback_start_time: '08:00'
+    });
+    const [lateDeductionLoading, setLateDeductionLoading] = useState(false);
+    const [lateDeductionMessage, setLateDeductionMessage] = useState({ type: '', text: '' });
+
     // Employee Columns Configuration state
     const [empColumns, setEmpColumns] = useState(() => getInitialVisibleColumns());
     const [empColumnsLoading, setEmpColumnsLoading] = useState(false);
@@ -314,6 +329,7 @@ export default function AdminSettings() {
         fetchBackupInfo();
         fetchAttendanceLocationSettings();
         fetchHolidayOvertimeSettings();
+        fetchLateDeductionSettings();
     }, []);
 
     const fetchBackupInfo = async () => {
@@ -428,6 +444,41 @@ export default function AdminSettings() {
             setHolidayOtMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan lembur hari libur' });
         } finally {
             setHolidayOtLoading(false);
+        }
+    };
+
+    const fetchLateDeductionSettings = async () => {
+        try {
+            const data = await settingsAPI.getLateDeduction();
+            if (data) {
+                setLateDeductionSettings({
+                    late_deduction_enabled: data.late_deduction_enabled === true,
+                    late_deduction_mode: data.late_deduction_mode || 'per_minute',
+                    late_deduction_rate_per_minute: data.late_deduction_rate_per_minute !== undefined ? data.late_deduction_rate_per_minute : 1000,
+                    late_deduction_rate_per_hour: data.late_deduction_rate_per_hour !== undefined ? data.late_deduction_rate_per_hour : 25000,
+                    late_deduction_hour_round: data.late_deduction_hour_round || 'round_up',
+                    late_grace_period_minutes: data.late_grace_period_minutes !== undefined ? data.late_grace_period_minutes : 0,
+                    late_deduct_grace_period: data.late_deduct_grace_period === true,
+                    late_exempt_approved_leave: data.late_exempt_approved_leave !== false,
+                    late_fallback_start_time: data.late_fallback_start_time || '08:00'
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load late deduction settings:', error);
+        }
+    };
+
+    const handleLateDeductionSave = async (e) => {
+        if (e) e.preventDefault();
+        setLateDeductionLoading(true);
+        setLateDeductionMessage({ type: '', text: '' });
+        try {
+            const res = await settingsAPI.updateLateDeduction(lateDeductionSettings);
+            setLateDeductionMessage({ type: 'success', text: res.message || 'Pengaturan potongan keterlambatan berhasil disimpan!' });
+        } catch (error) {
+            setLateDeductionMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan potongan keterlambatan' });
+        } finally {
+            setLateDeductionLoading(false);
         }
     };
 
@@ -1517,6 +1568,437 @@ export default function AdminSettings() {
                                     <>
                                         <Icon name="Save" size={16} inline />
                                         <span>Simpan Pengaturan Lembur</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ============ LATE DEDUCTION SECTION ============ */}
+                <div className="card" style={{ marginBottom: '1.5rem', overflow: 'visible' }}>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Icon name="Clock" size={18} inline /> Potongan Keterlambatan Otomatis (Global)
+                            </h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.25rem', marginBottom: 0 }}>
+                                Otomatis hitung dan terapkan pemotongan gaji pada payroll jika karyawan datang terlambat melewati jam masuk kerja.
+                            </p>
+                        </div>
+                        <span className={`badge ${lateDeductionSettings.late_deduction_enabled ? 'badge-danger' : 'badge-secondary'}`} style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                            {lateDeductionSettings.late_deduction_enabled ? '● Potongan Telat Aktif' : '○ Nonaktif'}
+                        </span>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {lateDeductionMessage.text && (
+                            <div className={`alert alert-${lateDeductionMessage.type}`} style={{ marginBottom: '1.25rem' }}>
+                                <span className="alert-icon">{lateDeductionMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {lateDeductionMessage.text}
+                            </div>
+                        )}
+
+                        {/* Info Banner */}
+                        <div style={{
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            background: 'var(--gray-50, #f8fafc)',
+                            border: '1px solid var(--gray-200, #e2e8f0)',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            gap: '0.75rem',
+                            alignItems: 'flex-start'
+                        }}>
+                            <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>⏱️</span>
+                            <div style={{ fontSize: '0.875rem', color: 'var(--gray-700, #334155)', lineHeight: 1.5 }}>
+                                <strong>Cara Kerja:</strong> Saat Payroll dihitung, sistem memeriksa jam check-in harian karyawan terhadap jadwal kerja/shift aktif mereka. Karyawan yang terlambat melewati batas toleransi akan diakumulasikan menit/jam keterlambatannya dan dikalikan dengan tarif global di bawah, kemudian otomatis mengurangi Take Home Pay pada slip gaji.
+                                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--gray-300, #cbd5e1)', fontSize: '0.825rem', color: 'var(--primary-600, #2563eb)' }}>
+                                    💡 <strong>Tarif Berbeda Tiap Jabatan?</strong> Pengaturan di bawah ini berlaku secara Global. Jika Anda ingin tarif atau toleransi yang berbeda untuk jabatan tertentu (atau membebaskan jabatan manajerial dari potongan), Anda dapat mengaturnya langsung di menu <a href="#/positions" style={{ textDecoration: 'underline', fontWeight: 600 }}>Data Jabatan</a>.
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Main Switches Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            {/* Toggle 1: Enable Late Deduction */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: `1.5px solid ${lateDeductionSettings.late_deduction_enabled ? 'var(--danger-500, #ef4444)' : 'var(--gray-200, #e2e8f0)'}`,
+                                background: lateDeductionSettings.late_deduction_enabled ? 'rgba(239, 68, 68, 0.04)' : '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
+                                        Potongan Keterlambatan Otomatis
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Otomatis potong gaji di payroll saat karyawan telat
+                                    </div>
+                                </div>
+                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={lateDeductionSettings.late_deduction_enabled}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_enabled: e.target.checked }))}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+
+                            {/* Toggle 2: Exempt Approved Leave */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: '1.5px solid var(--gray-200, #e2e8f0)',
+                                background: '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
+                                        Bebaskan Jika Ada Izin Terlambat
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Tidak dipotong jika pengajuan Izin Terlambat disetujui atasan
+                                    </div>
+                                </div>
+                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={lateDeductionSettings.late_exempt_approved_leave}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_exempt_approved_leave: e.target.checked }))}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Calculation Mode Selection */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>
+                                Skema Hitungan Global Potongan
+                            </label>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                gap: '1rem'
+                            }}>
+                                {/* Mode: Per Menit */}
+                                <div
+                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_minute' }))}
+                                    style={{
+                                        padding: '1rem',
+                                        borderRadius: 'var(--radius-md, 8px)',
+                                        border: `2px solid ${lateDeductionSettings.late_deduction_mode === 'per_minute' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                        background: lateDeductionSettings.late_deduction_mode === 'per_minute' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                        <input
+                                            type="radio"
+                                            name="late_mode"
+                                            checked={lateDeductionSettings.late_deduction_mode === 'per_minute'}
+                                            onChange={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_minute' }))}
+                                            style={{ margin: 0 }}
+                                        />
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--gray-800)' }}>Hitungan Per Menit</strong>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', paddingLeft: '1.5rem' }}>
+                                        Dihitung proporsional persis per menit keterlambatan (misal Rp 1.000 × total menit).
+                                    </div>
+                                </div>
+
+                                {/* Mode: Per Jam */}
+                                <div
+                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_hour' }))}
+                                    style={{
+                                        padding: '1rem',
+                                        borderRadius: 'var(--radius-md, 8px)',
+                                        border: `2px solid ${lateDeductionSettings.late_deduction_mode === 'per_hour' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                        background: lateDeductionSettings.late_deduction_mode === 'per_hour' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                        <input
+                                            type="radio"
+                                            name="late_mode"
+                                            checked={lateDeductionSettings.late_deduction_mode === 'per_hour'}
+                                            onChange={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_hour' }))}
+                                            style={{ margin: 0 }}
+                                        />
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--gray-800)' }}>Hitungan Per Jam</strong>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', paddingLeft: '1.5rem' }}>
+                                        Dihitung per jam keterlambatan (dengan opsi pembulatan ke atas, prorata, atau jam penuh).
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Rate and Rounding Configuration */}
+                        <div style={{
+                            padding: '1.25rem',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            background: 'var(--gray-50, #f8fafc)',
+                            border: '1px solid var(--gray-200, #e2e8f0)',
+                            marginBottom: '1.5rem'
+                        }}>
+                            {lateDeductionSettings.late_deduction_mode === 'per_minute' ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Tarif Potongan per Menit (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)' }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="100"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_deduction_rate_per_minute}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_minute: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[500, 1000, 2000, 5000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_minute: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: lateDeductionSettings.late_deduction_rate_per_minute === val ? 'var(--primary-color)' : 'var(--gray-300)',
+                                                        background: lateDeductionSettings.late_deduction_rate_per_minute === val ? 'var(--primary-color)' : '#fff',
+                                                        color: lateDeductionSettings.late_deduction_rate_per_minute === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    Rp {val.toLocaleString('id-ID')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Toleransi Keterlambatan (Grace Period)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="60"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_grace_period_minutes}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>menit</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.4rem' }}>
+                                            Contoh: Jika 5 menit, telat ≤ 5 menit dianggap tepat waktu (Rp 0).
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Tarif Potongan per Jam (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)' }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1000"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_deduction_rate_per_hour}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_hour: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[15000, 20000, 25000, 50000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_hour: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: lateDeductionSettings.late_deduction_rate_per_hour === val ? 'var(--primary-color)' : 'var(--gray-300)',
+                                                        background: lateDeductionSettings.late_deduction_rate_per_hour === val ? 'var(--primary-color)' : '#fff',
+                                                        color: lateDeductionSettings.late_deduction_rate_per_hour === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {(val / 1000)}rb
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Metode Pembulatan Jam
+                                        </label>
+                                        <select
+                                            className="form-input form-select"
+                                            value={lateDeductionSettings.late_deduction_hour_round}
+                                            onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_hour_round: e.target.value }))}
+                                        >
+                                            <option value="round_up">Pembulatan Ke Atas Total (Ceil: misal telat 15 mnt = 1 jam)</option>
+                                            <option value="round_up_daily">Pembulatan Ke Atas Per Hari Kejadian (15 mnt/hari = 1 jam/hari)</option>
+                                            <option value="prorated">Proporsional / Prorata (Menit ÷ 60 × Tarif)</option>
+                                            <option value="exact_hour">Hanya Kelipatan Jam Penuh (Floor)</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Toleransi Keterlambatan (Grace Period)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="60"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_grace_period_minutes}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>menit</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Additional Options */}
+                            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--gray-200)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-700)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={lateDeductionSettings.late_deduct_grace_period}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduct_grace_period: e.target.checked }))}
+                                        style={{ width: '16px', height: '16px' }}
+                                    />
+                                    <span>Kurangi menit toleransi saat memotong (hanya potong kelebihannya)</span>
+                                </label>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start' }}>
+                                    <label style={{ fontSize: '0.85rem', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
+                                        Jam Masuk Standar (Fallback):
+                                    </label>
+                                    <input
+                                        type="time"
+                                        className="form-input"
+                                        value={lateDeductionSettings.late_fallback_start_time}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_fallback_start_time: e.target.value }))}
+                                        style={{ width: '110px', padding: '0.3rem 0.5rem' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Interactive Simulation Preview Box */}
+                        {(() => {
+                            const testMinutes = 35;
+                            const grace = lateDeductionSettings.late_grace_period_minutes || 0;
+                            const isLate = testMinutes > grace;
+                            let charged = isLate ? (lateDeductionSettings.late_deduct_grace_period ? testMinutes - grace : testMinutes) : 0;
+                            let simulatedAmount = 0;
+                            let explanation = '';
+
+                            if (lateDeductionSettings.late_deduction_mode === 'per_minute') {
+                                simulatedAmount = charged * (lateDeductionSettings.late_deduction_rate_per_minute || 0);
+                                explanation = `${charged} mnt x Rp ${(lateDeductionSettings.late_deduction_rate_per_minute || 0).toLocaleString('id-ID')}`;
+                            } else {
+                                const rate = lateDeductionSettings.late_deduction_rate_per_hour || 0;
+                                if (lateDeductionSettings.late_deduction_hour_round === 'round_up' || lateDeductionSettings.late_deduction_hour_round === 'round_up_daily') {
+                                    const h = Math.ceil(charged / 60);
+                                    simulatedAmount = h * rate;
+                                    explanation = `${h} jam (dibulatkan ke atas) x Rp ${rate.toLocaleString('id-ID')}`;
+                                } else if (lateDeductionSettings.late_deduction_hour_round === 'prorated') {
+                                    const h = charged / 60;
+                                    simulatedAmount = Math.round(h * rate);
+                                    explanation = `${charged}/60 jam (${h.toFixed(2)} jam prorata) x Rp ${rate.toLocaleString('id-ID')}`;
+                                } else {
+                                    const h = Math.floor(charged / 60);
+                                    simulatedAmount = h * rate;
+                                    explanation = `${h} jam penuh x Rp ${rate.toLocaleString('id-ID')}`;
+                                }
+                            }
+
+                            return (
+                                <div style={{
+                                    padding: '1rem',
+                                    borderRadius: 'var(--radius-md, 8px)',
+                                    background: 'rgba(245, 158, 11, 0.08)',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    marginBottom: '1.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: '0.75rem'
+                                }}>
+                                    <div>
+                                        <div style={{ fontWeight: 700, color: '#b45309', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <Icon name="Calculator" size={16} inline /> Simulasi Contoh (Karyawan Telat 35 Menit):
+                                        </div>
+                                        <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.2rem' }}>
+                                            Toleransi: {grace} mnt | Menit dipotong: {charged} mnt ({explanation})
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#92400e' }}>Nominal Potongan:</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309' }}>
+                                            Rp {simulatedAmount.toLocaleString('id-ID')}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Save Action */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleLateDeductionSave}
+                                disabled={lateDeductionLoading}
+                                style={{ minWidth: '220px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                {lateDeductionLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icon name="Save" size={16} inline />
+                                        <span>Simpan Potongan Keterlambatan</span>
                                     </>
                                 )}
                             </button>

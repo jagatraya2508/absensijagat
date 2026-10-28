@@ -13,6 +13,7 @@ import History from './pages/History';
 import AdminLocations from './pages/AdminLocations';
 import AdminUsers from './pages/AdminUsers';
 import AdminReports from './pages/AdminReports';
+import AdminContractReport from './pages/AdminContractReport';
 import AdminFaceRegistration from './pages/AdminFaceRegistration';
 import Leaves from './pages/Leaves';
 import AdminLeaves from './pages/AdminLeaves';
@@ -281,6 +282,17 @@ function AppRoutes() {
                     <ProtectedRoute permission="admin.reports" managerOrAdmin>
                         <AppLayout>
                             <AdminReports />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/contract-report"
+                element={
+                    <ProtectedRoute permission="admin.reports" managerOrAdmin>
+                        <AppLayout>
+                            <AdminContractReport />
                         </AppLayout>
                     </ProtectedRoute>
                 }

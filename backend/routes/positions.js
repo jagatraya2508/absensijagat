@@ -281,14 +281,43 @@ router.post('/import', ...canManagePositions, (req, res, next) => {
 });
 
 router.post('/', async (req, res) => {
-    const { name, description } = req.body;
+    const {
+        name,
+        description,
+        use_custom_late_deduction,
+        late_deduction_enabled,
+        late_deduction_mode,
+        late_deduction_rate_per_minute,
+        late_deduction_rate_per_hour,
+        late_deduction_hour_round,
+        late_grace_period_minutes,
+        late_deduct_grace_period
+    } = req.body;
+
     if (!name) {
         return res.status(400).json({ error: 'Name is required' });
     }
     try {
         const result = await pool.query(
-            'INSERT INTO positions (name, description, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP) RETURNING *',
-            [name, description]
+            `INSERT INTO positions (
+                name, description, 
+                use_custom_late_deduction, late_deduction_enabled, late_deduction_mode,
+                late_deduction_rate_per_minute, late_deduction_rate_per_hour,
+                late_deduction_hour_round, late_grace_period_minutes, late_deduct_grace_period,
+                updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP) RETURNING *`,
+            [
+                name,
+                description || null,
+                use_custom_late_deduction === true,
+                late_deduction_enabled !== false,
+                late_deduction_mode || 'per_minute',
+                parseFloat(late_deduction_rate_per_minute) || 0,
+                parseFloat(late_deduction_rate_per_hour) || 0,
+                late_deduction_hour_round || 'round_up',
+                parseInt(late_grace_period_minutes, 10) || 0,
+                late_deduct_grace_period === true
+            ]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -302,14 +331,50 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const {
+        name,
+        description,
+        use_custom_late_deduction,
+        late_deduction_enabled,
+        late_deduction_mode,
+        late_deduction_rate_per_minute,
+        late_deduction_rate_per_hour,
+        late_deduction_hour_round,
+        late_grace_period_minutes,
+        late_deduct_grace_period
+    } = req.body;
+
     if (!name) {
         return res.status(400).json({ error: 'Name is required' });
     }
     try {
         const result = await pool.query(
-            'UPDATE positions SET name = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-            [name, description, id]
+            `UPDATE positions SET 
+                name = $1, 
+                description = $2,
+                use_custom_late_deduction = $3,
+                late_deduction_enabled = $4,
+                late_deduction_mode = $5,
+                late_deduction_rate_per_minute = $6,
+                late_deduction_rate_per_hour = $7,
+                late_deduction_hour_round = $8,
+                late_grace_period_minutes = $9,
+                late_deduct_grace_period = $10,
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = $11 RETURNING *`,
+            [
+                name,
+                description || null,
+                use_custom_late_deduction === true,
+                late_deduction_enabled !== false,
+                late_deduction_mode || 'per_minute',
+                parseFloat(late_deduction_rate_per_minute) || 0,
+                parseFloat(late_deduction_rate_per_hour) || 0,
+                late_deduction_hour_round || 'round_up',
+                parseInt(late_grace_period_minutes, 10) || 0,
+                late_deduct_grace_period === true,
+                id
+            ]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Position not found' });
