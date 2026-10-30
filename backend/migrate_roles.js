@@ -2,11 +2,11 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
+    user: process.env.DB_USER || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    database: process.env.DB_NAME || 'absensi',
+    password: process.env.DB_PASSWORD || 'sa',
+    port: process.env.DB_PORT || 5432,
 });
 
 async function migrateRoles() {
@@ -42,11 +42,12 @@ async function migrateRoles() {
         await client.query(`
             INSERT INTO roles (name, label, is_system) 
             VALUES 
-                ('admin', 'Administrator', true),
+                ('super_admin', 'Super Admin', true),
+                ('admin', 'Admin', true),
                 ('employee', 'Karyawan', true),
                 ('manager', 'Pimpinan / Manager', true),
                 ('kiosk', 'Operator Kiosk', true)
-            ON CONFLICT (name) DO NOTHING;
+            ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label;
         `);
         console.log('Inserted default system roles');
 
@@ -58,18 +59,15 @@ async function migrateRoles() {
             ON CONFLICT (role_id, permission_key) DO NOTHING
         `);
 
-        // 4. Update existing users role values if needed
-        // Assuming current users have 'admin', 'employee', 'manager'
-        // If not, we might need to handle it. For now, the existing VARCHAR is compatible with the `name` column.
-
         await client.query('COMMIT');
         console.log('Migration completed successfully.');
+        process.exit(0);
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Migration failed:', error);
+        process.exit(1);
     } finally {
         client.release();
-        await pool.end();
     }
 }
 

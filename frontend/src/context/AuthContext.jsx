@@ -39,18 +39,37 @@ export function AuthProvider({ children }) {
 
     function hasPermission(permissionKey) {
         if (!user) return false;
-        if (user.role === 'admin') return true;
+        if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin') return true;
         if (user.role === 'kiosk') return permissionKey === 'admin.kiosk';
         if (!user.permissions) return false;
         return user.permissions.includes(permissionKey);
+    }
+
+    function isSuperAdmin() {
+        return user?.role === 'super_admin' || user?.role === 'superadmin';
+    }
+
+    function isAdminUser() {
+        return user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin';
     }
 
     function isKioskOnly() {
         return user?.role === 'kiosk';
     }
 
+    async function updateHiddenMenus(newHiddenMenus) {
+        try {
+            const res = await authAPI.updateMenuPreferences(newHiddenMenus);
+            setUser(prev => prev ? { ...prev, hidden_menus: res.hidden_menus || newHiddenMenus } : prev);
+            return res;
+        } catch (err) {
+            console.error('Failed to update hidden menus:', err);
+            throw err;
+        }
+    }
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, setUser, hasPermission, isKioskOnly }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, setUser, hasPermission, isKioskOnly, isSuperAdmin, isAdminUser, updateHiddenMenus }}>
             {children}
         </AuthContext.Provider>
     );

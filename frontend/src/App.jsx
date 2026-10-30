@@ -72,11 +72,13 @@ function ProtectedRoute({ children, adminOnly = false, managerOrAdmin = false, p
         return <Navigate to="/kiosk" replace />;
     }
 
-    if (adminOnly && user.role !== 'admin') {
+    const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin';
+
+    if (adminOnly && !isAdmin) {
         return <Navigate to="/" replace />;
     }
 
-    const managerAccess = user.role === 'admin' || user.role === 'manager';
+    const managerAccess = isAdmin || user.role === 'manager';
     const gated = !!(permission || anyPermission || allowSupervisor || managerOrAdmin);
     const hasAccess =
         (permission && hasPermission(permission)) ||

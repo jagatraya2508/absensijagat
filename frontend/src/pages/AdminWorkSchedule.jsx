@@ -308,6 +308,9 @@ export default function AdminWorkSchedule() {
     const [overtimeRequests, setOvertimeRequests] = useState([]);
     const [otFilter, setOtFilter] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), department: '', status: '' });
     const [otForm, setOtForm] = useState({ date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '', employee_ids: [] });
+    const [otMode, setOtMode] = useState('single'); // 'single' or 'dual'
+    const [dualBefore, setDualBefore] = useState({ start: '', end: '' });
+    const [dualAfter, setDualAfter] = useState({ start: '', end: '' });
 
     // Calendar
     const [calendarEvents, setCalendarEvents] = useState([]);
@@ -847,20 +850,56 @@ export default function AdminWorkSchedule() {
         }
     }
 
-    function calcEstimatedHours() {
-        if (!otForm.overtime_start || !otForm.overtime_end) return 0;
-        const [sh, sm] = otForm.overtime_start.split(':').map(Number);
-        const [eh, em] = otForm.overtime_end.split(':').map(Number);
+    function calcHours(startStr, endStr) {
+        if (!startStr || !endStr) return 0;
+        const [sh, sm] = String(startStr).substring(0, 5).split(':').map(Number);
+        const [eh, em] = String(endStr).substring(0, 5).split(':').map(Number);
         let diff = (eh * 60 + em) - (sh * 60 + sm);
         if (diff < 0) diff += 1440;
         return Math.round((diff / 60) * 10) / 10;
     }
 
+    function calcEstimatedHours() {
+        return calcHours(otForm.overtime_start, otForm.overtime_end);
+    }
+
     async function saveOvertimeRequest() {
         setLoading(true);
         try {
-            const estimated = calcEstimatedHours();
-            const body = { ...otForm, estimated_hours: estimated };
+            let body;
+            const dualBeforeH = calcHours(dualBefore.start, dualBefore.end);
+            const dualAfterH = calcHours(dualAfter.start, dualAfter.end);
+
+            if (otMode === 'dual') {
+                if (!dualBefore.start || !dualBefore.end || !dualAfter.start || !dualAfter.end) {
+                    throw new Error('Harap lengkapi jam lembur Sebelum Shift dan Sesudah Shift');
+                }
+                body = {
+                    date: otForm.date,
+                    shift_id: otForm.shift_id,
+                    department: otForm.department,
+                    reason: otForm.reason,
+                    employee_ids: otForm.employee_ids,
+                    sessions: [
+                        {
+                            overtime_start: dualBefore.start,
+                            overtime_end: dualBefore.end,
+                            estimated_hours: dualBeforeH,
+                            label: 'Sebelum Shift'
+                        },
+                        {
+                            overtime_start: dualAfter.start,
+                            overtime_end: dualAfter.end,
+                            estimated_hours: dualAfterH,
+                            label: 'Sesudah Shift'
+                        }
+                    ]
+                };
+            } else {
+                const estimated = calcEstimatedHours();
+                body = { ...otForm, estimated_hours: estimated };
+            }
+
             const res = await fetch(`${API}/work-schedules/overtime-requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -868,10 +907,17 @@ export default function AdminWorkSchedule() {
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.error);
+                throw new Error(err.error || 'Gagal membuat pengajuan lembur');
             }
-            showMsg('success', 'Pengajuan lembur berhasil dibuat');
+            const resData = await res.json();
+            const successMsg = (otMode === 'dual' && resData.created_count > 1)
+                ? `Berhasil membuat ${resData.created_count} SPL (Sebelum & Sesudah Shift)`
+                : 'Pengajuan lembur berhasil dibuat';
+            showMsg('success', successMsg);
             setShowOvertimeModal(false);
+            setOtMode('single');
+            setDualBefore({ start: '', end: '' });
+            setDualAfter({ start: '', end: '' });
             setOtForm({ date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '', employee_ids: [] });
             fetchOvertimeRequests();
         } catch (e) {
@@ -1291,6 +1337,9 @@ export default function AdminWorkSchedule() {
                     </div>
                     <button className="btn btn-primary" onClick={() => {
                         setOtForm({ date: '', shift_id: '', department: '', overtime_start: '', overtime_end: '', estimated_hours: '', reason: '', employee_ids: [] });
+                        setOtMode('single');
+                        setDualBefore({ start: '', end: '' });
+                        setDualAfter({ start: '', end: '' });
                         setEmpPage(1);
                         setShowOvertimeModal(true);
                     }}>+ Ajukan Lembur</button>
@@ -1816,6 +1865,43 @@ export default function AdminWorkSchedule() {
             setOtForm(f => ({ ...f, overtime_start: start, overtime_end: end }));
         }
 
+        const isDualBeforeOverlap = selectedShift && dualBefore.start && dualBefore.end
+            ? checkShiftOvertimeOverlap(dualBefore.start, dualBefore.end, selectedShift.start_time, selectedShift.end_time)
+            : false;
+        const isDualAfterOverlap = selectedShift && dualAfter.start && dualAfter.end
+            ? checkShiftOvertimeOverlap(dualAfter.start, dualAfter.end, selectedShift.start_time, selectedShift.end_time)
+            : false;
+
+        const dualBeforeHours = calcHours(dualBefore.start, dualBefore.end);
+        const dualAfterHours = calcHours(dualAfter.start, dualAfter.end);
+        const totalDualHours = Math.round((dualBeforeHours + dualAfterHours) * 10) / 10;
+
+        function applyDualBefore(hours) {
+            if (!selectedShift) return;
+            const end = selectedShift.start_time.substring(0, 5);
+            const start = adjustTime(end, -hours);
+            setDualBefore({ start, end });
+        }
+
+        function applyDualAfter(hours) {
+            if (!selectedShift) return;
+            const start = selectedShift.end_time.substring(0, 5);
+            const end = adjustTime(start, hours);
+            setDualAfter({ start, end });
+        }
+
+        function applyDualCombo(beforeH, afterH) {
+            if (!selectedShift) return;
+            setOtMode('dual');
+            const beforeEnd = selectedShift.start_time.substring(0, 5);
+            const beforeStart = adjustTime(beforeEnd, -beforeH);
+            setDualBefore({ start: beforeStart, end: beforeEnd });
+
+            const afterStart = selectedShift.end_time.substring(0, 5);
+            const afterEnd = adjustTime(afterStart, afterH);
+            setDualAfter({ start: afterStart, end: afterEnd });
+        }
+
         return (
             <div className="modal-overlay">
                 <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflow: 'auto' }}>
@@ -1858,81 +1944,268 @@ export default function AdminWorkSchedule() {
                             </select>
                         </div>
 
-                        {/* Shortcut Buttons for Overtime Time */}
+                        {/* Mode Toggle when shift is selected */}
                         {selectedShift && (
-                            <div style={{
-                                background: 'rgba(59, 130, 246, 0.08)',
-                                border: '1px solid rgba(59, 130, 246, 0.25)',
-                                borderRadius: 'var(--radius-md)',
-                                padding: '0.75rem',
-                                marginBottom: '0.85rem'
-                            }}>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-400)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    <Icon name="Zap" size={14} inline /> Shortcut Pengisian Jam Lembur ({selectedShift.name}: {formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)})
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: '0.75rem', color: '#06b6d4', fontWeight: 600 }}>🌅 Sebelum Shift:</span>
-                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
-                                            onClick={() => applyBeforeShift(1)}>
-                                            1 Jam ({adjustTime(selectedShift.start_time, -1)} - {formatTime(selectedShift.start_time)})
-                                        </button>
-                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
-                                            onClick={() => applyBeforeShift(2)}>
-                                            2 Jam ({adjustTime(selectedShift.start_time, -2)} - {formatTime(selectedShift.start_time)})
-                                        </button>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>🌆 Sesudah Shift:</span>
-                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
-                                            onClick={() => applyAfterShift(1)}>
-                                            1 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 1)})
-                                        </button>
-                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
-                                            onClick={() => applyAfterShift(2)}>
-                                            2 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 2)})
-                                        </button>
-                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
-                                            onClick={() => applyAfterShift(3)}>
-                                            3 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 3)})
-                                        </button>
-                                    </div>
-                                </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem' }}>
+                                <button
+                                    type="button"
+                                    className={`btn ${otMode === 'single' ? 'btn-primary' : 'btn-outline'}`}
+                                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem 0.6rem' }}
+                                    onClick={() => setOtMode('single')}
+                                >
+                                    1 Sesi (Sebelum ATAU Sesudah)
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`btn ${otMode === 'dual' ? 'btn-primary' : 'btn-outline'}`}
+                                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                                    onClick={() => {
+                                        setOtMode('dual');
+                                        if (!dualBefore.start) {
+                                            const bEnd = selectedShift.start_time.substring(0, 5);
+                                            const bStart = adjustTime(bEnd, -1);
+                                            setDualBefore({ start: bStart, end: bEnd });
+                                        }
+                                        if (!dualAfter.start) {
+                                            const aStart = selectedShift.end_time.substring(0, 5);
+                                            const aEnd = adjustTime(aStart, 1);
+                                            setDualAfter({ start: aStart, end: aEnd });
+                                        }
+                                    }}
+                                >
+                                    <Icon name="Zap" size={14} inline /> ⚡ 2 Sesi Sekaligus (Sebelum & Sesudah Shift)
+                                </button>
                             </div>
                         )}
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                            <div className="form-group">
-                                <label className="form-label">Jam Mulai *</label>
-                                <input type="time" className="form-input" value={otForm.overtime_start}
-                                    onChange={e => setOtForm(f => ({ ...f, overtime_start: e.target.value }))} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Jam Selesai *</label>
-                                <input type="time" className="form-input" value={otForm.overtime_end}
-                                    onChange={e => setOtForm(f => ({ ...f, overtime_end: e.target.value }))} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Estimasi (jam)</label>
-                                <input type="text" className="form-input" readOnly value={calcEstimatedHours()} style={{ background: 'rgba(255,255,255,0.02)' }} />
-                            </div>
-                        </div>
+                        {/* MODE 1: SINGLE SESSION */}
+                        {otMode === 'single' && (
+                            <>
+                                {/* Shortcut Buttons for Overtime Time */}
+                                {selectedShift && (
+                                    <div style={{
+                                        background: 'rgba(59, 130, 246, 0.08)',
+                                        border: '1px solid rgba(59, 130, 246, 0.25)',
+                                        borderRadius: 'var(--radius-md)',
+                                        padding: '0.75rem',
+                                        marginBottom: '0.85rem'
+                                    }}>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-400)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                <Icon name="Zap" size={14} inline /> Shortcut Pengisian Jam Lembur ({selectedShift.name}: {formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)})
+                                            </div>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', borderColor: 'var(--primary-400)', color: 'var(--primary-400)' }}
+                                                onClick={() => {
+                                                    setOtMode('dual');
+                                                    applyDualCombo(1, 1);
+                                                }}>
+                                                ⚡ Ajukan Sebelum & Sesudah Sekaligus?
+                                            </button>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#06b6d4', fontWeight: 600 }}>🌅 Sebelum Shift:</span>
+                                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                                    onClick={() => applyBeforeShift(1)}>
+                                                    1 Jam ({adjustTime(selectedShift.start_time, -1)} - {formatTime(selectedShift.start_time)})
+                                                </button>
+                                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                                    onClick={() => applyBeforeShift(2)}>
+                                                    2 Jam ({adjustTime(selectedShift.start_time, -2)} - {formatTime(selectedShift.start_time)})
+                                                </button>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>🌆 Sesudah Shift:</span>
+                                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                    onClick={() => applyAfterShift(1)}>
+                                                    1 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 1)})
+                                                </button>
+                                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                    onClick={() => applyAfterShift(2)}>
+                                                    2 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 2)})
+                                                </button>
+                                                <button type="button" className="btn btn-outline" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                    onClick={() => applyAfterShift(3)}>
+                                                    3 Jam ({formatTime(selectedShift.end_time)} - {adjustTime(selectedShift.end_time, 3)})
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {/* Overlap Error Warning Alert */}
-                        {isOverlap && (
-                            <div className="alert alert-danger mb-3" style={{ fontSize: '0.82rem', padding: '0.6rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <Icon name="AlertTriangle" size={16} inline />
-                                <span><strong>Peringatan Jam Lembur:</strong> Jam lembur bertabrakan dengan jam kerja reguler shift <strong>{selectedShift.name}</strong> ({formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.</span>
-                            </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Jam Mulai *</label>
+                                        <input type="time" className="form-input" value={otForm.overtime_start}
+                                            onChange={e => setOtForm(f => ({ ...f, overtime_start: e.target.value }))} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Jam Selesai *</label>
+                                        <input type="time" className="form-input" value={otForm.overtime_end}
+                                            onChange={e => setOtForm(f => ({ ...f, overtime_end: e.target.value }))} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Estimasi (jam)</label>
+                                        <input type="text" className="form-input" readOnly value={calcEstimatedHours()} style={{ background: 'rgba(255,255,255,0.02)' }} />
+                                    </div>
+                                </div>
+
+                                {/* Overlap Error Warning Alert */}
+                                {isOverlap && (
+                                    <div className="alert alert-danger mb-3" style={{ fontSize: '0.82rem', padding: '0.6rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <Icon name="AlertTriangle" size={16} inline />
+                                        <span><strong>Peringatan Jam Lembur:</strong> Jam lembur bertabrakan dengan jam kerja reguler shift <strong>{selectedShift.name}</strong> ({formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.</span>
+                                    </div>
+                                )}
+
+                                {/* Category detection badge preview */}
+                                {!isOverlap && otForm.overtime_start && otForm.overtime_end && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+                                        <span style={{ color: 'var(--gray-400)' }}>Kategori Lembur:</span>
+                                        <span className={`badge ${currentCategory === 'Lembur Awal' ? 'badge-info' : currentCategory === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`}>
+                                            {currentCategory === 'Lembur Awal' ? '🌅 Lembur Awal (Sebelum Masuk Shift)' : currentCategory === 'Lembur Akhir' ? '🌆 Lembur Akhir (Setelah Pulang Shift)' : 'Lembur Bebas'}
+                                        </span>
+                                    </div>
+                                )}
+                            </>
                         )}
 
-                        {/* Category detection badge preview */}
-                        {!isOverlap && otForm.overtime_start && otForm.overtime_end && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
-                                <span style={{ color: 'var(--gray-400)' }}>Kategori Lembur:</span>
-                                <span className={`badge ${currentCategory === 'Lembur Awal' ? 'badge-info' : currentCategory === 'Lembur Akhir' ? 'badge-warning' : 'badge-secondary'}`}>
-                                    {currentCategory === 'Lembur Awal' ? '🌅 Lembur Awal (Sebelum Masuk Shift)' : currentCategory === 'Lembur Akhir' ? '🌆 Lembur Akhir (Setelah Pulang Shift)' : 'Lembur Bebas'}
-                                </span>
+                        {/* MODE 2: DUAL SESSIONS (SEBELUM & SESUDAH SHIFT SEKALIGUS) */}
+                        {otMode === 'dual' && selectedShift && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                                {/* Combo Shortcuts */}
+                                <div style={{
+                                    background: 'rgba(59, 130, 246, 0.08)',
+                                    border: '1px dashed rgba(59, 130, 246, 0.4)',
+                                    borderRadius: 'var(--radius-md)',
+                                    padding: '0.75rem'
+                                }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary-400)', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        <Icon name="Zap" size={14} inline /> Shortcut Paket Lembur (Sebelum + Sesudah Shift)
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.73rem', padding: '0.25rem 0.55rem' }}
+                                            onClick={() => applyDualCombo(1, 1)}>
+                                            ⚡ 1j Sblm + 1j Ssdh (Total 2 Jam)
+                                        </button>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.73rem', padding: '0.25rem 0.55rem' }}
+                                            onClick={() => applyDualCombo(1, 2)}>
+                                            ⚡ 1j Sblm + 2j Ssdh (Total 3 Jam)
+                                        </button>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.73rem', padding: '0.25rem 0.55rem' }}
+                                            onClick={() => applyDualCombo(2, 2)}>
+                                            ⚡ 2j Sblm + 2j Ssdh (Total 4 Jam)
+                                        </button>
+                                        <button type="button" className="btn btn-outline" style={{ fontSize: '0.73rem', padding: '0.25rem 0.55rem' }}
+                                            onClick={() => applyDualCombo(2, 3)}>
+                                            ⚡ 2j Sblm + 3j Ssdh (Total 5 Jam)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Sesi 1: Sebelum Shift */}
+                                <div style={{
+                                    background: 'rgba(6, 182, 212, 0.06)',
+                                    border: '1px solid rgba(6, 182, 212, 0.3)',
+                                    borderRadius: 'var(--radius-md)',
+                                    padding: '0.75rem'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#06b6d4', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                            🌅 Sesi 1: Lembur Awal (Sebelum Shift: masuk jam {formatTime(selectedShift.start_time)})
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                                onClick={() => applyDualBefore(1)}>1 Jam</button>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                                onClick={() => applyDualBefore(2)}>2 Jam</button>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                                        <div>
+                                            <label className="form-label" style={{ fontSize: '0.72rem' }}>Jam Mulai</label>
+                                            <input type="time" className="form-input" value={dualBefore.start}
+                                                onChange={e => setDualBefore(d => ({ ...d, start: e.target.value }))} />
+                                        </div>
+                                        <div>
+                                            <label className="form-label" style={{ fontSize: '0.72rem' }}>Jam Selesai</label>
+                                            <input type="time" className="form-input" value={dualBefore.end}
+                                                onChange={e => setDualBefore(d => ({ ...d, end: e.target.value }))} />
+                                        </div>
+                                        <div>
+                                            <label className="form-label" style={{ fontSize: '0.72rem' }}>Estimasi</label>
+                                            <input type="text" className="form-input" readOnly value={`${dualBeforeHours} jam`} style={{ background: 'rgba(255,255,255,0.02)' }} />
+                                        </div>
+                                    </div>
+                                    {isDualBeforeOverlap && (
+                                        <div style={{ color: 'var(--danger-500)', fontSize: '0.75rem', marginTop: '0.4rem' }}>
+                                            ⚠️ Jam sesi 1 bertabrakan dengan shift ({formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)})
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Sesi 2: Sesudah Shift */}
+                                <div style={{
+                                    background: 'rgba(245, 158, 11, 0.06)',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    borderRadius: 'var(--radius-md)',
+                                    padding: '0.75rem'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                            🌆 Sesi 2: Lembur Akhir (Sesudah Shift: pulang jam {formatTime(selectedShift.end_time)})
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                onClick={() => applyDualAfter(1)}>1 Jam</button>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                onClick={() => applyDualAfter(2)}>2 Jam</button>
+                                            <button type="button" className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: '#f59e0b', color: '#f59e0b' }}
+                                                onClick={() => applyDualAfter(3)}>3 Jam</button>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                                        <div>
+                                            <label className="form-label" style={{ fontSize: '0.72rem' }}>Jam Mulai</label>
+                                            <input type="time" className="form-input" value={dualAfter.start}
+                                                onChange={e => setDualAfter(d => ({ ...d, start: e.target.value }))} />
+                                        </div>
+                                        <div>
+                                            <label className="form-label" style={{ fontSize: '0.72rem' }}>Jam Selesai</label>
+                                            <input type="time" className="form-input" value={dualAfter.end}
+                                                onChange={e => setDualAfter(d => ({ ...d, end: e.target.value }))} />
+                                        </div>
+                                        <div>
+                                            <label className="form-label" style={{ fontSize: '0.72rem' }}>Estimasi</label>
+                                            <input type="text" className="form-input" readOnly value={`${dualAfterHours} jam`} style={{ background: 'rgba(255,255,255,0.02)' }} />
+                                        </div>
+                                    </div>
+                                    {isDualAfterOverlap && (
+                                        <div style={{ color: 'var(--danger-500)', fontSize: '0.75rem', marginTop: '0.4rem' }}>
+                                            ⚠️ Jam sesi 2 bertabrakan dengan shift ({formatTime(selectedShift.start_time)} - {formatTime(selectedShift.end_time)})
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Combined Summary Alert */}
+                                <div style={{
+                                    background: 'rgba(59, 130, 246, 0.12)',
+                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                    borderRadius: 'var(--radius-md)',
+                                    padding: '0.6rem 0.75rem',
+                                    fontSize: '0.8rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.2rem'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 600, color: 'var(--primary-300)' }}>Total Estimasi Lembur:</span>
+                                        <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff' }}>{totalDualHours} Jam ({dualBeforeHours}j + {dualAfterHours}j)</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>
+                                        ℹ️ Kedua sesi lembur akan diajukan bersamaan dan otomatis menerbitkan 2 nomor SPL resmi yang berbeda.
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -1996,11 +2269,17 @@ export default function AdminWorkSchedule() {
                             );
                         })()}
 
-                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                             <button className="btn btn-outline" onClick={() => setShowOvertimeModal(false)}>Batal</button>
                             <button className="btn btn-primary" onClick={saveOvertimeRequest}
-                                disabled={loading || isOverlap || !otForm.date || !otForm.overtime_start || !otForm.overtime_end || !otForm.reason || !otForm.employee_ids.length}>
-                                {loading ? 'Menyimpan...' : 'Ajukan Lembur'}
+                                disabled={
+                                    loading || !otForm.date || !otForm.reason || !otForm.employee_ids.length ||
+                                    (otMode === 'dual'
+                                        ? (!dualBefore.start || !dualBefore.end || !dualAfter.start || !dualAfter.end || isDualBeforeOverlap || isDualAfterOverlap)
+                                        : (!otForm.overtime_start || !otForm.overtime_end || isOverlap)
+                                    )
+                                }>
+                                {loading ? 'Menyimpan...' : (otMode === 'dual' ? 'Ajukan 2 SPL Sekaligus' : 'Ajukan Lembur')}
                             </button>
                         </div>
                     </div>
@@ -2114,7 +2393,7 @@ export default function AdminWorkSchedule() {
                         )}
 
                         {/* Action buttons */}
-                        {ot.status === 'pending' && user?.role === 'admin' && (
+                        {ot.status === 'pending' && (user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin') && (
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
                                 <button className="btn btn-danger" onClick={() => {
                                     const notes = prompt('Catatan penolakan (opsional):');
@@ -2126,7 +2405,7 @@ export default function AdminWorkSchedule() {
                                 }}>Setujui</button>
                             </div>
                         )}
-                        {ot.status === 'approved' && user?.role === 'admin' && (
+                        {ot.status === 'approved' && (user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin') && (
                             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
                                 <button className="btn btn-primary" onClick={() => updateOtStatus(ot.id, 'completed')}>
                                     Tandai Selesai

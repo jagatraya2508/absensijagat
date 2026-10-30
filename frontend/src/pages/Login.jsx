@@ -41,7 +41,7 @@ export default function Login() {
             const data = await login(employeeId, password);
             navigate(data?.user?.role === 'kiosk' ? '/kiosk' : '/');
         } catch (err) {
-            setError(err.message || 'Login gagal. Periksa kembali Employee ID dan password.');
+            setError(err.message || 'Login gagal. Periksa kembali User ID dan password.');
         } finally {
             setLoading(false);
         }
@@ -67,13 +67,13 @@ export default function Login() {
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                             <label className="form-label" htmlFor="employeeId">
-                                Employee ID
+                                User ID
                             </label>
                             <input
                                 type="text"
                                 id="employeeId"
                                 className="form-input"
-                                placeholder="Masukkan Employee ID"
+                                placeholder="Masukkan User ID"
                                 value={employeeId}
                                 onChange={(e) => setEmployeeId(e.target.value)}
                                 required
@@ -178,7 +178,7 @@ export default function Login() {
                     <div className="modal-content" style={{ maxWidth: '400px', width: '90%', padding: '2rem', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--bg-secondary)', boxShadow: 'var(--shadow-xl)' }}>
                         <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: '1.25rem', color: 'var(--text-primary)' }}>Lupa Password</h2>
                         <p style={{ fontSize: '0.9rem', color: 'var(--gray-400)', marginBottom: '1.5rem' }}>
-                            Masukkan Employee ID Anda. Password baru akan dikirimkan ke email Anda yang terdaftar.
+                            Masukkan User ID Anda. Password baru akan dikirimkan ke email Anda yang terdaftar.
                         </p>
                         
                         {forgotErr && <div className="alert alert-danger" style={{ marginBottom: '1rem', padding: '0.75rem', fontSize: '0.85rem' }}>{forgotErr}</div>}
@@ -207,14 +207,14 @@ export default function Login() {
                             }
                         }}>
                             <div className="form-group">
-                                <label className="form-label" style={{ color: 'var(--text-primary)' }}>Employee ID</label>
+                                <label className="form-label" style={{ color: 'var(--text-primary)' }}>User ID</label>
                                 <input
                                     type="text"
                                     className="form-input"
                                     value={forgotId}
                                     onChange={(e) => setForgotId(e.target.value)}
                                     required
-                                    placeholder="Masukkan Employee ID"
+                                    placeholder="Masukkan User ID"
                                     disabled={forgotLoading}
                                 />
                             </div>

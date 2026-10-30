@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import Icon from '../components/Icon';
@@ -137,8 +137,77 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
     );
 }
 
+
+const TABS = [
+    { id: 'general', label: 'Umum & Tampilan', icon: 'Building2', count: 4, desc: 'Identitas, logo, tema & kolom' },
+    { id: 'attendance', label: 'Aturan Absensi', icon: 'MapPin', count: 2, desc: 'Validasi pulang & kemiripan wajah' },
+    { id: 'payroll', label: 'Gaji & Lembur', icon: 'Banknote', count: 3, desc: 'Potongan telat, lembur libur & slip gaji' },
+    { id: 'leave', label: 'Cuti & Izin', icon: 'Palmtree', count: 1, desc: 'Kuota, satuan, approval & cuti besar' },
+    { id: 'system', label: 'Sistem & Backup', icon: 'Save', count: 2, desc: 'SMTP email & backup database' },
+];
+
+const TAB_ALIASES = {
+    late: 'payroll',
+    lembur: 'payroll',
+    overtime: 'payroll',
+    slip: 'payroll',
+    gaji: 'payroll',
+    payroll: 'payroll',
+    cuti: 'leave',
+    izin: 'leave',
+    approval: 'leave',
+    leave: 'leave',
+    lokasi: 'attendance',
+    wajah: 'attendance',
+    face: 'attendance',
+    attendance: 'attendance',
+    logo: 'general',
+    tema: 'general',
+    theme: 'general',
+    kolom: 'general',
+    company: 'general',
+    general: 'general',
+    smtp: 'system',
+    email: 'system',
+    backup: 'system',
+    system: 'system'
+};
+
 export default function AdminSettings() {
+
+    const location = useLocation();
     const navigate = useNavigate();
+
+    const resolveTab = (key) => {
+        if (!key) return null;
+        const clean = key.replace(/^[#?]/, '').toLowerCase();
+        if (TABS.some(t => t.id === clean)) return clean;
+        return TAB_ALIASES[clean] || null;
+    };
+
+    const [activeTab, setActiveTab] = useState(() => {
+        const hashTab = resolveTab(window.location.hash);
+        if (hashTab) return hashTab;
+        const searchTab = resolveTab(new URLSearchParams(window.location.search).get('tab'));
+        if (searchTab) return searchTab;
+        return localStorage.getItem('admin_settings_active_tab') || 'general';
+    });
+
+    useEffect(() => {
+        const hashTab = resolveTab(location.hash);
+        const searchTab = resolveTab(new URLSearchParams(location.search).get('tab'));
+        const next = hashTab || searchTab;
+        if (next && next !== activeTab) {
+            setActiveTab(next);
+        }
+    }, [location.hash, location.search]);
+
+    const handleTabChange = (tabId) => {
+        setActiveTab(tabId);
+        localStorage.setItem('admin_settings_active_tab', tabId);
+        navigate(`/admin/settings?tab=${tabId}`, { replace: true });
+    };
+
     const { logout, hasPermission } = useAuth();
     const canEditPayslipLayout = hasPermission('admin.payslip_layout');
     const { settings, fetchSettings, updateLogo, updatePayslipShowLogo, updatePayslipFields, themeColors, updateTheme, previewTheme, resetPreview, companyName, updateCompanyName, DEFAULT_THEME } = useSettings();
@@ -682,9 +751,66 @@ export default function AdminSettings() {
                 <p className="page-subtitle">Kelola konfigurasi sistem dan tampilan</p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', maxWidth: '800px' }}>
+            {/* Sheet / Tab Navigation */}
+            <div style={{
+                display: 'flex',
+                gap: '0.4rem',
+                flexWrap: 'wrap',
+                marginBottom: '1.75rem',
+                padding: '0.35rem',
+                background: 'var(--bg-card, #f8fafc)',
+                borderRadius: 'var(--radius-lg, 12px)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                maxWidth: '960px'
+            }}>
+                {TABS.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => handleTabChange(tab.id)}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.65rem 1.15rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: isActive ? 600 : 500,
+                                transition: 'all 0.15s ease',
+                                background: isActive ? 'var(--primary-600, #2563eb)' : 'transparent',
+                                color: isActive ? '#ffffff' : 'var(--gray-600, #64748b)',
+                                boxShadow: isActive ? '0 2px 4px rgba(37, 99, 235, 0.25)' : 'none'
+                            }}
+                        >
+                            <Icon name={tab.icon} size={16} inline />
+                            <span>{tab.label}</span>
+                            <span style={{
+                                fontSize: '0.72rem',
+                                padding: '0.1rem 0.45rem',
+                                borderRadius: '9999px',
+                                background: isActive ? 'rgba(255, 255, 255, 0.22)' : 'var(--gray-200, rgba(148, 163, 184, 0.2))',
+                                color: isActive ? '#ffffff' : 'var(--gray-500, #64748b)',
+                                marginLeft: '0.15rem'
+                            }}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
 
-                {/* ============ COMPANY NAME SECTION ============ */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', maxWidth: '960px' }}>
+
+
+                
+                {activeTab === 'general' && (
+                    <>
+                        {/* ============ COMPANY NAME SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
                     <div className="card-header">
                         <h2 className="card-title"><Icon name="Building2" size={16} inline /> Nama Perusahaan</h2>
@@ -736,62 +862,493 @@ export default function AdminSettings() {
                     </div>
                 </div>
 
-                {/* ============ FACE MATCH SECTION ============ */}
-                <div className="card" style={{ overflow: 'visible' }}>
+                        {/* ============ LOGO SECTION ============ */}
+                <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title"><Icon name="ScanFace" size={16} inline /> Kemiripan Wajah</h2>
+                        <h2 className="card-title"><Icon name="Image" size={16} inline /> Manajemen Logo</h2>
                     </div>
-                    <div style={{ padding: '0.5rem 0' }}>
-                        {faceMatchMessage.text && (
-                            <div className={`alert alert-${faceMatchMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                <span className="alert-icon">{faceMatchMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
-                                {faceMatchMessage.text}
-                            </div>
-                        )}
-                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1rem' }}>
-                            Absensi dan kiosk menerima wajah jika kemiripannya mencapai angka ini. Menaikkan angka membuat pencocokan lebih ketat. Bawaan 60%.
-                        </p>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                            <div style={{ flex: '1 1 220px' }}>
-                                <label className="form-label" htmlFor="face-match-percent">Minimal kemiripan (%)</label>
+                    
+                    <div style={{ padding: '0 0.5rem' }}>
+                        <LogoUploader 
+                            title="Logo Utama Aplikasi" 
+                            type="app_logo" 
+                            currentLogoUrl={settings.app_logo} 
+                            updateLogoFn={updateLogo} 
+                        />
+                        
+                        <LogoUploader 
+                            title="Logo Login Page" 
+                            type="login_logo" 
+                            currentLogoUrl={settings.login_logo || settings.app_logo} 
+                            updateLogoFn={updateLogo} 
+                        />
+                        
+                        <LogoUploader 
+                            title="Favicon (Ikon Tab Browser)" 
+                            type="favicon_logo" 
+                            currentLogoUrl={settings.favicon_logo || settings.app_logo} 
+                            updateLogoFn={updateLogo} 
+                        />
+
+                        <div style={{ padding: '0.25rem 0 1.25rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer' }}>
                                 <input
-                                    id="face-match-percent"
-                                    className="form-input"
-                                    type="number"
-                                    min={FACE_MATCH_MIN}
-                                    max={FACE_MATCH_MAX}
-                                    step="1"
-                                    value={faceMatchPercent}
-                                    onChange={(e) => setFaceMatchPercent(e.target.value)}
+                                    type="checkbox"
+                                    checked={showPayslipLogo}
+                                    disabled={payslipLogoLoading}
+                                    onChange={async (e) => {
+                                        const next = e.target.checked;
+                                        setShowPayslipLogo(next);
+                                        setPayslipLogoLoading(true);
+                                        setPayslipLogoMessage({ type: '', text: '' });
+                                        try {
+                                            await updatePayslipShowLogo(next);
+                                            setPayslipLogoMessage({
+                                                type: 'success',
+                                                text: next ? 'Logo akan tampil di slip gaji' : 'Logo disembunyikan dari slip gaji'
+                                            });
+                                        } catch (error) {
+                                            setShowPayslipLogo(!next);
+                                            setPayslipLogoMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan logo slip' });
+                                        } finally {
+                                            setPayslipLogoLoading(false);
+                                        }
+                                    }}
+                                    style={{ width: '18px', height: '18px', marginTop: '0.15rem' }}
                                 />
-                                <input
-                                    type="range"
-                                    min={FACE_MATCH_MIN}
-                                    max={FACE_MATCH_MAX}
-                                    step="1"
-                                    value={normalizeFaceMatchPercent(faceMatchPercent)}
-                                    onChange={(e) => setFaceMatchPercent(Number(e.target.value))}
-                                    style={{ width: '100%', marginTop: '0.75rem' }}
-                                    aria-label="Geser batas kemiripan wajah"
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleFaceMatchSave}
-                                disabled={faceMatchLoading}
-                                style={{ minWidth: '120px', height: '42px' }}
-                            >
-                                {faceMatchLoading ? 'Menyimpan...' : 'Simpan'}
-                            </button>
+                                <div>
+                                    <div style={{ fontWeight: 600 }}>Tampilkan logo pada slip gaji</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Logo Utama Aplikasi muncul di atas judul slip, termasuk saat diunduh PDF. Matikan jika slip tidak perlu menampilkan logo.
+                                    </div>
+                                </div>
+                            </label>
+                            {payslipLogoMessage.text && (
+                                <div className={`alert alert-${payslipLogoMessage.type}`} style={{ marginTop: '1rem' }}>
+                                    {payslipLogoMessage.text}
+                                </div>
+                            )}
                         </div>
-                        <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--gray-500)' }}>
-                            Rentang {FACE_MATCH_MIN}% sampai {FACE_MATCH_MAX}%. Layar kiosk yang sudah terbuka perlu dimuat ulang agar angka baru dipakai.
-                        </p>
                     </div>
                 </div>
 
-                {/* ============ EMPLOYEE TABLE COLUMNS SECTION ============ */}
+                        {/* ============ THEME COLOR SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="Palette" size={16} inline /> Kustomisasi Warna Tema</h2>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {themeMessage.text && (
+                            <div className={`alert alert-${themeMessage.type}`} style={{ marginBottom: '1.5rem' }}>
+                                <span className="alert-icon">{themeMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {themeMessage.text}
+                            </div>
+                        )}
+
+                        {/* Color Presets */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{
+                                display: 'block',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                color: 'var(--gray-600)',
+                                marginBottom: '0.75rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02em'
+                            }}>
+                                Pilih Tema Preset
+                            </label>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+                                gap: '0.75rem'
+                            }}>
+                                {THEME_PRESETS.map((preset, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => handlePresetSelect(index)}
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            padding: '1rem 0.75rem',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: activePreset === index
+                                                ? `2.5px solid ${preset.primary}`
+                                                : '2px solid var(--gray-200)',
+                                            background: activePreset === index
+                                                ? `linear-gradient(135deg, ${preset.bg}, white)`
+                                                : 'white',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.25s ease',
+                                            transform: activePreset === index ? 'scale(1.03)' : 'scale(1)',
+                                            boxShadow: activePreset === index
+                                                ? `0 4px 16px ${preset.primary}30`
+                                                : 'var(--shadow-sm)',
+                                            position: 'relative',
+                                            overflow: 'hidden'
+                                        }}
+                                    >
+                                        {/* Color swatch */}
+                                        <div style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '50%',
+                                            background: `linear-gradient(135deg, ${preset.primary}, ${preset.primary}cc)`,
+                                            boxShadow: `0 2px 8px ${preset.primary}40`,
+                                            border: '3px solid white',
+                                            transition: 'transform 0.3s ease',
+                                            transform: activePreset === index ? 'scale(1.1)' : 'scale(1)',
+                                        }} />
+                                        <span style={{
+                                            fontSize: '0.72rem',
+                                            fontWeight: 600,
+                                            color: activePreset === index ? preset.primary : 'var(--gray-600)',
+                                            textAlign: 'center',
+                                            lineHeight: 1.2,
+                                        }}>
+                                            {preset.name}
+                                        </span>
+                                        {/* Active check */}
+                                        {activePreset === index && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '6px',
+                                                right: '6px',
+                                                width: '18px',
+                                                height: '18px',
+                                                borderRadius: '50%',
+                                                background: preset.primary,
+                                                color: 'white',
+                                                fontSize: '0.6rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 700,
+                                            }}><Icon name="Check" size={16} inline /></div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Custom Color Pickers */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '1.25rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--gray-600)',
+                                    marginBottom: '0.5rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    Warna Utama (Sidebar)
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    background: 'var(--gray-50)',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1.5px solid var(--gray-200)'
+                                }}>
+                                    <input
+                                        type="color"
+                                        value={selectedPrimary}
+                                        onChange={(e) => handleCustomColorChange('primary', e.target.value)}
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 600,
+                                            color: 'var(--gray-800)',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {selectedPrimary}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
+                                            Sidebar, header, aksen
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--gray-600)',
+                                    marginBottom: '0.5rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    Warna Background
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    background: 'var(--gray-50)',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1.5px solid var(--gray-200)'
+                                }}>
+                                    <input
+                                        type="color"
+                                        value={selectedBg}
+                                        onChange={(e) => handleCustomColorChange('bg', e.target.value)}
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 600,
+                                            color: 'var(--gray-800)',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {selectedBg}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
+                                            Latar belakang halaman
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Card / Form BG Color */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--gray-600)',
+                                    marginBottom: '0.5rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    Warna Dasar Card/Form
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    background: 'var(--gray-50)',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1.5px solid var(--gray-200)'
+                                }}>
+                                    <input
+                                        type="color"
+                                        value={selectedCardBg}
+                                        onChange={(e) => handleCustomColorChange('card_bg', e.target.value)}
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 600,
+                                            color: 'var(--gray-800)',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {selectedCardBg}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
+                                            Form input & master
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Button BG Color */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--gray-600)',
+                                    marginBottom: '0.5rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                }}>
+                                    Warna Tombol
+                                </label>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    background: 'var(--gray-50)',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1.5px solid var(--gray-200)'
+                                }}>
+                                    <input
+                                        type="color"
+                                        value={selectedBtnBg}
+                                        onChange={(e) => handleCustomColorChange('btn_bg', e.target.value)}
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius)',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 600,
+                                            color: 'var(--gray-800)',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            {selectedBtnBg}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
+                                            Tombol aksi utama
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Live Preview */}
+                        <div style={{
+                            marginBottom: '1.5rem',
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-lg)',
+                            border: '1.5px solid var(--gray-200)',
+                            background: 'var(--gray-50)'
+                        }}>
+                            <label style={{
+                                display: 'block',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: 'var(--gray-500)',
+                                marginBottom: '0.75rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
+                            }}>
+                                Preview Tema
+                            </label>
+                            <div style={{
+                                display: 'flex',
+                                borderRadius: 'var(--radius-md)',
+                                overflow: 'hidden',
+                                boxShadow: 'var(--shadow-md)',
+                                height: '90px',
+                            }}>
+                                {/* Mini sidebar preview */}
+                                <div style={{
+                                    width: '60px',
+                                    background: `linear-gradient(180deg, ${selectedPrimary}, ${selectedPrimary}cc)`,
+                                    padding: '0.5rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}>
+                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)' }} />
+                                    <div style={{ width: '80%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.3)' }} />
+                                    <div style={{ width: '80%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.15)' }} />
+                                    <div style={{ width: '80%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.15)' }} />
+                                </div>
+                                {/* Mini content preview */}
+                                <div style={{
+                                    flex: 1,
+                                    background: selectedBg,
+                                    padding: '0.75rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.4rem',
+                                }}>
+                                    <div style={{ width: '40%', height: '8px', borderRadius: '3px', background: selectedPrimary, opacity: 0.8 }} />
+                                    <div style={{ width: '60%', height: '5px', borderRadius: '2px', background: 'var(--gray-300)' }} />
+                                    <div style={{
+                                        flex: 1,
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '0.3rem',
+                                        marginTop: '0.25rem'
+                                    }}>
+                                        <div style={{ borderRadius: '4px', background: selectedCardBg, border: '1px solid var(--gray-200)' }} />
+                                        <div style={{ borderRadius: '4px', background: selectedCardBg, border: '1px solid var(--gray-200)' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleThemeSave}
+                                disabled={themeLoading}
+                                style={{ flex: 1 }}
+                            >
+                                {themeLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    'Simpan Tema'
+                                )}
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={handleThemeReset}
+                                disabled={themeLoading}
+                                style={{ minWidth: '140px' }}
+                            >
+                                <Icon name="RefreshCw" size={16} inline /> Reset Default
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                        {/* ============ EMPLOYEE TABLE COLUMNS SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
                     <div className="card-header">
                         <h2 className="card-title"><Icon name="SlidersHorizontal" size={16} inline /> Kolom Tampilan Data Karyawan</h2>
@@ -894,8 +1451,12 @@ export default function AdminSettings() {
                         </div>
                     </div>
                 </div>
+                    </>
+                )}
 
-                {/* ============ ATTENDANCE LOCATION SETTINGS SECTION ============ */}
+                {activeTab === 'attendance' && (
+                    <>
+                        {/* ============ ATTENDANCE LOCATION SETTINGS SECTION ============ */}
                 <div className="card" style={{ overflow: 'visible' }}>
                     <div className="card-header">
                         <h2 className="card-title"><Icon name="MapPin" size={16} inline /> Validasi Lokasi Absen Pulang (Check-Out)</h2>
@@ -1058,7 +1619,497 @@ export default function AdminSettings() {
                     </div>
                 </div>
 
-                {/* ============ HOLIDAY OVERTIME SECTION ============ */}
+                        {/* ============ FACE MATCH SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="ScanFace" size={16} inline /> Kemiripan Wajah</h2>
+                    </div>
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {faceMatchMessage.text && (
+                            <div className={`alert alert-${faceMatchMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                <span className="alert-icon">{faceMatchMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {faceMatchMessage.text}
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1rem' }}>
+                            Absensi dan kiosk menerima wajah jika kemiripannya mencapai angka ini. Menaikkan angka membuat pencocokan lebih ketat. Bawaan 60%.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <div style={{ flex: '1 1 220px' }}>
+                                <label className="form-label" htmlFor="face-match-percent">Minimal kemiripan (%)</label>
+                                <input
+                                    id="face-match-percent"
+                                    className="form-input"
+                                    type="number"
+                                    min={FACE_MATCH_MIN}
+                                    max={FACE_MATCH_MAX}
+                                    step="1"
+                                    value={faceMatchPercent}
+                                    onChange={(e) => setFaceMatchPercent(e.target.value)}
+                                />
+                                <input
+                                    type="range"
+                                    min={FACE_MATCH_MIN}
+                                    max={FACE_MATCH_MAX}
+                                    step="1"
+                                    value={normalizeFaceMatchPercent(faceMatchPercent)}
+                                    onChange={(e) => setFaceMatchPercent(Number(e.target.value))}
+                                    style={{ width: '100%', marginTop: '0.75rem' }}
+                                    aria-label="Geser batas kemiripan wajah"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleFaceMatchSave}
+                                disabled={faceMatchLoading}
+                                style={{ minWidth: '120px', height: '42px' }}
+                            >
+                                {faceMatchLoading ? 'Menyimpan...' : 'Simpan'}
+                            </button>
+                        </div>
+                        <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--gray-500)' }}>
+                            Rentang {FACE_MATCH_MIN}% sampai {FACE_MATCH_MAX}%. Layar kiosk yang sudah terbuka perlu dimuat ulang agar angka baru dipakai.
+                        </p>
+                    </div>
+                </div>
+                    </>
+                )}
+
+                {activeTab === 'payroll' && (
+                    <>
+                        {/* ============ LATE DEDUCTION SECTION ============ */}
+                <div className="card" style={{ marginBottom: '1.5rem', overflow: 'visible' }}>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Icon name="Clock" size={18} inline /> Potongan Keterlambatan Otomatis (Global)
+                            </h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.25rem', marginBottom: 0 }}>
+                                Otomatis hitung dan terapkan pemotongan gaji pada payroll jika karyawan datang terlambat melewati jam masuk kerja.
+                            </p>
+                        </div>
+                        <span className={`badge ${lateDeductionSettings.late_deduction_enabled ? 'badge-danger' : 'badge-secondary'}`} style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                            {lateDeductionSettings.late_deduction_enabled ? '● Potongan Telat Aktif' : '○ Nonaktif'}
+                        </span>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {lateDeductionMessage.text && (
+                            <div className={`alert alert-${lateDeductionMessage.type}`} style={{ marginBottom: '1.25rem' }}>
+                                <span className="alert-icon">{lateDeductionMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {lateDeductionMessage.text}
+                            </div>
+                        )}
+
+                        {/* Info Banner */}
+                        <div style={{
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            background: 'var(--gray-50, #f8fafc)',
+                            border: '1px solid var(--gray-200, #e2e8f0)',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            gap: '0.75rem',
+                            alignItems: 'flex-start'
+                        }}>
+                            <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>⏱️</span>
+                            <div style={{ fontSize: '0.875rem', color: 'var(--gray-700, #334155)', lineHeight: 1.5 }}>
+                                <strong>Cara Kerja:</strong> Saat Payroll dihitung, sistem memeriksa jam check-in harian karyawan terhadap jadwal kerja/shift aktif mereka. Karyawan yang terlambat melewati batas toleransi akan diakumulasikan menit/jam keterlambatannya dan dikalikan dengan tarif global di bawah, kemudian otomatis mengurangi Take Home Pay pada slip gaji.
+                                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--gray-300, #cbd5e1)', fontSize: '0.825rem', color: 'var(--primary-600, #2563eb)' }}>
+                                    💡 <strong>Tarif Berbeda Tiap Jabatan?</strong> Pengaturan di bawah ini berlaku secara Global. Jika Anda ingin tarif atau toleransi yang berbeda untuk jabatan tertentu (atau membebaskan jabatan manajerial dari potongan), Anda dapat mengaturnya langsung di menu <a href="#/positions" style={{ textDecoration: 'underline', fontWeight: 600 }}>Data Jabatan</a>.
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Main Switches Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            {/* Toggle 1: Enable Late Deduction */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: `1.5px solid ${lateDeductionSettings.late_deduction_enabled ? 'var(--danger-500, #ef4444)' : 'var(--gray-200, #e2e8f0)'}`,
+                                background: lateDeductionSettings.late_deduction_enabled ? 'rgba(239, 68, 68, 0.04)' : '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
+                                        Potongan Keterlambatan Otomatis
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Otomatis potong gaji di payroll saat karyawan telat
+                                    </div>
+                                </div>
+                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={lateDeductionSettings.late_deduction_enabled}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_enabled: e.target.checked }))}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+
+                            {/* Toggle 2: Exempt Approved Leave */}
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: '1.5px solid var(--gray-200, #e2e8f0)',
+                                background: '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
+                                        Bebaskan Jika Ada Izin Terlambat
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                                        Tidak dipotong jika pengajuan Izin Terlambat disetujui atasan
+                                    </div>
+                                </div>
+                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={lateDeductionSettings.late_exempt_approved_leave}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_exempt_approved_leave: e.target.checked }))}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Calculation Mode Selection */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>
+                                Skema Hitungan Global Potongan
+                            </label>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                gap: '1rem'
+                            }}>
+                                {/* Mode: Per Menit */}
+                                <div
+                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_minute' }))}
+                                    style={{
+                                        padding: '1rem',
+                                        borderRadius: 'var(--radius-md, 8px)',
+                                        border: `2px solid ${lateDeductionSettings.late_deduction_mode === 'per_minute' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                        background: lateDeductionSettings.late_deduction_mode === 'per_minute' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                        <input
+                                            type="radio"
+                                            name="late_mode"
+                                            checked={lateDeductionSettings.late_deduction_mode === 'per_minute'}
+                                            onChange={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_minute' }))}
+                                            style={{ margin: 0 }}
+                                        />
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--gray-800)' }}>Hitungan Per Menit</strong>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', paddingLeft: '1.5rem' }}>
+                                        Dihitung proporsional persis per menit keterlambatan (misal Rp 1.000 × total menit).
+                                    </div>
+                                </div>
+
+                                {/* Mode: Per Jam */}
+                                <div
+                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_hour' }))}
+                                    style={{
+                                        padding: '1rem',
+                                        borderRadius: 'var(--radius-md, 8px)',
+                                        border: `2px solid ${lateDeductionSettings.late_deduction_mode === 'per_hour' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
+                                        background: lateDeductionSettings.late_deduction_mode === 'per_hour' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                        <input
+                                            type="radio"
+                                            name="late_mode"
+                                            checked={lateDeductionSettings.late_deduction_mode === 'per_hour'}
+                                            onChange={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_hour' }))}
+                                            style={{ margin: 0 }}
+                                        />
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--gray-800)' }}>Hitungan Per Jam</strong>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', paddingLeft: '1.5rem' }}>
+                                        Dihitung per jam keterlambatan (dengan opsi pembulatan ke atas, prorata, atau jam penuh).
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Rate and Rounding Configuration */}
+                        <div style={{
+                            padding: '1.25rem',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            background: 'var(--gray-50, #f8fafc)',
+                            border: '1px solid var(--gray-200, #e2e8f0)',
+                            marginBottom: '1.5rem'
+                        }}>
+                            {lateDeductionSettings.late_deduction_mode === 'per_minute' ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Tarif Potongan per Menit (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)' }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="100"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_deduction_rate_per_minute}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_minute: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[500, 1000, 2000, 5000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_minute: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: lateDeductionSettings.late_deduction_rate_per_minute === val ? 'var(--primary-color)' : 'var(--gray-300)',
+                                                        background: lateDeductionSettings.late_deduction_rate_per_minute === val ? 'var(--primary-color)' : '#fff',
+                                                        color: lateDeductionSettings.late_deduction_rate_per_minute === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    Rp {val.toLocaleString('id-ID')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Toleransi Keterlambatan (Grace Period)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="60"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_grace_period_minutes}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>menit</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.4rem' }}>
+                                            Contoh: Jika 5 menit, telat ≤ 5 menit dianggap tepat waktu (Rp 0).
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Tarif Potongan per Jam (Rp)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)' }}>Rp</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1000"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_deduction_rate_per_hour}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_hour: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                            {[15000, 20000, 25000, 50000].map(val => (
+                                                <button
+                                                    key={val}
+                                                    type="button"
+                                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_hour: val }))}
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{
+                                                        padding: '0.2rem 0.5rem',
+                                                        fontSize: '0.75rem',
+                                                        borderColor: lateDeductionSettings.late_deduction_rate_per_hour === val ? 'var(--primary-color)' : 'var(--gray-300)',
+                                                        background: lateDeductionSettings.late_deduction_rate_per_hour === val ? 'var(--primary-color)' : '#fff',
+                                                        color: lateDeductionSettings.late_deduction_rate_per_hour === val ? '#fff' : 'inherit'
+                                                    }}
+                                                >
+                                                    {(val / 1000)}rb
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Metode Pembulatan Jam
+                                        </label>
+                                        <select
+                                            className="form-input form-select"
+                                            value={lateDeductionSettings.late_deduction_hour_round}
+                                            onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_hour_round: e.target.value }))}
+                                        >
+                                            <option value="round_up">Pembulatan Ke Atas Total (Ceil: misal telat 15 mnt = 1 jam)</option>
+                                            <option value="round_up_daily">Pembulatan Ke Atas Per Hari Kejadian (15 mnt/hari = 1 jam/hari)</option>
+                                            <option value="prorated">Proporsional / Prorata (Menit ÷ 60 × Tarif)</option>
+                                            <option value="exact_hour">Hanya Kelipatan Jam Penuh (Floor)</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label" style={{ fontWeight: 600 }}>
+                                            Toleransi Keterlambatan (Grace Period)
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="60"
+                                                className="form-input"
+                                                value={lateDeductionSettings.late_grace_period_minutes}
+                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                                                style={{ fontWeight: 600 }}
+                                            />
+                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>menit</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Additional Options */}
+                            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--gray-200)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-700)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={lateDeductionSettings.late_deduct_grace_period}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduct_grace_period: e.target.checked }))}
+                                        style={{ width: '16px', height: '16px' }}
+                                    />
+                                    <span>Kurangi menit toleransi saat memotong (hanya potong kelebihannya)</span>
+                                </label>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start' }}>
+                                    <label style={{ fontSize: '0.85rem', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
+                                        Jam Masuk Standar (Fallback):
+                                    </label>
+                                    <input
+                                        type="time"
+                                        className="form-input"
+                                        value={lateDeductionSettings.late_fallback_start_time}
+                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_fallback_start_time: e.target.value }))}
+                                        style={{ width: '110px', padding: '0.3rem 0.5rem' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Interactive Simulation Preview Box */}
+                        {(() => {
+                            const testMinutes = 35;
+                            const grace = lateDeductionSettings.late_grace_period_minutes || 0;
+                            const isLate = testMinutes > grace;
+                            let charged = isLate ? (lateDeductionSettings.late_deduct_grace_period ? testMinutes - grace : testMinutes) : 0;
+                            let simulatedAmount = 0;
+                            let explanation = '';
+
+                            if (lateDeductionSettings.late_deduction_mode === 'per_minute') {
+                                simulatedAmount = charged * (lateDeductionSettings.late_deduction_rate_per_minute || 0);
+                                explanation = `${charged} mnt x Rp ${(lateDeductionSettings.late_deduction_rate_per_minute || 0).toLocaleString('id-ID')}`;
+                            } else {
+                                const rate = lateDeductionSettings.late_deduction_rate_per_hour || 0;
+                                if (lateDeductionSettings.late_deduction_hour_round === 'round_up' || lateDeductionSettings.late_deduction_hour_round === 'round_up_daily') {
+                                    const h = Math.ceil(charged / 60);
+                                    simulatedAmount = h * rate;
+                                    explanation = `${h} jam (dibulatkan ke atas) x Rp ${rate.toLocaleString('id-ID')}`;
+                                } else if (lateDeductionSettings.late_deduction_hour_round === 'prorated') {
+                                    const h = charged / 60;
+                                    simulatedAmount = Math.round(h * rate);
+                                    explanation = `${charged}/60 jam (${h.toFixed(2)} jam prorata) x Rp ${rate.toLocaleString('id-ID')}`;
+                                } else {
+                                    const h = Math.floor(charged / 60);
+                                    simulatedAmount = h * rate;
+                                    explanation = `${h} jam penuh x Rp ${rate.toLocaleString('id-ID')}`;
+                                }
+                            }
+
+                            return (
+                                <div style={{
+                                    padding: '1rem',
+                                    borderRadius: 'var(--radius-md, 8px)',
+                                    background: 'rgba(245, 158, 11, 0.08)',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    marginBottom: '1.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: '0.75rem'
+                                }}>
+                                    <div>
+                                        <div style={{ fontWeight: 700, color: '#b45309', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <Icon name="Calculator" size={16} inline /> Simulasi Contoh (Karyawan Telat 35 Menit):
+                                        </div>
+                                        <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.2rem' }}>
+                                            Toleransi: {grace} mnt | Menit dipotong: {charged} mnt ({explanation})
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#92400e' }}>Nominal Potongan:</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309' }}>
+                                            Rp {simulatedAmount.toLocaleString('id-ID')}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Save Action */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleLateDeductionSave}
+                                disabled={lateDeductionLoading}
+                                style={{ minWidth: '220px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                {lateDeductionLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icon name="Save" size={16} inline />
+                                        <span>Simpan Potongan Keterlambatan</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                        {/* ============ HOLIDAY OVERTIME SECTION ============ */}
                 <div className="card" style={{ marginBottom: '1.5rem', overflow: 'visible' }}>
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
                         <div>
@@ -1575,925 +2626,7 @@ export default function AdminSettings() {
                     </div>
                 </div>
 
-                {/* ============ LATE DEDUCTION SECTION ============ */}
-                <div className="card" style={{ marginBottom: '1.5rem', overflow: 'visible' }}>
-                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
-                        <div>
-                            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Icon name="Clock" size={18} inline /> Potongan Keterlambatan Otomatis (Global)
-                            </h2>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--gray-500)', marginTop: '0.25rem', marginBottom: 0 }}>
-                                Otomatis hitung dan terapkan pemotongan gaji pada payroll jika karyawan datang terlambat melewati jam masuk kerja.
-                            </p>
-                        </div>
-                        <span className={`badge ${lateDeductionSettings.late_deduction_enabled ? 'badge-danger' : 'badge-secondary'}`} style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 600 }}>
-                            {lateDeductionSettings.late_deduction_enabled ? '● Potongan Telat Aktif' : '○ Nonaktif'}
-                        </span>
-                    </div>
-
-                    <div style={{ padding: '0.5rem 0' }}>
-                        {lateDeductionMessage.text && (
-                            <div className={`alert alert-${lateDeductionMessage.type}`} style={{ marginBottom: '1.25rem' }}>
-                                <span className="alert-icon">{lateDeductionMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
-                                {lateDeductionMessage.text}
-                            </div>
-                        )}
-
-                        {/* Info Banner */}
-                        <div style={{
-                            padding: '1rem',
-                            borderRadius: 'var(--radius-md, 8px)',
-                            background: 'var(--gray-50, #f8fafc)',
-                            border: '1px solid var(--gray-200, #e2e8f0)',
-                            marginBottom: '1.25rem',
-                            display: 'flex',
-                            gap: '0.75rem',
-                            alignItems: 'flex-start'
-                        }}>
-                            <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>⏱️</span>
-                            <div style={{ fontSize: '0.875rem', color: 'var(--gray-700, #334155)', lineHeight: 1.5 }}>
-                                <strong>Cara Kerja:</strong> Saat Payroll dihitung, sistem memeriksa jam check-in harian karyawan terhadap jadwal kerja/shift aktif mereka. Karyawan yang terlambat melewati batas toleransi akan diakumulasikan menit/jam keterlambatannya dan dikalikan dengan tarif global di bawah, kemudian otomatis mengurangi Take Home Pay pada slip gaji.
-                                <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--gray-300, #cbd5e1)', fontSize: '0.825rem', color: 'var(--primary-600, #2563eb)' }}>
-                                    💡 <strong>Tarif Berbeda Tiap Jabatan?</strong> Pengaturan di bawah ini berlaku secara Global. Jika Anda ingin tarif atau toleransi yang berbeda untuk jabatan tertentu (atau membebaskan jabatan manajerial dari potongan), Anda dapat mengaturnya langsung di menu <a href="#/positions" style={{ textDecoration: 'underline', fontWeight: 600 }}>Data Jabatan</a>.
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Main Switches Grid */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                            gap: '1rem',
-                            marginBottom: '1.5rem'
-                        }}>
-                            {/* Toggle 1: Enable Late Deduction */}
-                            <div style={{
-                                padding: '1rem',
-                                borderRadius: 'var(--radius-md, 8px)',
-                                border: `1.5px solid ${lateDeductionSettings.late_deduction_enabled ? 'var(--danger-500, #ef4444)' : 'var(--gray-200, #e2e8f0)'}`,
-                                background: lateDeductionSettings.late_deduction_enabled ? 'rgba(239, 68, 68, 0.04)' : '#fff',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                gap: '1rem'
-                            }}>
-                                <div>
-                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
-                                        Potongan Keterlambatan Otomatis
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                        Otomatis potong gaji di payroll saat karyawan telat
-                                    </div>
-                                </div>
-                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={lateDeductionSettings.late_deduction_enabled}
-                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_enabled: e.target.checked }))}
-                                    />
-                                    <span className="slider round"></span>
-                                </label>
-                            </div>
-
-                            {/* Toggle 2: Exempt Approved Leave */}
-                            <div style={{
-                                padding: '1rem',
-                                borderRadius: 'var(--radius-md, 8px)',
-                                border: '1.5px solid var(--gray-200, #e2e8f0)',
-                                background: '#fff',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                gap: '1rem'
-                            }}>
-                                <div>
-                                    <div style={{ fontWeight: 600, color: 'var(--gray-800)', fontSize: '0.925rem' }}>
-                                        Bebaskan Jika Ada Izin Terlambat
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                        Tidak dipotong jika pengajuan Izin Terlambat disetujui atasan
-                                    </div>
-                                </div>
-                                <label className="switch" style={{ margin: 0, flexShrink: 0 }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={lateDeductionSettings.late_exempt_approved_leave}
-                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_exempt_approved_leave: e.target.checked }))}
-                                    />
-                                    <span className="slider round"></span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Calculation Mode Selection */}
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label className="form-label" style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>
-                                Skema Hitungan Global Potongan
-                            </label>
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                                gap: '1rem'
-                            }}>
-                                {/* Mode: Per Menit */}
-                                <div
-                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_minute' }))}
-                                    style={{
-                                        padding: '1rem',
-                                        borderRadius: 'var(--radius-md, 8px)',
-                                        border: `2px solid ${lateDeductionSettings.late_deduction_mode === 'per_minute' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
-                                        background: lateDeductionSettings.late_deduction_mode === 'per_minute' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                                        <input
-                                            type="radio"
-                                            name="late_mode"
-                                            checked={lateDeductionSettings.late_deduction_mode === 'per_minute'}
-                                            onChange={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_minute' }))}
-                                            style={{ margin: 0 }}
-                                        />
-                                        <strong style={{ fontSize: '0.95rem', color: 'var(--gray-800)' }}>Hitungan Per Menit</strong>
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', paddingLeft: '1.5rem' }}>
-                                        Dihitung proporsional persis per menit keterlambatan (misal Rp 1.000 × total menit).
-                                    </div>
-                                </div>
-
-                                {/* Mode: Per Jam */}
-                                <div
-                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_hour' }))}
-                                    style={{
-                                        padding: '1rem',
-                                        borderRadius: 'var(--radius-md, 8px)',
-                                        border: `2px solid ${lateDeductionSettings.late_deduction_mode === 'per_hour' ? 'var(--primary-color, #4f46e5)' : 'var(--gray-200, #e2e8f0)'}`,
-                                        background: lateDeductionSettings.late_deduction_mode === 'per_hour' ? 'rgba(79, 70, 229, 0.05)' : '#fff',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                                        <input
-                                            type="radio"
-                                            name="late_mode"
-                                            checked={lateDeductionSettings.late_deduction_mode === 'per_hour'}
-                                            onChange={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_mode: 'per_hour' }))}
-                                            style={{ margin: 0 }}
-                                        />
-                                        <strong style={{ fontSize: '0.95rem', color: 'var(--gray-800)' }}>Hitungan Per Jam</strong>
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', paddingLeft: '1.5rem' }}>
-                                        Dihitung per jam keterlambatan (dengan opsi pembulatan ke atas, prorata, atau jam penuh).
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Rate and Rounding Configuration */}
-                        <div style={{
-                            padding: '1.25rem',
-                            borderRadius: 'var(--radius-md, 8px)',
-                            background: 'var(--gray-50, #f8fafc)',
-                            border: '1px solid var(--gray-200, #e2e8f0)',
-                            marginBottom: '1.5rem'
-                        }}>
-                            {lateDeductionSettings.late_deduction_mode === 'per_minute' ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label className="form-label" style={{ fontWeight: 600 }}>
-                                            Tarif Potongan per Menit (Rp)
-                                        </label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)' }}>Rp</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="100"
-                                                className="form-input"
-                                                value={lateDeductionSettings.late_deduction_rate_per_minute}
-                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_minute: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                                                style={{ fontWeight: 600 }}
-                                            />
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                                            {[500, 1000, 2000, 5000].map(val => (
-                                                <button
-                                                    key={val}
-                                                    type="button"
-                                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_minute: val }))}
-                                                    className="btn btn-sm btn-outline"
-                                                    style={{
-                                                        padding: '0.2rem 0.5rem',
-                                                        fontSize: '0.75rem',
-                                                        borderColor: lateDeductionSettings.late_deduction_rate_per_minute === val ? 'var(--primary-color)' : 'var(--gray-300)',
-                                                        background: lateDeductionSettings.late_deduction_rate_per_minute === val ? 'var(--primary-color)' : '#fff',
-                                                        color: lateDeductionSettings.late_deduction_rate_per_minute === val ? '#fff' : 'inherit'
-                                                    }}
-                                                >
-                                                    Rp {val.toLocaleString('id-ID')}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label className="form-label" style={{ fontWeight: 600 }}>
-                                            Toleransi Keterlambatan (Grace Period)
-                                        </label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="60"
-                                                className="form-input"
-                                                value={lateDeductionSettings.late_grace_period_minutes}
-                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                                                style={{ fontWeight: 600 }}
-                                            />
-                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>menit</span>
-                                        </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.4rem' }}>
-                                            Contoh: Jika 5 menit, telat ≤ 5 menit dianggap tepat waktu (Rp 0).
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label className="form-label" style={{ fontWeight: 600 }}>
-                                            Tarif Potongan per Jam (Rp)
-                                        </label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)' }}>Rp</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="1000"
-                                                className="form-input"
-                                                value={lateDeductionSettings.late_deduction_rate_per_hour}
-                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_hour: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                                                style={{ fontWeight: 600 }}
-                                            />
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                                            {[15000, 20000, 25000, 50000].map(val => (
-                                                <button
-                                                    key={val}
-                                                    type="button"
-                                                    onClick={() => setLateDeductionSettings(prev => ({ ...prev, late_deduction_rate_per_hour: val }))}
-                                                    className="btn btn-sm btn-outline"
-                                                    style={{
-                                                        padding: '0.2rem 0.5rem',
-                                                        fontSize: '0.75rem',
-                                                        borderColor: lateDeductionSettings.late_deduction_rate_per_hour === val ? 'var(--primary-color)' : 'var(--gray-300)',
-                                                        background: lateDeductionSettings.late_deduction_rate_per_hour === val ? 'var(--primary-color)' : '#fff',
-                                                        color: lateDeductionSettings.late_deduction_rate_per_hour === val ? '#fff' : 'inherit'
-                                                    }}
-                                                >
-                                                    {(val / 1000)}rb
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label className="form-label" style={{ fontWeight: 600 }}>
-                                            Metode Pembulatan Jam
-                                        </label>
-                                        <select
-                                            className="form-input form-select"
-                                            value={lateDeductionSettings.late_deduction_hour_round}
-                                            onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduction_hour_round: e.target.value }))}
-                                        >
-                                            <option value="round_up">Pembulatan Ke Atas Total (Ceil: misal telat 15 mnt = 1 jam)</option>
-                                            <option value="round_up_daily">Pembulatan Ke Atas Per Hari Kejadian (15 mnt/hari = 1 jam/hari)</option>
-                                            <option value="prorated">Proporsional / Prorata (Menit ÷ 60 × Tarif)</option>
-                                            <option value="exact_hour">Hanya Kelipatan Jam Penuh (Floor)</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label className="form-label" style={{ fontWeight: 600 }}>
-                                            Toleransi Keterlambatan (Grace Period)
-                                        </label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="60"
-                                                className="form-input"
-                                                value={lateDeductionSettings.late_grace_period_minutes}
-                                                onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_grace_period_minutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                                                style={{ fontWeight: 600 }}
-                                            />
-                                            <span style={{ fontWeight: 600, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>menit</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Additional Options */}
-                            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--gray-200)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-700)', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={lateDeductionSettings.late_deduct_grace_period}
-                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_deduct_grace_period: e.target.checked }))}
-                                        style={{ width: '16px', height: '16px' }}
-                                    />
-                                    <span>Kurangi menit toleransi saat memotong (hanya potong kelebihannya)</span>
-                                </label>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start' }}>
-                                    <label style={{ fontSize: '0.85rem', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
-                                        Jam Masuk Standar (Fallback):
-                                    </label>
-                                    <input
-                                        type="time"
-                                        className="form-input"
-                                        value={lateDeductionSettings.late_fallback_start_time}
-                                        onChange={(e) => setLateDeductionSettings(prev => ({ ...prev, late_fallback_start_time: e.target.value }))}
-                                        style={{ width: '110px', padding: '0.3rem 0.5rem' }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Interactive Simulation Preview Box */}
-                        {(() => {
-                            const testMinutes = 35;
-                            const grace = lateDeductionSettings.late_grace_period_minutes || 0;
-                            const isLate = testMinutes > grace;
-                            let charged = isLate ? (lateDeductionSettings.late_deduct_grace_period ? testMinutes - grace : testMinutes) : 0;
-                            let simulatedAmount = 0;
-                            let explanation = '';
-
-                            if (lateDeductionSettings.late_deduction_mode === 'per_minute') {
-                                simulatedAmount = charged * (lateDeductionSettings.late_deduction_rate_per_minute || 0);
-                                explanation = `${charged} mnt x Rp ${(lateDeductionSettings.late_deduction_rate_per_minute || 0).toLocaleString('id-ID')}`;
-                            } else {
-                                const rate = lateDeductionSettings.late_deduction_rate_per_hour || 0;
-                                if (lateDeductionSettings.late_deduction_hour_round === 'round_up' || lateDeductionSettings.late_deduction_hour_round === 'round_up_daily') {
-                                    const h = Math.ceil(charged / 60);
-                                    simulatedAmount = h * rate;
-                                    explanation = `${h} jam (dibulatkan ke atas) x Rp ${rate.toLocaleString('id-ID')}`;
-                                } else if (lateDeductionSettings.late_deduction_hour_round === 'prorated') {
-                                    const h = charged / 60;
-                                    simulatedAmount = Math.round(h * rate);
-                                    explanation = `${charged}/60 jam (${h.toFixed(2)} jam prorata) x Rp ${rate.toLocaleString('id-ID')}`;
-                                } else {
-                                    const h = Math.floor(charged / 60);
-                                    simulatedAmount = h * rate;
-                                    explanation = `${h} jam penuh x Rp ${rate.toLocaleString('id-ID')}`;
-                                }
-                            }
-
-                            return (
-                                <div style={{
-                                    padding: '1rem',
-                                    borderRadius: 'var(--radius-md, 8px)',
-                                    background: 'rgba(245, 158, 11, 0.08)',
-                                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                                    marginBottom: '1.5rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    flexWrap: 'wrap',
-                                    gap: '0.75rem'
-                                }}>
-                                    <div>
-                                        <div style={{ fontWeight: 700, color: '#b45309', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                            <Icon name="Calculator" size={16} inline /> Simulasi Contoh (Karyawan Telat 35 Menit):
-                                        </div>
-                                        <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.2rem' }}>
-                                            Toleransi: {grace} mnt | Menit dipotong: {charged} mnt ({explanation})
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.75rem', color: '#92400e' }}>Nominal Potongan:</div>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309' }}>
-                                            Rp {simulatedAmount.toLocaleString('id-ID')}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {/* Save Action */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleLateDeductionSave}
-                                disabled={lateDeductionLoading}
-                                style={{ minWidth: '220px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                            >
-                                {lateDeductionLoading ? (
-                                    <>
-                                        <div className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
-                                        <span>Menyimpan...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Icon name="Save" size={16} inline />
-                                        <span>Simpan Potongan Keterlambatan</span>
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ============ THEME COLOR SECTION ============ */}
-                <div className="card" style={{ overflow: 'visible' }}>
-                    <div className="card-header">
-                        <h2 className="card-title"><Icon name="Palette" size={16} inline /> Kustomisasi Warna Tema</h2>
-                    </div>
-
-                    <div style={{ padding: '0.5rem 0' }}>
-                        {themeMessage.text && (
-                            <div className={`alert alert-${themeMessage.type}`} style={{ marginBottom: '1.5rem' }}>
-                                <span className="alert-icon">{themeMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
-                                {themeMessage.text}
-                            </div>
-                        )}
-
-                        {/* Color Presets */}
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                color: 'var(--gray-600)',
-                                marginBottom: '0.75rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.02em'
-                            }}>
-                                Pilih Tema Preset
-                            </label>
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-                                gap: '0.75rem'
-                            }}>
-                                {THEME_PRESETS.map((preset, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => handlePresetSelect(index)}
-                                        style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            gap: '0.5rem',
-                                            padding: '1rem 0.75rem',
-                                            borderRadius: 'var(--radius-lg)',
-                                            border: activePreset === index
-                                                ? `2.5px solid ${preset.primary}`
-                                                : '2px solid var(--gray-200)',
-                                            background: activePreset === index
-                                                ? `linear-gradient(135deg, ${preset.bg}, white)`
-                                                : 'white',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.25s ease',
-                                            transform: activePreset === index ? 'scale(1.03)' : 'scale(1)',
-                                            boxShadow: activePreset === index
-                                                ? `0 4px 16px ${preset.primary}30`
-                                                : 'var(--shadow-sm)',
-                                            position: 'relative',
-                                            overflow: 'hidden'
-                                        }}
-                                    >
-                                        {/* Color swatch */}
-                                        <div style={{
-                                            width: '36px',
-                                            height: '36px',
-                                            borderRadius: '50%',
-                                            background: `linear-gradient(135deg, ${preset.primary}, ${preset.primary}cc)`,
-                                            boxShadow: `0 2px 8px ${preset.primary}40`,
-                                            border: '3px solid white',
-                                            transition: 'transform 0.3s ease',
-                                            transform: activePreset === index ? 'scale(1.1)' : 'scale(1)',
-                                        }} />
-                                        <span style={{
-                                            fontSize: '0.72rem',
-                                            fontWeight: 600,
-                                            color: activePreset === index ? preset.primary : 'var(--gray-600)',
-                                            textAlign: 'center',
-                                            lineHeight: 1.2,
-                                        }}>
-                                            {preset.name}
-                                        </span>
-                                        {/* Active check */}
-                                        {activePreset === index && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '6px',
-                                                right: '6px',
-                                                width: '18px',
-                                                height: '18px',
-                                                borderRadius: '50%',
-                                                background: preset.primary,
-                                                color: 'white',
-                                                fontSize: '0.6rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontWeight: 700,
-                                            }}><Icon name="Check" size={16} inline /></div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Custom Color Pickers */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1.25rem',
-                            marginBottom: '1.5rem'
-                        }}>
-                            <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    color: 'var(--gray-600)',
-                                    marginBottom: '0.5rem',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.02em'
-                                }}>
-                                    Warna Utama (Sidebar)
-                                </label>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    background: 'var(--gray-50)',
-                                    padding: '0.6rem 0.75rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1.5px solid var(--gray-200)'
-                                }}>
-                                    <input
-                                        type="color"
-                                        value={selectedPrimary}
-                                        onChange={(e) => handleCustomColorChange('primary', e.target.value)}
-                                        style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            border: 'none',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            padding: 0,
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontFamily: 'monospace',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 600,
-                                            color: 'var(--gray-800)',
-                                            textTransform: 'uppercase'
-                                        }}>
-                                            {selectedPrimary}
-                                        </div>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
-                                            Sidebar, header, aksen
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    color: 'var(--gray-600)',
-                                    marginBottom: '0.5rem',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.02em'
-                                }}>
-                                    Warna Background
-                                </label>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    background: 'var(--gray-50)',
-                                    padding: '0.6rem 0.75rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1.5px solid var(--gray-200)'
-                                }}>
-                                    <input
-                                        type="color"
-                                        value={selectedBg}
-                                        onChange={(e) => handleCustomColorChange('bg', e.target.value)}
-                                        style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            border: 'none',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            padding: 0,
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontFamily: 'monospace',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 600,
-                                            color: 'var(--gray-800)',
-                                            textTransform: 'uppercase'
-                                        }}>
-                                            {selectedBg}
-                                        </div>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
-                                            Latar belakang halaman
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Card / Form BG Color */}
-                            <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    color: 'var(--gray-600)',
-                                    marginBottom: '0.5rem',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.02em'
-                                }}>
-                                    Warna Dasar Card/Form
-                                </label>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    background: 'var(--gray-50)',
-                                    padding: '0.6rem 0.75rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1.5px solid var(--gray-200)'
-                                }}>
-                                    <input
-                                        type="color"
-                                        value={selectedCardBg}
-                                        onChange={(e) => handleCustomColorChange('card_bg', e.target.value)}
-                                        style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            border: 'none',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            padding: 0,
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontFamily: 'monospace',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 600,
-                                            color: 'var(--gray-800)',
-                                            textTransform: 'uppercase'
-                                        }}>
-                                            {selectedCardBg}
-                                        </div>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
-                                            Form input & master
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Button BG Color */}
-                            <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    color: 'var(--gray-600)',
-                                    marginBottom: '0.5rem',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.02em'
-                                }}>
-                                    Warna Tombol
-                                </label>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    background: 'var(--gray-50)',
-                                    padding: '0.6rem 0.75rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1.5px solid var(--gray-200)'
-                                }}>
-                                    <input
-                                        type="color"
-                                        value={selectedBtnBg}
-                                        onChange={(e) => handleCustomColorChange('btn_bg', e.target.value)}
-                                        style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            border: 'none',
-                                            borderRadius: 'var(--radius)',
-                                            cursor: 'pointer',
-                                            padding: 0,
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontFamily: 'monospace',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 600,
-                                            color: 'var(--gray-800)',
-                                            textTransform: 'uppercase'
-                                        }}>
-                                            {selectedBtnBg}
-                                        </div>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)' }}>
-                                            Tombol aksi utama
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Live Preview */}
-                        <div style={{
-                            marginBottom: '1.5rem',
-                            padding: '1rem',
-                            borderRadius: 'var(--radius-lg)',
-                            border: '1.5px solid var(--gray-200)',
-                            background: 'var(--gray-50)'
-                        }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                color: 'var(--gray-500)',
-                                marginBottom: '0.75rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em'
-                            }}>
-                                Preview Tema
-                            </label>
-                            <div style={{
-                                display: 'flex',
-                                borderRadius: 'var(--radius-md)',
-                                overflow: 'hidden',
-                                boxShadow: 'var(--shadow-md)',
-                                height: '90px',
-                            }}>
-                                {/* Mini sidebar preview */}
-                                <div style={{
-                                    width: '60px',
-                                    background: `linear-gradient(180deg, ${selectedPrimary}, ${selectedPrimary}cc)`,
-                                    padding: '0.5rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.35rem',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}>
-                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)' }} />
-                                    <div style={{ width: '80%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.3)' }} />
-                                    <div style={{ width: '80%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.15)' }} />
-                                    <div style={{ width: '80%', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.15)' }} />
-                                </div>
-                                {/* Mini content preview */}
-                                <div style={{
-                                    flex: 1,
-                                    background: selectedBg,
-                                    padding: '0.75rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.4rem',
-                                }}>
-                                    <div style={{ width: '40%', height: '8px', borderRadius: '3px', background: selectedPrimary, opacity: 0.8 }} />
-                                    <div style={{ width: '60%', height: '5px', borderRadius: '2px', background: 'var(--gray-300)' }} />
-                                    <div style={{
-                                        flex: 1,
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gap: '0.3rem',
-                                        marginTop: '0.25rem'
-                                    }}>
-                                        <div style={{ borderRadius: '4px', background: selectedCardBg, border: '1px solid var(--gray-200)' }} />
-                                        <div style={{ borderRadius: '4px', background: selectedCardBg, border: '1px solid var(--gray-200)' }} />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div style={{ display: 'flex', gap: '0.75rem' }}>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleThemeSave}
-                                disabled={themeLoading}
-                                style={{ flex: 1 }}
-                            >
-                                {themeLoading ? (
-                                    <>
-                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                        <span>Menyimpan...</span>
-                                    </>
-                                ) : (
-                                    'Simpan Tema'
-                                )}
-                            </button>
-                            <button
-                                className="btn btn-outline"
-                                onClick={handleThemeReset}
-                                disabled={themeLoading}
-                                style={{ minWidth: '140px' }}
-                            >
-                                <Icon name="RefreshCw" size={16} inline /> Reset Default
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-
-                {/* ============ LOGO SECTION ============ */}
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="card-title"><Icon name="Image" size={16} inline /> Manajemen Logo</h2>
-                    </div>
-                    
-                    <div style={{ padding: '0 0.5rem' }}>
-                        <LogoUploader 
-                            title="Logo Utama Aplikasi" 
-                            type="app_logo" 
-                            currentLogoUrl={settings.app_logo} 
-                            updateLogoFn={updateLogo} 
-                        />
-                        
-                        <LogoUploader 
-                            title="Logo Login Page" 
-                            type="login_logo" 
-                            currentLogoUrl={settings.login_logo || settings.app_logo} 
-                            updateLogoFn={updateLogo} 
-                        />
-                        
-                        <LogoUploader 
-                            title="Favicon (Ikon Tab Browser)" 
-                            type="favicon_logo" 
-                            currentLogoUrl={settings.favicon_logo || settings.app_logo} 
-                            updateLogoFn={updateLogo} 
-                        />
-
-                        <div style={{ padding: '0.25rem 0 1.25rem' }}>
-                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={showPayslipLogo}
-                                    disabled={payslipLogoLoading}
-                                    onChange={async (e) => {
-                                        const next = e.target.checked;
-                                        setShowPayslipLogo(next);
-                                        setPayslipLogoLoading(true);
-                                        setPayslipLogoMessage({ type: '', text: '' });
-                                        try {
-                                            await updatePayslipShowLogo(next);
-                                            setPayslipLogoMessage({
-                                                type: 'success',
-                                                text: next ? 'Logo akan tampil di slip gaji' : 'Logo disembunyikan dari slip gaji'
-                                            });
-                                        } catch (error) {
-                                            setShowPayslipLogo(!next);
-                                            setPayslipLogoMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan logo slip' });
-                                        } finally {
-                                            setPayslipLogoLoading(false);
-                                        }
-                                    }}
-                                    style={{ width: '18px', height: '18px', marginTop: '0.15rem' }}
-                                />
-                                <div>
-                                    <div style={{ fontWeight: 600 }}>Tampilkan logo pada slip gaji</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
-                                        Logo Utama Aplikasi muncul di atas judul slip, termasuk saat diunduh PDF. Matikan jika slip tidak perlu menampilkan logo.
-                                    </div>
-                                </div>
-                            </label>
-                            {payslipLogoMessage.text && (
-                                <div className={`alert alert-${payslipLogoMessage.type}`} style={{ marginTop: '1rem' }}>
-                                    {payslipLogoMessage.text}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {canEditPayslipLayout && <div className="card">
+                        {canEditPayslipLayout && <div className="card">
                     <div className="card-header">
                         <h2 className="card-title"><Icon name="FileText" size={16} inline /> Isi Slip Gaji</h2>
                     </div>
@@ -2551,230 +2684,12 @@ export default function AdminSettings() {
                         </div>
                     )}
                 </div>}
+                    </>
+                )}
 
-                {/* ============ SMTP SETTINGS SECTION ============ */}
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="card-title"><Icon name="Mail" size={16} inline /> Konfigurasi SMTP Email</h2>
-                    </div>
-
-                    <div style={{ padding: '1.5rem 0' }}>
-                        {smtpMessage.text && (
-                            <div className={`alert alert-${smtpMessage.type}`} style={{ marginBottom: '1.5rem' }}>
-                                <span className="alert-icon">{smtpMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
-                                {smtpMessage.text}
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSmtpSave}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">SMTP Host</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Contoh: smtp.gmail.com"
-                                        value={smtpSettings.smtp_host}
-                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_host: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">SMTP Port</label>
-                                    <input
-                                        type="number"
-                                        className="form-input"
-                                        placeholder="Contoh: 587 atau 465"
-                                        value={smtpSettings.smtp_port}
-                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_port: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Username (Email)</label>
-                                    <input
-                                        type="email"
-                                        className="form-input"
-                                        placeholder="Alamat Email"
-                                        value={smtpSettings.smtp_user}
-                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_user: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Password / App Password</label>
-                                    <input
-                                        type="password"
-                                        className="form-input"
-                                        placeholder="Password"
-                                        value={smtpSettings.smtp_pass}
-                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_pass: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-group" style={{ marginBottom: '2rem' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={smtpSettings.smtp_secure}
-                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_secure: e.target.checked })}
-                                        style={{ width: '18px', height: '18px' }}
-                                    />
-                                    <div>
-                                        <div style={{ fontWeight: 600 }}>Gunakan SSL/TLS (Secure)</div>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Biasanya dicentang jika menggunakan port 465</div>
-                                    </div>
-                                </label>
-                            </div>
-
-                            <button
-                                type="submit"
-                                className="btn btn-primary"
-                                disabled={smtpLoading}
-                            >
-                                {smtpLoading ? (
-                                    <>
-                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                        <span>Menyimpan...</span>
-                                    </>
-                                ) : (
-                                    'Simpan SMTP'
-                                )}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                {/* ============ BACKUP & RESTORE SECTION ============ */}
-                <div className="card" style={{ overflow: 'visible' }}>
-                    <div className="card-header">
-                        <h2 className="card-title"><Icon name="Save" size={16} inline /> Backup & Restore Database</h2>
-                    </div>
-
-                    <div style={{ padding: '0.5rem 0' }}>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '0.75rem' }}>
-                            Unduh file backup (.sql), lalu restore file itu di komputer atau server tujuan.
-                            Database tujuan akan ditimpa seluruhnya. File upload (foto, logo) tidak ikut tersalin.
-                        </p>
-                        {dbInfo && (
-                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>
-                                Database saat ini: <strong>{dbInfo.database}</strong> @ {dbInfo.host}
-                                {dbInfo.isLocal ? ' (lokal)' : ' (server)'}
-                            </p>
-                        )}
-
-                        <div style={{
-                            padding: '1.25rem',
-                            border: '1px solid var(--gray-200)',
-                            borderRadius: 'var(--radius-md)',
-                            marginBottom: '1.25rem',
-                            background: 'var(--gray-50)'
-                        }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
-                                Export Backup
-                            </h3>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
-                                Menghasilkan file SQL data lengkap dari database saat ini.
-                            </p>
-                            {backupMessage.text && (
-                                <div className={`alert alert-${backupMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                    <span className="alert-icon">{backupMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
-                                    {backupMessage.text}
-                                </div>
-                            )}
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleBackupDownload}
-                                disabled={busyBackup}
-                            >
-                                {backupLoading ? (
-                                    <>
-                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                        <span>Membuat backup...</span>
-                                    </>
-                                ) : (
-                                    'Unduh Backup (.sql)'
-                                )}
-                            </button>
-                        </div>
-
-                        <div style={{
-                            padding: '1.25rem',
-                            border: '1px solid #fecaca',
-                            borderRadius: 'var(--radius-md)',
-                            background: '#fff5f5'
-                        }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: '#991b1b' }}>
-                                Restore dari File
-                            </h3>
-                            <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginBottom: '1rem' }}>
-                                Semua data saat ini akan diganti dengan isi file backup.
-                            </p>
-                            {restoreMessage.text && (
-                                <div className={`alert alert-${restoreMessage.type}`} style={{ marginBottom: '1rem' }}>
-                                    <span className="alert-icon">{restoreMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
-                                    {restoreMessage.text}
-                                </div>
-                            )}
-                            <form onSubmit={handleRestore}>
-                                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                                    <label className="form-label">File Backup (.sql)</label>
-                                    <input
-                                        type="file"
-                                        className="form-input"
-                                        accept=".sql,.dump,.backup,.json"
-                                        disabled={busyBackup}
-                                        onChange={(e) => {
-                                            setRestoreFile(e.target.files?.[0] || null);
-                                            setRestoreMessage({ type: '', text: '' });
-                                        }}
-                                    />
-                                    {restoreFile && (
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.35rem' }}>
-                                            Dipilih: {restoreFile.name} ({Math.round(restoreFile.size / 1024)} KB)
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                                    <label className="form-label">
-                                        Ketik <strong>TIMPA</strong> untuk konfirmasi
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        value={restoreConfirm}
-                                        onChange={(e) => setRestoreConfirm(e.target.value)}
-                                        placeholder="TIMPA"
-                                        disabled={busyBackup}
-                                        autoComplete="off"
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="btn btn-danger"
-                                    disabled={busyBackup || !restoreFile || restoreConfirm.trim().toUpperCase() !== 'TIMPA'}
-                                >
-                                    {restoreLoading ? (
-                                        <>
-                                            <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                                            <span>Merestore...</span>
-                                        </>
-                                    ) : (
-                                        'Restore & Timpa Database'
-                                    )}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ============ LEAVE SETTINGS SECTION ============ */}
+                {activeTab === 'leave' && (
+                    <>
+                        {/* ============ LEAVE SETTINGS SECTION ============ */}
                 <div className="card">
                     <div className="card-header">
                         <h2 className="card-title"><Icon name="Palmtree" size={16} inline /> Pengaturan Cuti & Izin</h2>
@@ -3123,6 +3038,234 @@ export default function AdminSettings() {
                         </form>
                     </div>
                 </div>
+                    </>
+                )}
+
+                {activeTab === 'system' && (
+                    <>
+                        {/* ============ SMTP SETTINGS SECTION ============ */}
+                <div className="card">
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="Mail" size={16} inline /> Konfigurasi SMTP Email</h2>
+                    </div>
+
+                    <div style={{ padding: '1.5rem 0' }}>
+                        {smtpMessage.text && (
+                            <div className={`alert alert-${smtpMessage.type}`} style={{ marginBottom: '1.5rem' }}>
+                                <span className="alert-icon">{smtpMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {smtpMessage.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSmtpSave}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">SMTP Host</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Contoh: smtp.gmail.com"
+                                        value={smtpSettings.smtp_host}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_host: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">SMTP Port</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        placeholder="Contoh: 587 atau 465"
+                                        value={smtpSettings.smtp_port}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_port: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Username (Email)</label>
+                                    <input
+                                        type="email"
+                                        className="form-input"
+                                        placeholder="Alamat Email"
+                                        value={smtpSettings.smtp_user}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_user: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Password / App Password</label>
+                                    <input
+                                        type="password"
+                                        className="form-input"
+                                        placeholder="Password"
+                                        value={smtpSettings.smtp_pass}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_pass: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={smtpSettings.smtp_secure}
+                                        onChange={(e) => setSmtpSettings({ ...smtpSettings, smtp_secure: e.target.checked })}
+                                        style={{ width: '18px', height: '18px' }}
+                                    />
+                                    <div>
+                                        <div style={{ fontWeight: 600 }}>Gunakan SSL/TLS (Secure)</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Biasanya dicentang jika menggunakan port 465</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
+                                disabled={smtpLoading}
+                            >
+                                {smtpLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                        <span>Menyimpan...</span>
+                                    </>
+                                ) : (
+                                    'Simpan SMTP'
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                        {/* ============ BACKUP & RESTORE SECTION ============ */}
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="Save" size={16} inline /> Backup & Restore Database</h2>
+                    </div>
+
+                    <div style={{ padding: '0.5rem 0' }}>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '0.75rem' }}>
+                            Unduh file backup (.sql), lalu restore file itu di komputer atau server tujuan.
+                            Database tujuan akan ditimpa seluruhnya. File upload (foto, logo) tidak ikut tersalin.
+                        </p>
+                        {dbInfo && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>
+                                Database saat ini: <strong>{dbInfo.database}</strong> @ {dbInfo.host}
+                                {dbInfo.isLocal ? ' (lokal)' : ' (server)'}
+                            </p>
+                        )}
+
+                        <div style={{
+                            padding: '1.25rem',
+                            border: '1px solid var(--gray-200)',
+                            borderRadius: 'var(--radius-md)',
+                            marginBottom: '1.25rem',
+                            background: 'var(--gray-50)'
+                        }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--gray-800)' }}>
+                                Export Backup
+                            </h3>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '1rem' }}>
+                                Menghasilkan file SQL data lengkap dari database saat ini.
+                            </p>
+                            {backupMessage.text && (
+                                <div className={`alert alert-${backupMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                    <span className="alert-icon">{backupMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                    {backupMessage.text}
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleBackupDownload}
+                                disabled={busyBackup}
+                            >
+                                {backupLoading ? (
+                                    <>
+                                        <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                        <span>Membuat backup...</span>
+                                    </>
+                                ) : (
+                                    'Unduh Backup (.sql)'
+                                )}
+                            </button>
+                        </div>
+
+                        <div style={{
+                            padding: '1.25rem',
+                            border: '1px solid #fecaca',
+                            borderRadius: 'var(--radius-md)',
+                            background: '#fff5f5'
+                        }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: '#991b1b' }}>
+                                Restore dari File
+                            </h3>
+                            <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginBottom: '1rem' }}>
+                                Semua data saat ini akan diganti dengan isi file backup.
+                            </p>
+                            {restoreMessage.text && (
+                                <div className={`alert alert-${restoreMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                    <span className="alert-icon">{restoreMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                    {restoreMessage.text}
+                                </div>
+                            )}
+                            <form onSubmit={handleRestore}>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="form-label">File Backup (.sql)</label>
+                                    <input
+                                        type="file"
+                                        className="form-input"
+                                        accept=".sql,.dump,.backup,.json"
+                                        disabled={busyBackup}
+                                        onChange={(e) => {
+                                            setRestoreFile(e.target.files?.[0] || null);
+                                            setRestoreMessage({ type: '', text: '' });
+                                        }}
+                                    />
+                                    {restoreFile && (
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '0.35rem' }}>
+                                            Dipilih: {restoreFile.name} ({Math.round(restoreFile.size / 1024)} KB)
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="form-label">
+                                        Ketik <strong>TIMPA</strong> untuk konfirmasi
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={restoreConfirm}
+                                        onChange={(e) => setRestoreConfirm(e.target.value)}
+                                        placeholder="TIMPA"
+                                        disabled={busyBackup}
+                                        autoComplete="off"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="btn btn-danger"
+                                    disabled={busyBackup || !restoreFile || restoreConfirm.trim().toUpperCase() !== 'TIMPA'}
+                                >
+                                    {restoreLoading ? (
+                                        <>
+                                            <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                                            <span>Merestore...</span>
+                                        </>
+                                    ) : (
+                                        'Restore & Timpa Database'
+                                    )}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                    </>
+                )}
             </div>
         </div>
     );

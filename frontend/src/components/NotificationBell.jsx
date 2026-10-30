@@ -7,6 +7,8 @@ import Icon from './Icon';
 function canReceiveNotifications(user, hasPermission) {
     if (!user) return false;
     return user.role === 'admin'
+        || user.role === 'super_admin'
+        || user.role === 'superadmin'
         || user.role === 'manager'
         || user.is_supervisor
         || hasPermission('manager.approvals')

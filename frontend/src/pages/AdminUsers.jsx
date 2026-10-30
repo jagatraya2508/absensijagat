@@ -47,8 +47,15 @@ export default function AdminUsers() {
                 authAPI.getUsers(),
                 rolesAPI.getAll()
             ]);
+            const defaultRolesFallback = [
+                { id: 1, name: 'super_admin', label: 'Super Admin' },
+                { id: 2, name: 'admin', label: 'Admin' },
+                { id: 3, name: 'manager', label: 'Pimpinan / Manager' },
+                { id: 4, name: 'employee', label: 'Karyawan' },
+                { id: 5, name: 'kiosk', label: 'Operator Kiosk' }
+            ];
             setUsers(usersData);
-            setRoles(rolesData);
+            setRoles(Array.isArray(rolesData) && rolesData.length > 0 ? rolesData : defaultRolesFallback);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -164,7 +171,7 @@ export default function AdminUsers() {
     async function handleRoleChange(user, newRole) {
         if (newRole === user.role) return;
 
-        const roleLabels = { admin: 'Admin', manager: 'Pimpinan / Manager', employee: 'Karyawan', kiosk: 'Operator Kiosk' };
+        const roleLabels = { super_admin: 'Super Admin', superadmin: 'Super Admin', admin: 'Admin', manager: 'Pimpinan / Manager', employee: 'Karyawan', kiosk: 'Operator Kiosk' };
         const confirmed = confirm(
             `Ubah role ${user.name} dari "${roleLabels[user.role]}" menjadi "${roleLabels[newRole]}"?`
         );
@@ -206,6 +213,7 @@ export default function AdminUsers() {
     function getRoleLabel(role) {
         const fromList = roles.find((r) => r.name === role);
         if (fromList?.label) return fromList.label;
+        if (role === 'super_admin' || role === 'superadmin') return 'Super Admin';
         if (role === 'admin') return 'Admin';
         if (role === 'manager') return 'Pimpinan / Manager';
         if (role === 'kiosk') return 'Operator Kiosk';
@@ -256,7 +264,7 @@ export default function AdminUsers() {
     function handleExportExcel() {
         const data = filteredUsers.map((user, i) => ({
             'No': i + 1,
-            'Employee ID': user.employee_id,
+            'User ID': user.employee_id,
             'Nama': user.name,
             'Email': user.email || '-',
             'Role': getRoleLabel(user.role),
@@ -347,7 +355,7 @@ export default function AdminUsers() {
 
         autoTable(doc, {
             startY: 28,
-            head: [['No', 'Employee ID', 'Nama', 'Email', 'Role', 'Tanggal Daftar']],
+            head: [['No', 'User ID', 'Nama', 'Email', 'Role', 'Tanggal Daftar']],
             body: tableData,
             styles: { fontSize: 8, cellPadding: 3 },
             headStyles: { fillColor: [30, 41, 82], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
@@ -430,7 +438,7 @@ export default function AdminUsers() {
                 ) : filteredUsers.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-state-icon"><Icon name="Users" size={28} /></div> <p className="empty-state-text">Belum ada user terdaftar</p> </div> ) : ( <> <div className="table-container"> <table className="table stack-table"> <thead> <tr> <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                        Employee ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
+                                        User ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
                                     </th>
                                     <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                         Nama <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'name' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('name')}</span>
@@ -450,7 +458,7 @@ export default function AdminUsers() {
                             <tbody>
                                 {pagedUsers.map((user) => (
                                     <tr key={user.id}>
-                                        <td data-label="Employee ID" style={{ fontWeight: 500 }}>{user.employee_id}</td>
+                                        <td data-label="User ID" style={{ fontWeight: 500 }}>{user.employee_id}</td>
                                         <td data-label="Nama">{user.name}</td>
                                         <td data-label="Email">{user.email || '-'}</td>
                                         <td data-label="Role">
@@ -469,21 +477,27 @@ export default function AdminUsers() {
                                                     borderRadius: 'var(--radius-md)',
                                                     cursor: changingRole === user.id ? 'wait' : 'pointer',
                                                     opacity: changingRole === user.id ? 0.6 : 1,
-                                                    background: user.role === 'admin'
-                                                        ? 'rgba(99, 102, 241, 0.1)'
-                                                        : user.role === 'manager'
-                                                            ? 'rgba(6, 182, 212, 0.1)'
-                                                            : 'rgba(16, 185, 129, 0.1)',
-                                                    borderColor: user.role === 'admin'
-                                                        ? 'rgba(99, 102, 241, 0.3)'
-                                                        : user.role === 'manager'
-                                                            ? 'rgba(6, 182, 212, 0.3)'
-                                                            : 'rgba(16, 185, 129, 0.3)',
-                                                    color: user.role === 'admin'
-                                                        ? 'var(--primary-400, #818cf8)'
-                                                        : user.role === 'manager'
-                                                            ? 'var(--info-500, #06b6d4)'
-                                                            : 'var(--success-500, #10b981)',
+                                                    background: (user.role === 'super_admin' || user.role === 'superadmin')
+                                                        ? 'rgba(245, 158, 11, 0.15)'
+                                                        : user.role === 'admin'
+                                                            ? 'rgba(99, 102, 241, 0.1)'
+                                                            : user.role === 'manager'
+                                                                ? 'rgba(6, 182, 212, 0.1)'
+                                                                : 'rgba(16, 185, 129, 0.1)',
+                                                    borderColor: (user.role === 'super_admin' || user.role === 'superadmin')
+                                                        ? 'rgba(245, 158, 11, 0.4)'
+                                                        : user.role === 'admin'
+                                                            ? 'rgba(99, 102, 241, 0.3)'
+                                                            : user.role === 'manager'
+                                                                ? 'rgba(6, 182, 212, 0.3)'
+                                                                : 'rgba(16, 185, 129, 0.3)',
+                                                    color: (user.role === 'super_admin' || user.role === 'superadmin')
+                                                        ? '#f59e0b'
+                                                        : user.role === 'admin'
+                                                            ? 'var(--primary-400, #818cf8)'
+                                                            : user.role === 'manager'
+                                                                ? 'var(--info-500, #06b6d4)'
+                                                                : 'var(--success-500, #10b981)',
                                                     transition: 'all 0.2s ease'
                                                 }}
                                             >
@@ -517,7 +531,7 @@ export default function AdminUsers() {
                             <div className="modal-body">
                                 {error && (
                                     <div className="alert alert-danger mb-3">
-                                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} </div> )} <div className="form-group"> <label className="form-label">Employee ID *</label> <input type="text" className="form-input" placeholder="Contoh: EMP001" value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })} required /> </div> <div className="form-group"> <label className="form-label">Nama Lengkap *</label> <input type="text" className="form-input" placeholder="Nama lengkap karyawan" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /> </div> <div className="form-group"> <label className="form-label">Email</label> <input type="email" className="form-input" placeholder="email@company.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /> </div> <div className="form-group"> <label className="form-label"> Password {editingUser ?'(kosongkan jika tidak ingin mengubah)' : '*'}
+                                        <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} </div> )} <div className="form-group"> <label className="form-label">User ID *</label> <input type="text" className="form-input" placeholder="Contoh: USER001" value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })} required /> </div> <div className="form-group"> <label className="form-label">Nama Lengkap *</label> <input type="text" className="form-input" placeholder="Nama lengkap karyawan" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /> </div> <div className="form-group"> <label className="form-label">Email</label> <input type="email" className="form-input" placeholder="email@company.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /> </div> <div className="form-group"> <label className="form-label"> Password {editingUser ?'(kosongkan jika tidak ingin mengubah)' : '*'}
                                     </label>
                                     <input
                                         type="password"
@@ -569,7 +583,7 @@ export default function AdminUsers() {
                         <div className="modal-body">
                             {error && (
                                 <div className="alert alert-danger mb-3">
-                                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} </div> )} <div className="alert alert-info mb-3"> <span className="alert-icon"><Icon name="Info" size={16} inline /></span> <div> Unduh template resmi, isi data user, lalu unggah file .xlsx. Kolom wajib: <strong>Employee ID</strong>, <strong>Nama</strong>, dan <strong>Password</strong> (minimal 6 karakter). </div> </div> <div className="form-group"> <label className="form-label">File Excel (.xlsx)</label> <input type="file" className="form-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); setError('');
+                                    <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error} </div> )} <div className="alert alert-info mb-3"> <span className="alert-icon"><Icon name="Info" size={16} inline /></span> <div> Unduh template resmi, isi data user, lalu unggah file .xlsx. Kolom wajib: <strong>User ID</strong>, <strong>Nama</strong>, dan <strong>Password</strong> (minimal 6 karakter). </div> </div> <div className="form-group"> <label className="form-label">File Excel (.xlsx)</label> <input type="file" className="form-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); setError('');
                                     }}
                                 />
                                 {importFile && (
@@ -598,7 +612,7 @@ export default function AdminUsers() {
                                                 <thead>
                                                     <tr>
                                                         <th>Baris</th>
-                                                        <th>Employee ID</th>
+                                                        <th>User ID</th>
                                                         <th>Status</th>
                                                         <th>Keterangan</th>
                                                     </tr>

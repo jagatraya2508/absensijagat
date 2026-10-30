@@ -96,6 +96,9 @@ function normalizeRoleName(value, roles) {
         karyawan: 'employee',
         pegawai: 'employee',
         employee: 'employee',
+        super_admin: 'super_admin',
+        superadmin: 'super_admin',
+        'super admin': 'super_admin',
         admin: 'admin',
         administrator: 'admin',
         manager: 'manager',
@@ -115,6 +118,7 @@ function normalizeRoleName(value, roles) {
 }
 
 const DEFAULT_ROLES = [
+    { name: 'super_admin', label: 'Super Admin' },
     { name: 'admin', label: 'Admin' },
     { name: 'manager', label: 'Pimpinan / Manager' },
     { name: 'employee', label: 'Karyawan' },
@@ -132,7 +136,7 @@ async function getImportRoles() {
 }
 
 async function getRolePermissions(roleName) {
-    if (!roleName || roleName === 'admin') return [];
+    if (!roleName || roleName === 'admin' || roleName === 'super_admin' || roleName === 'superadmin') return [];
     const permsResult = await pool.query(
         `SELECT rp.permission_key
          FROM role_permissions rp
@@ -220,6 +224,7 @@ router.post('/login', async (req, res) => {
                 is_sales: user.is_sales,
                 use_tracking: user.use_tracking,
                 is_supervisor: isSupervisor,
+                hidden_menus: user.hidden_menus || [],
                 permissions,
             }
         });
@@ -286,6 +291,24 @@ router.put('/profile/photo', authenticateToken, uploadProfile.single('photo'), a
     }
 });
 
+// Update Menu Preferences (Specifically for Admin to hide / unhide menus)
+router.put('/menu-preferences', authenticateToken, async (req, res) => {
+    try {
+        const { hidden_menus } = req.body;
+        if (!Array.isArray(hidden_menus)) {
+            return res.status(400).json({ error: 'hidden_menus harus berupa array' });
+        }
+        const result = await pool.query(
+            'UPDATE users SET hidden_menus = $1 WHERE id = $2 RETURNING id, hidden_menus',
+            [JSON.stringify(hidden_menus), req.user.id]
+        );
+        res.json({ message: 'Preferensi menu berhasil disimpan', hidden_menus: result.rows[0].hidden_menus });
+    } catch (err) {
+        console.error('Error updating menu preferences:', err);
+        res.status(500).json({ error: 'Gagal menyimpan preferensi menu' });
+    }
+});
+
 // Register (Admin only)
 router.post('/register', authenticateToken, isAdmin, async (req, res) => {
     try {
@@ -330,6 +353,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at, u.off_day, u.photo,
+                    COALESCE(u.hidden_menus, '[]'::jsonb) as hidden_menus,
                     COALESCE(ed.is_driver, false) as is_driver,
                     COALESCE(ed.is_collector, false) as is_collector,
                     COALESCE(ed.is_sales, false) as is_sales,
@@ -347,7 +371,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         const user = result.rows[0];
 
         let permissions = [];
-        if (user.role !== 'admin') {
+        if (user.role !== 'admin' && user.role !== 'super_admin' && user.role !== 'superadmin') {
             permissions = await getRolePermissions(user.role);
         }
 
@@ -685,6 +709,14 @@ router.delete('/users/:id', authenticateToken, isAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Tidak dapat menghapus akun sendiri' });
         }
 
+        const targetUserRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
+        if (targetUserRes.rows.length > 0) {
+            const targetRole = targetUserRes.rows[0].role;
+            if (targetRole === 'super_admin' || targetRole === 'superadmin') {
+                return res.status(403).json({ error: 'Akun Super Admin tidak dapat dihapus' });
+            }
+        }
+
         await pool.query('DELETE FROM users WHERE id = $1', [id]);
         res.json({ message: 'User berhasil dihapus' });
     } catch (error) {
@@ -698,6 +730,21 @@ router.put('/users/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const { employee_id, name, email, password, role } = req.body;
+
+        const targetUserRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
+        if (targetUserRes.rows.length === 0) {
+            return res.status(404).json({ error: 'User tidak ditemukan' });
+        }
+        const targetRole = targetUserRes.rows[0].role;
+        const isOperatorSuperAdmin = req.user.role === 'super_admin' || req.user.role === 'superadmin';
+
+        // Only super_admin can modify a super_admin user or assign super_admin role
+        if ((targetRole === 'super_admin' || targetRole === 'superadmin') && !isOperatorSuperAdmin) {
+            return res.status(403).json({ error: 'Hanya Super Admin yang dapat mengubah akun Super Admin' });
+        }
+        if ((role === 'super_admin' || role === 'superadmin') && !isOperatorSuperAdmin) {
+            return res.status(403).json({ error: 'Hanya Super Admin yang dapat menetapkan role Super Admin' });
+        }
 
         // Build update query dynamically
         const updates = [];

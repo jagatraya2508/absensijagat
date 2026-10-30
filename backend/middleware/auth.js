@@ -22,14 +22,21 @@ function authenticateToken(req, res, next) {
 const { pool } = require('../db'); // Need pool for DB query
 
 function isAdmin(req, res, next) {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin' && req.user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Akses ditolak. Hanya admin yang diizinkan.' });
     }
     next();
 }
 
+function isSuperAdmin(req, res, next) {
+    if (req.user.role !== 'super_admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Akses ditolak. Hanya Super Admin yang diizinkan.' });
+    }
+    next();
+}
+
 function isManagerOrAdmin(req, res, next) {
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin' && req.user.role !== 'superadmin' && req.user.role !== 'manager') {
         return res.status(403).json({ error: 'Akses ditolak. Memerlukan hak akses manajer atau admin.' });
     }
     next();
@@ -39,8 +46,8 @@ function isManagerOrAdmin(req, res, next) {
 function hasPermission(permissionKey) {
     return async (req, res, next) => {
         try {
-            // Admin always has all permissions
-            if (req.user.role === 'admin') {
+            // Super Admin and Admin always have all permissions
+            if (req.user.role === 'admin' || req.user.role === 'super_admin' || req.user.role === 'superadmin') {
                 return next();
             }
 
@@ -67,7 +74,8 @@ function hasPermission(permissionKey) {
 module.exports = { 
     authenticateToken, 
     verifyToken: authenticateToken, // Alias for backward compatibility
-    isAdmin, 
+    isAdmin,
+    isSuperAdmin,
     isManagerOrAdmin, 
     hasPermission,
     JWT_SECRET 

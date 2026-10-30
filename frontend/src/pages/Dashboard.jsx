@@ -378,7 +378,7 @@ export default function Dashboard() {
                         <span className="menu-label">Kalender</span>
                     </Link>
                     {/* Tracking - sesuai tugas yang diaktifkan */}
-                    {(user?.use_tracking || user?.role === 'admin') && (
+                    {(user?.use_tracking || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin') && (
                         <Link to="/driver-tracking" className="menu-item">
                             <MenuIcon name="MapPin" className="bg-teal-100 text-teal-600" />
                             <span className="menu-label">Tracking</span>
@@ -418,7 +418,7 @@ export default function Dashboard() {
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
-                            {(user?.role === 'manager' || user?.role === 'admin' || hasPermission('manager.approvals')) && (
+                            {(user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin' || hasPermission('manager.approvals')) && (
                                 <Link to="/approvals" className="menu-item">
                                     <MenuIcon name="CheckCircle2" className="bg-emerald-100 text-emerald-600" />
                                     <span className="menu-label">Persetujuan Lembur</span>

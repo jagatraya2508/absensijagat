@@ -147,7 +147,7 @@ export default function History() {
     // Image Modal State
     const [selectedImg, setSelectedImg] = useState({ src: '', caption: '', isOpen: false });
 
-    const isAdmin = user?.role === 'admin';
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin';
 
     useEffect(() => {
         if (isAdmin) {

@@ -602,17 +602,17 @@ router.delete('/assignments/:id', ...canManage, async (req, res) => {
 // ============================================
 
 // Generate SPL number
-async function generateSplNumber(date) {
+async function generateSplNumber(date, dbClient = pool, offset = 0) {
     const d = new Date(date);
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
     const prefix = `SPL/${year}/${month}`;
 
-    const result = await pool.query(
+    const result = await dbClient.query(
         `SELECT COUNT(*) as count FROM overtime_requests WHERE spl_number LIKE $1`,
         [`${prefix}/%`]
     );
-    const seq = parseInt(result.rows[0].count) + 1;
+    const seq = parseInt(result.rows[0].count) + 1 + offset;
     return `${prefix}/${String(seq).padStart(4, '0')}`;
 }
 
@@ -760,10 +760,25 @@ router.get('/overtime-requests/list', authenticateToken, async (req, res) => {
 router.post('/overtime-requests', authenticateToken, async (req, res) => {
     const client = await pool.connect();
     try {
-        const { date, shift_id, department, overtime_start, overtime_end, estimated_hours, reason, employee_ids } = req.body;
+        const { date, shift_id, department, reason, employee_ids } = req.body;
 
-        if (!date || !overtime_start || !overtime_end || !reason || !employee_ids || !employee_ids.length) {
-            return res.status(400).json({ error: 'Tanggal, jam mulai, jam selesai, alasan, dan karyawan harus diisi' });
+        if (!date || !reason || !employee_ids || !employee_ids.length) {
+            return res.status(400).json({ error: 'Tanggal, alasan, dan karyawan harus diisi' });
+        }
+
+        // Support multiple sessions (e.g. before shift & after shift submitted simultaneously)
+        let sessions = [];
+        if (req.body.sessions && Array.isArray(req.body.sessions) && req.body.sessions.length > 0) {
+            sessions = req.body.sessions;
+        } else if (req.body.overtime_start && req.body.overtime_end) {
+            sessions = [{
+                overtime_start: req.body.overtime_start,
+                overtime_end: req.body.overtime_end,
+                estimated_hours: req.body.estimated_hours,
+                label: ''
+            }];
+        } else {
+            return res.status(400).json({ error: 'Jam mulai dan jam selesai lembur harus diisi' });
         }
 
         // Validate overlap with shift working hours
@@ -781,46 +796,69 @@ router.post('/overtime-requests', authenticateToken, async (req, res) => {
             if (assignRes.rows.length > 0) shiftToCheck = assignRes.rows[0];
         }
 
-        if (shiftToCheck) {
-            if (checkShiftOvertimeOverlap(overtime_start, overtime_end, shiftToCheck.start_time, shiftToCheck.end_time)) {
-                return res.status(400).json({
-                    error: `Jam lembur (${String(overtime_start).substring(0, 5)} - ${String(overtime_end).substring(0, 5)}) bertabrakan dengan jam kerja reguler shift ${shiftToCheck.name} (${String(shiftToCheck.start_time).substring(0, 5)} - ${String(shiftToCheck.end_time).substring(0, 5)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.`
-                });
+        // Validate each session
+        for (const sess of sessions) {
+            if (!sess.overtime_start || !sess.overtime_end) {
+                return res.status(400).json({ error: 'Jam mulai dan jam selesai untuk setiap sesi lembur harus diisi' });
+            }
+            if (shiftToCheck) {
+                if (checkShiftOvertimeOverlap(sess.overtime_start, sess.overtime_end, shiftToCheck.start_time, shiftToCheck.end_time)) {
+                    return res.status(400).json({
+                        error: `Jam lembur ${sess.label ? `(${sess.label}) ` : ''}(${String(sess.overtime_start).substring(0, 5)} - ${String(sess.overtime_end).substring(0, 5)}) bertabrakan dengan jam kerja reguler shift ${shiftToCheck.name} (${String(shiftToCheck.start_time).substring(0, 5)} - ${String(shiftToCheck.end_time).substring(0, 5)}). Lembur harus dilakukan sebelum shift dimulai atau setelah shift selesai.`
+                    });
+                }
             }
         }
 
         await client.query('BEGIN');
 
-        const splNumber = await generateSplNumber(date);
+        const createdRequests = [];
 
-        const result = await client.query(`
-            INSERT INTO overtime_requests (spl_number, date, shift_id, department, overtime_start, overtime_end, estimated_hours, reason, requested_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
-        `, [splNumber, date, shift_id || null, department || null, overtime_start, overtime_end, estimated_hours, reason, req.user.id]);
+        for (let i = 0; i < sessions.length; i++) {
+            const sess = sessions[i];
+            const splNumber = await generateSplNumber(date, client, i);
+            const sessionReason = sess.label ? `${reason} (${sess.label})` : reason;
 
-        const otRequest = result.rows[0];
+            let estHours = parseFloat(sess.estimated_hours);
+            if (isNaN(estHours) || estHours <= 0) {
+                const [sh, sm] = sess.overtime_start.split(':').map(Number);
+                const [eh, em] = sess.overtime_end.split(':').map(Number);
+                let diff = (eh * 60 + em) - (sh * 60 + sm);
+                if (diff < 0) diff += 1440;
+                estHours = Math.round((diff / 60) * 10) / 10;
+            }
 
-        // Add employees
-        for (const empId of employee_ids) {
-            await client.query(`
-                INSERT INTO overtime_request_employees (overtime_request_id, user_id)
-                VALUES ($1, $2)
-            `, [otRequest.id, empId]);
+            const result = await client.query(`
+                INSERT INTO overtime_requests (spl_number, date, shift_id, department, overtime_start, overtime_end, estimated_hours, reason, requested_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
+            `, [splNumber, date, shift_id || null, department || null, sess.overtime_start, sess.overtime_end, estHours, sessionReason, req.user.id]);
+
+            const otRequest = result.rows[0];
+
+            // Add employees
+            for (const empId of employee_ids) {
+                await client.query(`
+                    INSERT INTO overtime_request_employees (overtime_request_id, user_id)
+                    VALUES ($1, $2)
+                `, [otRequest.id, empId]);
+            }
+
+            createdRequests.push(otRequest);
+
+            await notifyOvertimeSubmitted(pool, {
+                requestId: otRequest.id,
+                requesterId: req.user.id,
+                requesterName: req.user.name || 'Karyawan',
+                date,
+                startTime: sess.overtime_start,
+                endTime: sess.overtime_end,
+                hours: estHours,
+            });
         }
 
         await client.query('COMMIT');
 
-        await notifyOvertimeSubmitted(pool, {
-            requestId: otRequest.id,
-            requesterId: req.user.id,
-            requesterName: req.user.name || 'Karyawan',
-            date,
-            startTime: overtime_start,
-            endTime: overtime_end,
-            hours: estimated_hours,
-        });
-
-        // Fetch full record with employees
+        // Fetch full records with employees
         const fullResult = await pool.query(`
             SELECT otr.*,
                    u_req.name as requested_by_name,
@@ -839,20 +877,30 @@ router.post('/overtime-requests', authenticateToken, async (req, res) => {
             LEFT JOIN work_shifts ws ON ws.id = otr.shift_id
             LEFT JOIN overtime_request_employees ore ON ore.overtime_request_id = otr.id
             LEFT JOIN users u_emp ON u_emp.id = ore.user_id
-            WHERE otr.id = $1
+            WHERE otr.id = ANY($1)
             GROUP BY otr.id, u_req.name, ws.name, ws.start_time, ws.end_time, ws.is_overnight
-        `, [otRequest.id]);
+            ORDER BY otr.overtime_start ASC
+        `, [createdRequests.map(r => r.id)]);
 
-        const row = fullResult.rows[0];
-        if (row) {
-            row.overtime_category = getOvertimeCategory(row.overtime_start, row.overtime_end, row.shift_start_time, row.shift_end_time);
+        const rows = fullResult.rows.map(row => ({
+            ...row,
+            overtime_category: getOvertimeCategory(row.overtime_start, row.overtime_end, row.shift_start_time, row.shift_end_time)
+        }));
+
+        if (rows.length === 1) {
+            res.status(201).json(rows[0]);
+        } else {
+            res.status(201).json({
+                message: `${rows.length} Pengajuan lembur berhasil dibuat`,
+                count: rows.length,
+                data: rows,
+                ...rows[0]
+            });
         }
-
-        res.status(201).json(row);
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Create overtime request error:', error);
-        res.status(500).json({ error: 'Terjadi kesalahan server' });
+        res.status(500).json({ error: error.message || 'Terjadi kesalahan server' });
     } finally {
         client.release();
     }

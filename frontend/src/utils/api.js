@@ -178,6 +178,13 @@ export const authAPI = {
             body: formData,
         }),
 
+    // Update menu preferences (hidden / unhidden menus)
+    updateMenuPreferences: (hidden_menus) =>
+        request('/auth/menu-preferences', {
+            method: 'PUT',
+            body: JSON.stringify({ hidden_menus }),
+        }),
+
     downloadUserTemplate: () => {
         const token = getToken();
         return fetch(`${API_BASE}/auth/users/template`, {

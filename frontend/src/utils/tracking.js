@@ -47,7 +47,7 @@ export function getTrackingTypeMeta(type) {
 
 export function getAllowedTrackingTypes(user) {
     if (!user) return ['visit'];
-    if (user.role === 'admin') return ['delivery', 'collection', 'sales', 'visit'];
+    if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin') return ['delivery', 'collection', 'sales', 'visit'];
 
     const types = [];
     if (user.is_driver) types.push('delivery');
