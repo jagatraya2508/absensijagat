@@ -343,6 +343,7 @@ CREATE TABLE IF NOT EXISTS loan_payments (
     payment_method VARCHAR(30) DEFAULT 'manual' CHECK (payment_method IN ('payroll_deduction', 'manual')),
     payroll_item_id INTEGER,
     notes TEXT,
+    periods INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

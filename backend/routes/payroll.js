@@ -877,9 +877,9 @@ router.put('/:id/finalize', authenticateToken, canManagePayroll, async (req, res
 
                 // Record payment
                 await client.query(`
-                    INSERT INTO loan_payments (loan_id, payment_date, amount, payment_method, payroll_item_id) 
-                    VALUES ($1, CURRENT_DATE, $2, 'payroll_deduction', $3)
-                `, [loan.id, payAmount, item.item_id]);
+                    INSERT INTO loan_payments (loan_id, payment_date, amount, payment_method, payroll_item_id, periods) 
+                    VALUES ($1, CURRENT_DATE, $2, 'payroll_deduction', $3, $4)
+                `, [loan.id, payAmount, item.item_id, periodsCovered]);
 
                 // Update loan balance
                 const newBalance = parseFloat(loan.remaining_balance) - payAmount;

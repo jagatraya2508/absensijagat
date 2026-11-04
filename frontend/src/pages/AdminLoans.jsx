@@ -77,13 +77,24 @@ export default function AdminLoans() {
     }
 
     function openPayment(loan) {
+        const installment = parseFloat(loan.installment_amount) || 0;
+        const remaining = parseFloat(loan.remaining_balance) || 0;
         setSelectedLoan(loan);
         setPaymentForm({
-            amount: loan.installment_amount,
+            amount: Math.min(remaining, installment) || remaining,
+            periods: 1,
             payment_date: new Date().toISOString().split('T')[0], notes: ''
         });
         setShowPaymentModal(true);
         setError('');
+    }
+
+    function onPaymentPeriodsChange(raw) {
+        const periods = Math.max(1, parseInt(raw, 10) || 1);
+        const installment = parseFloat(selectedLoan?.installment_amount) || 0;
+        const remaining = parseFloat(selectedLoan?.remaining_balance) || 0;
+        const suggested = Math.min(remaining, installment * periods);
+        setPaymentForm((prev) => ({ ...prev, periods, amount: suggested || remaining }));
     }
 
     async function handlePayment(e) {
@@ -309,8 +320,9 @@ export default function AdminLoans() {
                                     <input className="form-input" type="number" min="1" value={formData.total_installments} onChange={e => onInstallmentsChange(e.target.value)} required placeholder={weeklyInstallment ? '8' : '12'} />
                                 </div>
                                 <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                                    <label className="form-label">Cicilan per {weeklyInstallment ? 'Minggu' : 'Bulan'} (Rp)</label>
-                                    <input className="form-input" type="number" value={formData.installment_amount} onChange={e => setFormData({ ...formData, installment_amount: e.target.value })} readOnly style={{ opacity: 0.7 }} />
+                                    <label className="form-label">Cicilan per {weeklyInstallment ? 'Minggu' : 'Bulan'} (Rp) *</label>
+                                    <input className="form-input" type="number" min="1" value={formData.installment_amount} onChange={e => setFormData({ ...formData, installment_amount: e.target.value })} required />
+                                    <p className="payslip-field-note">Nilai ini boleh diubah. Cicilan terakhir atau kesepakatan karyawan bisa berbeda dari hasil bagi rata.</p>
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Keterangan</label>
@@ -337,12 +349,20 @@ export default function AdminLoans() {
                         <form onSubmit={handlePayment}>
                             <div className="modal-body">
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
-                                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-                                    <p style={{ color: 'var(--gray-400)', fontSize: '0.85rem' }}>Sisa pinjaman: <strong style={{ color: 'white' }}>{formatCurrency(selectedLoan.remaining_balance)}</strong></p>
+                                <div style={{ padding: '1rem', background: 'var(--gray-50, #f9fafb)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+                                    <p style={{ color: 'var(--gray-600)', fontSize: '0.85rem', margin: 0 }}>Sisa pinjaman: <strong style={{ color: 'var(--gray-900)' }}>{formatCurrency(selectedLoan.remaining_balance)}</strong></p>
+                                    <p style={{ color: 'var(--gray-500)', fontSize: '0.8rem', margin: '0.35rem 0 0' }}>
+                                        Cicilan rutin {installmentText(selectedLoan)}. Progress {selectedLoan.paid_installments}/{selectedLoan.total_installments}.
+                                    </p>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Jumlah Bayar (Rp) *</label>
-                                    <input className="form-input" type="number" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} required />
+                                    <label className="form-label">Jumlah {selectedLoan.installment_period === 'weekly' ? 'Minggu' : 'Bulan'} yang dibayar *</label>
+                                    <input className="form-input" type="number" min="1" value={paymentForm.periods} onChange={e => onPaymentPeriodsChange(e.target.value)} required />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Nilai yang dibayar (Rp) *</label>
+                                    <input className="form-input" type="number" min="1" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} required />
+                                    <p className="payslip-field-note">Nominal boleh diubah. Cicilan terakhir atau permintaan karyawan bisa berbeda dari cicilan rutin.</p>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Tanggal Bayar</label>

@@ -167,6 +167,7 @@ router.post('/:id/payment', authenticateToken, canManageLoans, async (req, res) 
     try {
         const { id } = req.params;
         const { amount, payment_date, notes } = req.body;
+        const requestedPeriods = Math.max(1, parseInt(req.body.periods, 10) || 1);
 
         if (!amount || amount <= 0) {
             return res.status(400).json({ error: 'Jumlah pembayaran harus valid' });
@@ -188,16 +189,20 @@ router.post('/:id/payment', authenticateToken, canManageLoans, async (req, res) 
         }
 
         const paymentAmount = Math.min(parseFloat(amount), parseFloat(loan.remaining_balance));
+        const totalInstallments = parseInt(loan.total_installments, 10) || 0;
+        const alreadyPaid = parseInt(loan.paid_installments, 10) || 0;
+        const periodsLeft = Math.max(1, totalInstallments - alreadyPaid);
+        const periods = Math.min(requestedPeriods, periodsLeft);
 
-        // Insert payment
         await client.query(`
-            INSERT INTO loan_payments (loan_id, payment_date, amount, payment_method, notes)
-            VALUES ($1, $2, $3, 'manual', $4)
-        `, [id, payment_date || new Date(), paymentAmount, notes || null]);
+            INSERT INTO loan_payments (loan_id, payment_date, amount, payment_method, notes, periods)
+            VALUES ($1, $2, $3, 'manual', $4, $5)
+        `, [id, payment_date || new Date(), paymentAmount, notes || null, periods]);
 
-        // Update loan
         const newBalance = parseFloat(loan.remaining_balance) - paymentAmount;
-        const newPaidInstallments = parseInt(loan.paid_installments) + 1;
+        const newPaidInstallments = newBalance <= 0
+            ? totalInstallments
+            : Math.min(totalInstallments, alreadyPaid + periods);
         const newStatus = newBalance <= 0 ? 'paid_off' : 'active';
 
         await client.query(`
