@@ -187,6 +187,19 @@ WHERE upper(u.employee_id) LIKE 'ANK%' OR upper(u.employee_id) LIKE 'SKB%'
 GROUP BY ed.employment_status
 ORDER BY ed.employment_status;
 SQL
+    echo "[4/4b5] Samakan departemen karyawan gudang berdasarkan nama (sekali)..."
+    deptapplied=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if docker compose exec -T -e ALLOW_GUDANG_DEPT_REMAP=1 backend node scripts/set-gudang-departments-by-name.js; then
+            deptapplied=1
+            break
+        fi
+        sleep 3
+    done
+    if [ "$deptapplied" != 1 ]; then
+        echo "Gagal menyamakan departemen karyawan gudang."
+        exit 1
+    fi
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
