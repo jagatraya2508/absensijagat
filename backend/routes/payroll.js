@@ -72,6 +72,14 @@ function canonicalSalaryType(value) {
     return 'monthly';
 }
 
+function payAllowance(rate, period, context) {
+    const amount = parseFloat(rate) || 0;
+    const kind = canonicalSalaryType(period);
+    if (kind === 'daily') return amount * Math.max(0, context.days || 0);
+    if (kind === 'weekly') return amount * Math.max(0, context.weeks || 0);
+    return context.payrollType === 'weekly' ? amount * 0.25 : amount;
+}
+
 function formatIsoDate(value) {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -330,6 +338,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                    COALESCE(ed.transport_allowance, 0) as transport_allowance,
                    COALESCE(ed.meal_allowance, 0) as meal_allowance,
                    COALESCE(ed.appreciation_allowance, 0) as appreciation_allowance,
+                   COALESCE(ed.transport_allowance_period, 'monthly') as transport_allowance_period,
+                   COALESCE(ed.meal_allowance_period, 'monthly') as meal_allowance_period,
+                   COALESCE(ed.appreciation_allowance_period, 'monthly') as appreciation_allowance_period,
                    COALESCE(ed.overtime_rate, 50000) as overtime_rate,
                    COALESCE(ed.tax_status, 'TK/0') as tax_status,
                    COALESCE(ed.is_driver, false) as is_driver,
@@ -385,7 +396,6 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             const dow = new Date(year, month - 1, d).getDay();
             if (dow !== 0 && dow !== 6) totalWorkingDays++;
         }
-        const allowanceFactor = periodType === 'weekly' ? 0.25 : 1;
 
         // Load late deduction settings
         const lateSettingsRes = await client.query(
@@ -426,9 +436,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
         for (const emp of payrollEmployees) {
             const salaryType = emp.salary_type || 'monthly';
             const baseSalaryRate = parseFloat(emp.basic_salary);
-            const transportAllowance = parseFloat(emp.transport_allowance) * allowanceFactor;
-            const mealAllowance = parseFloat(emp.meal_allowance) * allowanceFactor;
-            const appreciationAllowance = (parseFloat(emp.appreciation_allowance) || 0) * allowanceFactor;
+            let transportAllowance = 0;
+            let mealAllowance = 0;
+            let appreciationAllowance = 0;
 
             const attendanceResult = await client.query(`
                 SELECT COUNT(DISTINCT DATE(recorded_at)) as days_worked
@@ -499,6 +509,24 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                 workingDays = totalWorkingDays;
                 basicSalary = baseSalaryRate;
             }
+
+            let payableDays = attendedDays;
+            if (salaryType === 'daily' && workingDays > payableDays) payableDays = workingDays;
+            const allowancePeriods = [
+                emp.transport_allowance_period,
+                emp.meal_allowance_period,
+                emp.appreciation_allowance_period,
+            ];
+            let allowanceWeeks = 0;
+            if (allowancePeriods.some((period) => canonicalSalaryType(period) === 'weekly')) {
+                allowanceWeeks = periodType === 'weekly'
+                    ? (payableDays > 0 ? 1 : 0)
+                    : (emp._weeksWorked || await weeksWorkedInMonth(client, emp.id, year, month));
+            }
+            const allowanceContext = { payrollType: periodType, days: payableDays, weeks: allowanceWeeks };
+            transportAllowance = payAllowance(emp.transport_allowance, emp.transport_allowance_period, allowanceContext);
+            mealAllowance = payAllowance(emp.meal_allowance, emp.meal_allowance_period, allowanceContext);
+            appreciationAllowance = payAllowance(emp.appreciation_allowance, emp.appreciation_allowance_period, allowanceContext);
 
             const overtime = await sumEmployeeOvertime(client, emp.id, rangeStart, rangeEnd, parseFloat(emp.overtime_rate) || 50000);
             const overtimeHours = overtime.hours;

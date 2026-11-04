@@ -126,7 +126,10 @@ pool.query(`
     ADD COLUMN IF NOT EXISTS bpjs_jp_employee_rate DECIMAL(6,4),
     ADD COLUMN IF NOT EXISTS bpjs_jp_company_rate DECIMAL(6,4),
     ADD COLUMN IF NOT EXISTS bpjs_jkk_rate DECIMAL(6,4),
-    ADD COLUMN IF NOT EXISTS bpjs_jkm_rate DECIMAL(6,4)
+    ADD COLUMN IF NOT EXISTS bpjs_jkm_rate DECIMAL(6,4),
+    ADD COLUMN IF NOT EXISTS transport_allowance_period VARCHAR(10) DEFAULT 'monthly',
+    ADD COLUMN IF NOT EXISTS meal_allowance_period VARCHAR(10) DEFAULT 'monthly',
+    ADD COLUMN IF NOT EXISTS appreciation_allowance_period VARCHAR(10) DEFAULT 'monthly'
 `).catch((err) => console.warn('DB patch employee_details driver/bpjs columns:', err.message));
 
 async function ensurePrerequisiteUniques() {

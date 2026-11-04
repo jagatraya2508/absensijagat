@@ -113,7 +113,9 @@ export default function AdminEmployees() {
         contract_start_date: '', contract_end_date: '',
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
-        basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0, overtime_rate: 50000,
+        basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0,
+        transport_allowance_period: 'monthly', meal_allowance_period: 'monthly', appreciation_allowance_period: 'monthly',
+        overtime_rate: 50000,
         is_driver: false, is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
         vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
@@ -268,6 +270,9 @@ export default function AdminEmployees() {
                 transport_allowance: d.transport_allowance || 0,
                 meal_allowance: d.meal_allowance || 0,
                 appreciation_allowance: d.appreciation_allowance || 0,
+                transport_allowance_period: d.transport_allowance_period || 'monthly',
+                meal_allowance_period: d.meal_allowance_period || 'monthly',
+                appreciation_allowance_period: d.appreciation_allowance_period || 'monthly',
                 overtime_rate: d.overtime_rate || 50000,
                 is_driver: d.is_driver || false,
                 is_collector: d.is_collector || false,
@@ -1710,16 +1715,37 @@ export default function AdminEmployees() {
                                             <input {...moneyInputProps('basic_salary')} />
                                         </div>
                                         <div className="form-group">
-                                            <label className="form-label">Tunjangan Transport (Rp/bln)</label>
-                                            <input {...moneyInputProps('transport_allowance')} />
+                                            <label className="form-label">Tunjangan Transport (Rp)</label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '118px 1fr', gap: '0.5rem' }}>
+                                                <select className="form-input form-select" value={formData.transport_allowance_period || 'monthly'} onChange={e => updateField('transport_allowance_period', e.target.value)}>
+                                                    <option value="daily">Harian</option>
+                                                    <option value="weekly">Mingguan</option>
+                                                    <option value="monthly">Bulanan</option>
+                                                </select>
+                                                <input {...moneyInputProps('transport_allowance')} />
+                                            </div>
                                         </div>
                                         <div className="form-group">
-                                            <label className="form-label">Tunjangan Makan (Rp/bln)</label>
-                                            <input {...moneyInputProps('meal_allowance')} />
+                                            <label className="form-label">Tunjangan Makan (Rp)</label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '118px 1fr', gap: '0.5rem' }}>
+                                                <select className="form-input form-select" value={formData.meal_allowance_period || 'monthly'} onChange={e => updateField('meal_allowance_period', e.target.value)}>
+                                                    <option value="daily">Harian</option>
+                                                    <option value="weekly">Mingguan</option>
+                                                    <option value="monthly">Bulanan</option>
+                                                </select>
+                                                <input {...moneyInputProps('meal_allowance')} />
+                                            </div>
                                         </div>
                                         <div className="form-group">
-                                            <label className="form-label">Tunjangan Apresiasi (Rp/bln)</label>
-                                            <input {...moneyInputProps('appreciation_allowance')} />
+                                            <label className="form-label">Tunjangan Apresiasi (Rp)</label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '118px 1fr', gap: '0.5rem' }}>
+                                                <select className="form-input form-select" value={formData.appreciation_allowance_period || 'monthly'} onChange={e => updateField('appreciation_allowance_period', e.target.value)}>
+                                                    <option value="daily">Harian</option>
+                                                    <option value="weekly">Mingguan</option>
+                                                    <option value="monthly">Bulanan</option>
+                                                </select>
+                                                <input {...moneyInputProps('appreciation_allowance')} />
+                                            </div>
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tarif Lembur/Jam (Rp)</label>
@@ -1940,7 +1966,10 @@ export default function AdminEmployees() {
                                             <Icon name="Info" size={16} inline /> <strong>Info tipe gaji:</strong><br />
                                             • <strong>Harian</strong> = gaji per hari × jumlah hari hadir (absensi)<br />
                                             • <strong>Mingguan</strong> = gaji per minggu × jumlah minggu bekerja<br />
-                                            • <strong>Bulanan</strong> = gaji tetap per bulan
+                                            • <strong>Bulanan</strong> = gaji tetap per bulan<br />
+                                            • <strong>Tunjangan harian</strong> = nominal × hari hadir<br />
+                                            • <strong>Tunjangan mingguan</strong> = nominal per minggu kerja<br />
+                                            • <strong>Tunjangan bulanan</strong> = nominal penuh di payroll bulanan, dibagi 4 di payroll mingguan
                                         </div>
                                     </div>
                                 )}

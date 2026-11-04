@@ -425,7 +425,7 @@ export default function AdminPayroll() {
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
                                     <Icon name="Info" size={16} inline /> {genForm.period_type === 'weekly'
-                                        ? 'Payroll mingguan untuk karyawan gaji mingguan dan harian. Absensi, lembur, dan komponen lain dihitung dari tanggal yang Anda pilih. Gaji pokok mingguan tetap satu minggu jika ada kehadiran, tunjangan bulanan dibagi 4, dan cicilan mingguan dipotong satu kali.'
+                                        ? 'Payroll mingguan untuk karyawan gaji mingguan dan harian. Absensi dan lembur dihitung dari tanggal yang dipilih. Tunjangan harian dikali hari hadir, tunjangan mingguan dihitung satu minggu, dan tunjangan bulanan dibagi 4.'
                                         : 'Payroll bulanan menghitung gaji pokok, tunjangan, lembur, BPJS, PPh 21, dan potongan pinjaman. Karyawan gaji mingguan tidak ikut di sini.'}
                                 </div>
                                 <div className="payslip-scope-options" style={{ marginBottom: '1rem' }}>

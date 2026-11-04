@@ -215,6 +215,10 @@ function employmentStatusLabel(value) {
     return EMPLOYMENT_STATUSES.find(s => s.value === value)?.label || value || '';
 }
 
+function allowancePeriod(value) {
+    return value === 'daily' || value === 'weekly' ? value : 'monthly';
+}
+
 function resolveEmploymentStatusName(raw, statusNames = []) {
     if (!raw) return null;
     const trimmed = String(raw).trim();
@@ -891,6 +895,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bank_name, bank_account, bank_holder,
             npwp, bpjs_kesehatan_no, bpjs_ketenagakerjaan_no,
             basic_salary, salary_type, transport_allowance, meal_allowance, appreciation_allowance, overtime_rate,
+            transport_allowance_period, meal_allowance_period, appreciation_allowance_period,
             tax_status, emergency_contact_name, emergency_contact_phone,
             is_driver, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
             bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
@@ -1030,6 +1035,19 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bpjs_kes_employee_rate || null, bpjs_kes_company_rate || null, bpjs_jht_employee_rate || null, bpjs_jht_company_rate || null,
             bpjs_jp_employee_rate || null, bpjs_jp_company_rate || null, bpjs_jkk_rate || null, bpjs_jkm_rate || null,
             no_kk || null, vehicle_type_id || null, require_different_checkout || false
+        ]);
+
+        await pool.query(`
+            UPDATE employee_details
+            SET transport_allowance_period = $2,
+                meal_allowance_period = $3,
+                appreciation_allowance_period = $4
+            WHERE user_id = $1
+        `, [
+            id,
+            allowancePeriod(transport_allowance_period),
+            allowancePeriod(meal_allowance_period),
+            allowancePeriod(appreciation_allowance_period),
         ]);
 
         // Manage locations
