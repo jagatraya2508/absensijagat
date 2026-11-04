@@ -27,7 +27,7 @@ router.get('/employees', authenticateToken, canViewReports, async (req, res) => 
                 ORDER BY id DESC
                 LIMIT 1
              ) ed ON true
-             WHERE u.role IN ('employee', 'manager')
+             WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true
              ORDER BY u.name`
         );
         res.json(result.rows);
@@ -238,7 +238,7 @@ async function fetchAttendanceRows(start, end, userId = null) {
             ORDER BY id DESC
             LIMIT 1
         ) ot_rec ON true
-        WHERE u.role IN ('employee', 'manager') ${userFilter}
+        WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true ${userFilter}
         ORDER BY d.day, u.name`,
         params
     );
@@ -322,7 +322,7 @@ router.get('/monthly', authenticateToken, canViewReports, async (req, res) => {
       ) ed ON true
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
-      WHERE u.role IN ('employee', 'manager')
+      WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true
       GROUP BY u.id, u.employee_id, u.name, ed.department, ed.division
       ORDER BY u.name`,
             [startDate, endDate]
@@ -406,7 +406,7 @@ router.get('/employee/:id/days', authenticateToken, canViewReports, async (req, 
                 SELECT department, division FROM employee_details
                 WHERE user_id = u.id ORDER BY id DESC LIMIT 1
              ) ed ON true
-             WHERE u.id = $1 AND u.role IN ('employee', 'manager')`,
+             WHERE u.id = $1 AND u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true`,
             [req.params.id]
         );
         if (userResult.rows.length === 0) {
@@ -606,7 +606,7 @@ router.get('/export/monthly/pdf', authenticateToken, canViewReports, async (req,
       FROM users u
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
-      WHERE u.role IN ('employee', 'manager')
+      WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true
       GROUP BY u.id, u.employee_id, u.name
       ORDER BY u.name`,
             [startDate, endDate]
@@ -703,7 +703,7 @@ router.get('/export/monthly/excel', authenticateToken, canViewReports, async (re
       FROM users u
       LEFT JOIN attendance_records ar ON u.id = ar.user_id 
         AND DATE(ar.recorded_at) BETWEEN $1 AND $2
-      WHERE u.role IN ('employee', 'manager')
+      WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true
       GROUP BY u.id, u.employee_id, u.name
       ORDER BY u.name`,
             [startDate, endDate]
@@ -1167,7 +1167,7 @@ router.get('/history', authenticateToken, canViewReports, async (req, res) => {
                 ORDER BY id DESC
                 LIMIT 1
             ) ot_rec ON true
-            WHERE u.role IN ('employee', 'manager') ${userFilter}
+            WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true ${userFilter}
                 AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL OR ot_req.hours IS NOT NULL OR ot_rec.hours IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
@@ -1275,7 +1275,7 @@ router.get('/export/history/pdf', authenticateToken, canViewReports, async (req,
                 ORDER BY id DESC
                 LIMIT 1
             ) ot_rec ON true
-            WHERE u.role IN ('employee', 'manager') ${userFilter}
+            WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true ${userFilter}
                 AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL OR ot_req.hours IS NOT NULL OR ot_rec.hours IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
@@ -1465,7 +1465,7 @@ router.get('/export/history/excel', authenticateToken, canViewReports, async (re
                 ORDER BY id DESC
                 LIMIT 1
             ) ot_rec ON true
-            WHERE u.role IN ('employee', 'manager') ${userFilter}
+            WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk') AND COALESCE(u.is_active, true) = true ${userFilter}
                 AND (ci.id IS NOT NULL OR co.id IS NOT NULL OR uod.id IS NOT NULL OR lr.id IS NOT NULL OR ot_req.hours IS NOT NULL OR ot_rec.hours IS NOT NULL)
             ORDER BY d.date DESC, u.name ASC`,
             params
