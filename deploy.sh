@@ -55,6 +55,8 @@ if [ "$use_pm2" = true ]; then
     pm2 restart absensi-backend-5000 \
         || pm2 restart absensijagat-backend-5000 \
         || pm2 restart backend
+    echo "[4/4b] Set tunjangan apresiasi menjadi harian..."
+    (cd "$CD_DIR/backend" && node scripts/set-appreciation-daily.js)
     echo "DEPLOY JAGAT SELESAI"
 else
     echo "[4/4] Restart Docker containers..."
@@ -94,5 +96,18 @@ WHERE transport_allowance_period = 'daily'
   AND meal_allowance_period = 'daily'
   AND appreciation_allowance_period = 'daily';
 SQL
+    echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
+    applied=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if docker compose exec -T backend node scripts/set-appreciation-daily.js; then
+            applied=1
+            break
+        fi
+        sleep 3
+    done
+    if [ "$applied" != 1 ]; then
+        echo "Gagal mengubah tunjangan apresiasi menjadi harian."
+        exit 1
+    fi
     echo "DEPLOY GUDANG SELESAI"
 fi
