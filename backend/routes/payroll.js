@@ -65,6 +65,13 @@ function monthBounds(year, month) {
     };
 }
 
+function canonicalSalaryType(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (raw === 'daily' || raw === 'harian') return 'daily';
+    if (raw === 'weekly' || raw === 'mingguan') return 'weekly';
+    return 'monthly';
+}
+
 function formatIsoDate(value) {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -353,13 +360,15 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             FROM users u
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN positions pos ON LOWER(TRIM(COALESCE(ed.position, ''))) = LOWER(TRIM(pos.name))
-            WHERE u.role = 'employee'
+            WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk')
         `);
-        const payrollEmployees = employees.rows.filter((emp) => (
-            periodType === 'weekly' 
-                ? (emp.salary_type === 'weekly' || emp.salary_type === 'daily') 
-                : (emp.salary_type !== 'weekly' && emp.salary_type !== 'daily')
-        ));
+        const payrollEmployees = employees.rows.filter((emp) => {
+            const salaryType = canonicalSalaryType(emp.salary_type);
+            emp.salary_type = salaryType;
+            return periodType === 'weekly'
+                ? (salaryType === 'weekly' || salaryType === 'daily')
+                : (salaryType !== 'weekly' && salaryType !== 'daily');
+        });
         if (payrollEmployees.length === 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({
