@@ -39,6 +39,10 @@ git fetch --all
 git reset --hard origin/main
 git clean -fd -e backend/uploads/ -e .env -e backend/.env
 git pull origin main || true
+if [ "${DEPLOY_REEXEC:-}" != 1 ]; then
+  export DEPLOY_REEXEC=1
+  exec bash "$CD_DIR/deploy.sh"
+fi
 
 echo "[2/4] Install dependensi backend..."
 cd "$CD_DIR/backend"
@@ -151,29 +155,29 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_status_ank_skb') THEN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_status_ank_skb_v2') THEN
     UPDATE employee_details ed
     SET employment_status = CASE
-          WHEN upper(u.employee_id) LIKE 'ANK%' THEN 'OUTSOURCING ANK'
+          WHEN upper(btrim(u.employee_id)) LIKE 'ANK%' THEN 'OUTSOURCING ANK'
           ELSE 'OUTSOURCING SKB'
         END,
         updated_at = CURRENT_TIMESTAMP
     FROM users u
     WHERE ed.user_id = u.id
-      AND (upper(u.employee_id) LIKE 'ANK%' OR upper(u.employee_id) LIKE 'SKB%');
+      AND (upper(btrim(u.employee_id)) LIKE 'ANK%' OR upper(btrim(u.employee_id)) LIKE 'SKB%');
 
     INSERT INTO employee_details (user_id, employment_status, updated_at)
     SELECT u.id,
            CASE
-             WHEN upper(u.employee_id) LIKE 'ANK%' THEN 'OUTSOURCING ANK'
+             WHEN upper(btrim(u.employee_id)) LIKE 'ANK%' THEN 'OUTSOURCING ANK'
              ELSE 'OUTSOURCING SKB'
            END,
            CURRENT_TIMESTAMP
     FROM users u
-    WHERE (upper(u.employee_id) LIKE 'ANK%' OR upper(u.employee_id) LIKE 'SKB%')
+    WHERE (upper(btrim(u.employee_id)) LIKE 'ANK%' OR upper(btrim(u.employee_id)) LIKE 'SKB%')
       AND NOT EXISTS (SELECT 1 FROM employee_details ed WHERE ed.user_id = u.id);
 
-    INSERT INTO settings (key, value) VALUES ('gudang_status_ank_skb', 'done');
+    INSERT INTO settings (key, value) VALUES ('gudang_status_ank_skb_v2', 'done');
   END IF;
 END $$;
 SELECT ed.employment_status, COUNT(*) AS jumlah
