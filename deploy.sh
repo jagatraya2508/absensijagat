@@ -142,6 +142,47 @@ SQL
         echo "Gagal menyamakan ID karyawan gudang."
         exit 1
     fi
+    echo "[4/4b4] Set status karyawan ANK dan SKB (sekali)..."
+    docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f -' <<'SQL'
+INSERT INTO employment_statuses (name, description)
+VALUES
+  ('OUTSOURCING ANK', 'Tenaga outsourcing dengan ID ANK'),
+  ('OUTSOURCING SKB', 'Tenaga outsourcing dengan ID SKB')
+ON CONFLICT (name) DO NOTHING;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_status_ank_skb') THEN
+    UPDATE employee_details ed
+    SET employment_status = CASE
+          WHEN upper(u.employee_id) LIKE 'ANK%' THEN 'OUTSOURCING ANK'
+          ELSE 'OUTSOURCING SKB'
+        END,
+        updated_at = CURRENT_TIMESTAMP
+    FROM users u
+    WHERE ed.user_id = u.id
+      AND (upper(u.employee_id) LIKE 'ANK%' OR upper(u.employee_id) LIKE 'SKB%');
+
+    INSERT INTO employee_details (user_id, employment_status, updated_at)
+    SELECT u.id,
+           CASE
+             WHEN upper(u.employee_id) LIKE 'ANK%' THEN 'OUTSOURCING ANK'
+             ELSE 'OUTSOURCING SKB'
+           END,
+           CURRENT_TIMESTAMP
+    FROM users u
+    WHERE (upper(u.employee_id) LIKE 'ANK%' OR upper(u.employee_id) LIKE 'SKB%')
+      AND NOT EXISTS (SELECT 1 FROM employee_details ed WHERE ed.user_id = u.id);
+
+    INSERT INTO settings (key, value) VALUES ('gudang_status_ank_skb', 'done');
+  END IF;
+END $$;
+SELECT ed.employment_status, COUNT(*) AS jumlah
+FROM employee_details ed
+JOIN users u ON u.id = ed.user_id
+WHERE upper(u.employee_id) LIKE 'ANK%' OR upper(u.employee_id) LIKE 'SKB%'
+GROUP BY ed.employment_status
+ORDER BY ed.employment_status;
+SQL
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
