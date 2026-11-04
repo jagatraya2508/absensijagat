@@ -715,6 +715,10 @@ export const employeesAPI = {
         method: 'PATCH',
         body: JSON.stringify({ receives_tuang }),
     }),
+    setStatutoryDeductions: (userIds, enabled) => request('/employees/statutory-deductions', {
+        method: 'POST',
+        body: JSON.stringify({ user_ids: userIds, enabled }),
+    }),
     getDocuments: (id) => request(`/employees/${id}/documents`),
     uploadDocument: (id, formData) => request(`/employees/${id}/documents`, {
         method: 'POST',

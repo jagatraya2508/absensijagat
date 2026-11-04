@@ -96,6 +96,9 @@ export default function AdminEmployees() {
     const [importResult, setImportResult] = useState(null);
     const [importError, setImportError] = useState('');
     const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [statutorySaving, setStatutorySaving] = useState(false);
+    const statutoryFields = ['bpjs_kes_enrolled', 'bpjs_jht_enrolled', 'bpjs_jp_enrolled', 'bpjs_jkk_enrolled', 'bpjs_jkm_enrolled', 'pph21_enabled'];
 
     // Pengaturan Kolom Tampilan
     const [visibleColumns, setVisibleColumns] = useState(() => getInitialVisibleColumns());
@@ -355,6 +358,49 @@ export default function AdminEmployees() {
             setError(err.message || 'Gagal menyimpan data');
         } finally {
             setSaving(false);
+        }
+    }
+
+    function setAllStatutory(enabled) {
+        setFormData((prev) => {
+            const next = { ...prev };
+            statutoryFields.forEach((field) => { next[field] = enabled; });
+            return next;
+        });
+    }
+
+    function toggleEmployeeSelection(id) {
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    }
+
+    function toggleFilteredSelection() {
+        const ids = filteredEmployees.map((emp) => emp.id);
+        const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
+        setSelectedIds(allSelected ? selectedIds.filter((id) => !ids.includes(id)) : [...new Set([...selectedIds, ...ids])]);
+    }
+
+    async function applyStatutory(enabled) {
+        if (selectedIds.length === 0 || statutorySaving) return;
+        const message = enabled
+            ? `Aktifkan kembali BPJS dan PPh 21 untuk ${selectedIds.length} karyawan?`
+            : `Nonaktifkan BPJS Kesehatan, JHT, JP, JKK, JKM, dan PPh 21 untuk ${selectedIds.length} karyawan?\nPayroll berikutnya tidak memotong komponen ini.`;
+        if (!confirm(message)) return;
+        setStatutorySaving(true);
+        try {
+            await employeesAPI.setStatutoryDeductions(selectedIds, enabled);
+            setEmployees((prev) => prev.map((emp) => (
+                selectedIds.includes(emp.id)
+                    ? { ...emp, bpjs_kes_enrolled: enabled, bpjs_jht_enrolled: enabled, bpjs_jp_enrolled: enabled, bpjs_jkk_enrolled: enabled, bpjs_jkm_enrolled: enabled, pph21_enabled: enabled }
+                    : emp
+            )));
+            setSuccess(enabled
+                ? `BPJS dan PPh 21 diaktifkan untuk ${selectedIds.length} karyawan.`
+                : `BPJS dan PPh 21 dinonaktifkan untuk ${selectedIds.length} karyawan.`);
+            setSelectedIds([]);
+        } catch (err) {
+            alert(err.message || 'Gagal mengubah BPJS dan PPh 21');
+        } finally {
+            setStatutorySaving(false);
         }
     }
 
@@ -917,10 +963,35 @@ export default function AdminEmployees() {
                     </div>
                 ) : (
                     <div>
+                    {selectedIds.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', margin: '0 1.1rem 0.75rem', padding: '0.75rem 1rem', background: 'rgba(127, 29, 29, 0.06)', border: '1px solid rgba(127, 29, 29, 0.18)', borderRadius: 'var(--radius-md)' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{selectedIds.length} karyawan dipilih</span>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button type="button" className="btn btn-outline" disabled={statutorySaving} onClick={() => applyStatutory(false)} style={{ padding: '0.45rem 0.8rem', fontSize: '0.78rem' }}>
+                                    {statutorySaving ? 'Memproses...' : 'Nonaktifkan BPJS & PPh'}
+                                </button>
+                                <button type="button" className="btn btn-outline" disabled={statutorySaving} onClick={() => applyStatutory(true)} style={{ padding: '0.45rem 0.8rem', fontSize: '0.78rem' }}>
+                                    Aktifkan BPJS & PPh
+                                </button>
+                                <button type="button" className="btn btn-outline" disabled={statutorySaving} onClick={() => setSelectedIds([])} style={{ padding: '0.45rem 0.8rem', fontSize: '0.78rem' }}>
+                                    Batal pilih
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     <div className="table-container">
                         <table className="table">
                             <thead>
                                 <tr>
+                                    <th style={{ width: 42, textAlign: 'center' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={filteredEmployees.length > 0 && filteredEmployees.every((emp) => selectedIds.includes(emp.id))}
+                                            onChange={toggleFilteredSelection}
+                                            title="Pilih semua karyawan pada hasil pencarian"
+                                            style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                        />
+                                    </th>
                                     {visibleColumns.includes('employee_id') && (
                                         <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                             ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
@@ -1011,6 +1082,14 @@ export default function AdminEmployees() {
                             <tbody>
                                 {pagedEmployees.map(emp => (
                                     <tr key={emp.id}>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(emp.id)}
+                                                onChange={() => toggleEmployeeSelection(emp.id)}
+                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                            />
+                                        </td>
                                         {visibleColumns.includes('employee_id') && <td style={{ fontWeight: 500 }}>{emp.employee_id}</td>}
                                         {visibleColumns.includes('name') && (
                                             <td>
@@ -1794,6 +1873,27 @@ export default function AdminEmployees() {
                                 {/* Tab: BPJS & PPh */}
                                 {activeTab === 'bpjs' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <div style={{ padding: '1rem', background: statutoryFields.every((field) => formData[field] !== false) ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)', borderRadius: 'var(--radius-md)', border: `1px solid ${statutoryFields.every((field) => formData[field] !== false) ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}` }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={statutoryFields.every((field) => formData[field] !== false)}
+                                                        onChange={(e) => setAllStatutory(e.target.checked)}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{ width: 44, height: 24, borderRadius: 12, background: statutoryFields.every((field) => formData[field] !== false) ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--gray-600)', position: 'relative', display: 'inline-block', transition: 'background 0.3s', flexShrink: 0 }}>
+                                                        <span style={{ position: 'absolute', top: 3, left: statutoryFields.every((field) => formData[field] !== false) ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                                                    </span>
+                                                </label>
+                                                <div>
+                                                    <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Potong BPJS & PPh 21</span>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: 2 }}>
+                                                        Matikan untuk karyawan yayasan yang digaji yayasan. Semua komponen di bawah ikut mati, lalu tekan Simpan.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--gray-300)' }}>
                                             <Icon name="Info" size={16} inline /> <strong>Pengaturan BPJS & PPh 21 per karyawan.</strong><br />
                                             Toggle OFF jika karyawan belum terdaftar (misal masih masa percobaan 3 bulan).<br />

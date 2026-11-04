@@ -807,6 +807,43 @@ router.post('/import', authenticateToken, hasPermission('admin.employees'), (req
     }
 });
 
+router.post('/statutory-deductions', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
+    try {
+        const ids = [...new Set(
+            (Array.isArray(req.body.user_ids) ? req.body.user_ids : [])
+                .map((id) => parseInt(id, 10))
+                .filter((id) => Number.isInteger(id) && id > 0)
+        )];
+        if (ids.length === 0) {
+            return res.status(400).json({ error: 'Pilih minimal satu karyawan' });
+        }
+        const enabled = req.body.enabled === true;
+        const result = await pool.query(`
+            INSERT INTO employee_details (
+                user_id, bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled,
+                bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled, updated_at
+            )
+            SELECT u.id, $2, $2, $2, $2, $2, $2, CURRENT_TIMESTAMP
+            FROM users u
+            WHERE u.id = ANY($1::int[])
+              AND u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk')
+            ON CONFLICT (user_id) DO UPDATE SET
+                bpjs_kes_enrolled = EXCLUDED.bpjs_kes_enrolled,
+                bpjs_jht_enrolled = EXCLUDED.bpjs_jht_enrolled,
+                bpjs_jp_enrolled = EXCLUDED.bpjs_jp_enrolled,
+                bpjs_jkk_enrolled = EXCLUDED.bpjs_jkk_enrolled,
+                bpjs_jkm_enrolled = EXCLUDED.bpjs_jkm_enrolled,
+                pph21_enabled = EXCLUDED.pph21_enabled,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING user_id
+        `, [ids, enabled]);
+        res.json({ updated: result.rowCount, enabled });
+    } catch (error) {
+        console.error('Update statutory deductions error:', error);
+        res.status(500).json({ error: 'Gagal mengubah BPJS dan PPh 21' });
+    }
+});
+
 // Get single employee detail
 router.get('/:id', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
     try {
