@@ -387,6 +387,35 @@ export default function AdminEmployees() {
         }
     }
 
+    async function toggleAllYayasan(isYayasan) {
+        const targets = filteredEmployees;
+        if (targets.length === 0 || statutorySaving) return;
+        const message = isYayasan
+            ? `Tandai Yayasan untuk semua ${targets.length} karyawan pada daftar ini?\nBPJS dan PPh 21 tidak akan dipotong.`
+            : `Hapus tanda Yayasan untuk semua ${targets.length} karyawan pada daftar ini?\nBPJS dan PPh 21 diaktifkan kembali.`;
+        if (!confirm(message)) return;
+        const ids = targets.map((emp) => emp.id);
+        const nextFlags = {};
+        statutoryFields.forEach((field) => { nextFlags[field] = !isYayasan; });
+        const previous = employees.map((emp) => ({ id: emp.id, flags: Object.fromEntries(statutoryFields.map((field) => [field, emp[field]])) }));
+        setStatutorySaving(true);
+        setEmployees((prev) => prev.map((emp) => (ids.includes(emp.id) ? { ...emp, ...nextFlags } : emp)));
+        try {
+            await employeesAPI.setStatutoryDeductions(ids, !isYayasan);
+            setSuccess(isYayasan
+                ? `Yayasan dicentang untuk ${ids.length} karyawan.`
+                : `Tanda Yayasan dihapus untuk ${ids.length} karyawan.`);
+        } catch (err) {
+            setEmployees((prev) => prev.map((emp) => {
+                const old = previous.find((item) => item.id === emp.id);
+                return old ? { ...emp, ...old.flags } : emp;
+            }));
+            alert(err.message || 'Gagal mengubah status yayasan');
+        } finally {
+            setStatutorySaving(false);
+        }
+    }
+
     function toggleEmployeeSelection(id) {
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
     }
@@ -840,7 +869,7 @@ export default function AdminEmployees() {
         <div>
             <div className="page-header">
                 <h1 className="page-title"><Icon name="User" size={16} inline /> Data Karyawan</h1>
-                <p className="page-subtitle">Centang kolom <strong>Yayasan</strong> pada tabel jika gaji karyawan dibayar yayasan. BPJS dan PPh 21 lalu tidak dipotong.</p>
+                <p className="page-subtitle">Di kolom <strong>Yayasan</strong>, centang <strong>All</strong> untuk menandai semua karyawan pada daftar ini sekaligus.</p>
             </div>
 
             {error && !showModal && (
@@ -1013,7 +1042,20 @@ export default function AdminEmployees() {
                                             />
                                         </div>
                                     </th>
-                                    <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Yayasan</th>
+                                    <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                        Yayasan
+                                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', marginTop: '0.25rem', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={filteredEmployees.length > 0 && filteredEmployees.every((emp) => isYayasanRecord(emp))}
+                                                disabled={statutorySaving || filteredEmployees.length === 0}
+                                                onChange={(e) => toggleAllYayasan(e.target.checked)}
+                                                title="Tandai semua karyawan pada daftar ini sebagai Yayasan"
+                                                style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                            />
+                                            All
+                                        </label>
+                                    </th>
                                     {visibleColumns.includes('employee_id') && (
                                         <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                             ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
@@ -1117,6 +1159,7 @@ export default function AdminEmployees() {
                                             <input
                                                 type="checkbox"
                                                 checked={isYayasanRecord(emp)}
+                                                disabled={statutorySaving}
                                                 onChange={(e) => toggleYayasan(emp, e.target.checked)}
                                                 title="Karyawan yayasan: BPJS dan PPh 21 tidak dipotong"
                                                 style={{ width: 18, height: 18, cursor: 'pointer' }}
