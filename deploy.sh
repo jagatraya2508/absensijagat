@@ -96,6 +96,39 @@ WHERE transport_allowance_period = 'daily'
   AND meal_allowance_period = 'daily'
   AND appreciation_allowance_period = 'daily';
 SQL
+    echo "[4/4b2] Tambah master departemen gudang (sekali)..."
+    docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f -' <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_departments_20261104') THEN
+    INSERT INTO departments (name)
+    VALUES
+      ('ADMIN'),
+      ('CHECKER'),
+      ('CLEANING SERVICE'),
+      ('DRIVER CD'),
+      ('DRIVER FUSO'),
+      ('DRIVER G-MAX'),
+      ('KENEK CD'),
+      ('KENEK FUSO'),
+      ('KENEK TRONTON'),
+      ('LOGISTIK'),
+      ('MEKANIK'),
+      ('PROD FF & TEMPEL'),
+      ('PROD RESIN & POTONG'),
+      ('PROD SORTIR')
+    ON CONFLICT (name) DO NOTHING;
+    INSERT INTO settings (key, value) VALUES ('gudang_departments_20261104', 'done');
+  END IF;
+END $$;
+SELECT name FROM departments
+WHERE name IN (
+  'ADMIN', 'CHECKER', 'CLEANING SERVICE', 'DRIVER CD', 'DRIVER FUSO', 'DRIVER G-MAX',
+  'KENEK CD', 'KENEK FUSO', 'KENEK TRONTON', 'LOGISTIK', 'MEKANIK',
+  'PROD FF & TEMPEL', 'PROD RESIN & POTONG', 'PROD SORTIR'
+)
+ORDER BY name;
+SQL
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
