@@ -129,6 +129,19 @@ WHERE name IN (
 )
 ORDER BY name;
 SQL
+    echo "[4/4b3] Samakan ID karyawan gudang berdasarkan nama (sekali)..."
+    idapplied=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if docker compose exec -T -e ALLOW_GUDANG_ID_REMAP=1 backend node scripts/set-gudang-employee-ids.js; then
+            idapplied=1
+            break
+        fi
+        sleep 3
+    done
+    if [ "$idapplied" != 1 ]; then
+        echo "Gagal menyamakan ID karyawan gudang."
+        exit 1
+    fi
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
