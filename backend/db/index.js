@@ -316,9 +316,10 @@ async function ensurePayrollPeriodSchema() {
     ON payroll_runs (period_month, period_year)
     WHERE period_type = 'monthly'
   `);
+  await pool.query(`DROP INDEX IF EXISTS payroll_runs_weekly_start`);
   await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS payroll_runs_weekly_start
-    ON payroll_runs (week_start)
+    CREATE UNIQUE INDEX IF NOT EXISTS payroll_runs_weekly_range
+    ON payroll_runs (week_start, week_end)
     WHERE period_type = 'weekly'
   `);
 }

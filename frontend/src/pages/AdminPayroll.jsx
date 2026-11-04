@@ -18,6 +18,16 @@ function localIsoDate(date = new Date()) {
     return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function defaultWeekRange() {
+    const date = new Date();
+    const diffToMonday = date.getDay() === 0 ? -6 : 1 - date.getDay();
+    const start = new Date(date);
+    start.setDate(date.getDate() + diffToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from_date: localIsoDate(start), to_date: localIsoDate(end) };
+}
+
 export default function AdminPayroll() {
     const { settings, updatePayslipFields } = useSettings();
     const { hasPermission } = useAuth();
@@ -38,7 +48,7 @@ export default function AdminPayroll() {
         period_type: 'monthly',
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
-        week_date: localIsoDate(),
+        ...defaultWeekRange(),
         notes: ''
     });
     const [detailSort, setDetailSort] = useState({ key: null, direction: 'ascending' });
@@ -64,6 +74,11 @@ export default function AdminPayroll() {
         e.preventDefault();
         setSaving(true);
         setError('');
+        if (genForm.period_type === 'weekly' && genForm.from_date && genForm.to_date && genForm.to_date < genForm.from_date) {
+            setError('Sampai tanggal tidak boleh sebelum dari tanggal');
+            setSaving(false);
+            return;
+        }
         try {
             await payrollAPI.generate(genForm);
             setSuccess('Payroll berhasil di-generate!');
@@ -199,16 +214,10 @@ export default function AdminPayroll() {
         return `${monthNames[(run?.period_month || 1) - 1]} ${run?.period_year || ''}`;
     }
 
-    function weekRangeLabel(isoDate) {
-        if (!isoDate) return '';
-        const date = new Date(`${isoDate}T00:00:00`);
-        const diffToMonday = date.getDay() === 0 ? -6 : 1 - date.getDay();
-        const start = new Date(date);
-        start.setDate(date.getDate() + diffToMonday);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        const fmt = (value) => value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
-        return `${fmt(start)} – ${fmt(end)}`;
+    function chosenRangeLabel(fromDate, toDate) {
+        if (!fromDate || !toDate || toDate < fromDate) return '';
+        const fmt = (iso) => calendarDate(iso).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+        return `${fmt(fromDate)} – ${fmt(toDate)}`;
     }
     const savedSlipConfig = parsePayslipFields(selectedSlip?.payslip_layout || settings.payslip_fields);
     const slipConfig = slipDraft || savedSlipConfig;
@@ -416,7 +425,7 @@ export default function AdminPayroll() {
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
                                 <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.1)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--gray-300)' }}>
                                     <Icon name="Info" size={16} inline /> {genForm.period_type === 'weekly'
-                                        ? 'Payroll mingguan hanya untuk karyawan gaji mingguan. Gaji pokok dihitung satu minggu, tunjangan bulanan dibagi 4, dan cicilan mingguan dipotong satu kali.'
+                                        ? 'Payroll mingguan untuk karyawan gaji mingguan dan harian. Absensi, lembur, dan komponen lain dihitung dari tanggal yang Anda pilih. Gaji pokok mingguan tetap satu minggu jika ada kehadiran, tunjangan bulanan dibagi 4, dan cicilan mingguan dipotong satu kali.'
                                         : 'Payroll bulanan menghitung gaji pokok, tunjangan, lembur, BPJS, PPh 21, dan potongan pinjaman. Karyawan gaji mingguan tidak ikut di sini.'}
                                 </div>
                                 <div className="payslip-scope-options" style={{ marginBottom: '1rem' }}>
@@ -430,10 +439,18 @@ export default function AdminPayroll() {
                                     </label>
                                 </div>
                                 {genForm.period_type === 'weekly' ? (
-                                    <div className="form-group">
-                                        <label className="form-label">Tanggal dalam minggu *</label>
-                                        <input className="form-input" type="date" value={genForm.week_date} onChange={e => setGenForm({ ...genForm, week_date: e.target.value })} required />
-                                        <p className="payslip-field-note" style={{ marginTop: '0.45rem' }}>{weekRangeLabel(genForm.week_date)}</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div className="form-group">
+                                            <label className="form-label">Dari tanggal *</label>
+                                            <input className="form-input" type="date" value={genForm.from_date} onChange={e => setGenForm({ ...genForm, from_date: e.target.value })} required />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Sampai tanggal *</label>
+                                            <input className="form-input" type="date" value={genForm.to_date} min={genForm.from_date || undefined} onChange={e => setGenForm({ ...genForm, to_date: e.target.value })} required />
+                                        </div>
+                                        {chosenRangeLabel(genForm.from_date, genForm.to_date) && (
+                                            <p className="payslip-field-note" style={{ gridColumn: '1 / -1', marginTop: '-0.35rem' }}>{chosenRangeLabel(genForm.from_date, genForm.to_date)}</p>
+                                        )}
                                     </div>
                                 ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

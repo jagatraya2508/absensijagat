@@ -21,27 +21,35 @@ async function weeksWorkedInMonth(client, userId, year, month) {
     return parseInt(weeksResult.rows[0].weeks_worked, 10) || weeksInMonth;
 }
 
-function weekBounds(isoDate) {
-    const date = new Date(`${isoDate}T00:00:00`);
+function parseIsoDate(value) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    const date = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00`);
     if (Number.isNaN(date.getTime())) return null;
-    const day = date.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const start = new Date(date);
-    start.setDate(date.getDate() + diffToMonday);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    if (`${y}-${m}-${d}` !== `${match[1]}-${match[2]}-${match[3]}`) return null;
+    return date;
+}
+
+function formatIso(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function customRangeBounds(fromDate, toDate) {
+    const start = parseIsoDate(fromDate);
+    const end = parseIsoDate(toDate);
+    if (!start || !end || end < start) return null;
     const next = new Date(end);
     next.setDate(end.getDate() + 1);
-    const fmt = (value) => {
-        const y = value.getFullYear();
-        const m = String(value.getMonth() + 1).padStart(2, '0');
-        const d = String(value.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    };
     return {
-        start: fmt(start),
-        end: fmt(end),
-        endExclusive: fmt(next),
+        start: formatIso(start),
+        end: formatIso(end),
+        endExclusive: formatIso(next),
         month: start.getMonth() + 1,
         year: start.getFullYear(),
     };
@@ -253,9 +261,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
         let rangeStart;
         let rangeEnd;
         if (periodType === 'weekly') {
-            const bounds = weekBounds(req.body.week_date);
+            const bounds = customRangeBounds(req.body.from_date, req.body.to_date);
             if (!bounds) {
-                return res.status(400).json({ error: 'Tanggal minggu payroll harus diisi' });
+                return res.status(400).json({ error: 'Dari tanggal dan sampai tanggal harus diisi, dan sampai tanggal tidak boleh sebelum dari tanggal' });
             }
             weekStart = bounds.start;
             weekEnd = bounds.end;
@@ -274,7 +282,13 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
         await client.query('BEGIN');
 
         const existing = periodType === 'weekly'
-            ? await client.query('SELECT id FROM payroll_runs WHERE period_type = $1 AND week_start = $2::date', ['weekly', weekStart])
+            ? await client.query(
+                `SELECT id FROM payroll_runs
+                 WHERE period_type = 'weekly'
+                   AND week_start <= $2::date
+                   AND week_end >= $1::date`,
+                [weekStart, weekEnd]
+            )
             : await client.query(
                 `SELECT id FROM payroll_runs WHERE period_month = $1 AND period_year = $2 AND period_type = 'monthly'`,
                 [month, year]
@@ -283,7 +297,7 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             await client.query('ROLLBACK');
             return res.status(400).json({
                 error: periodType === 'weekly'
-                    ? 'Payroll untuk minggu ini sudah ada. Hapus dulu jika ingin generate ulang.'
+                    ? 'Payroll mingguan untuk rentang tanggal ini sudah ada atau bertumpuk dengan payroll lain. Hapus dulu jika ingin generate ulang.'
                     : 'Payroll untuk bulan ini sudah ada. Hapus dulu jika ingin generate ulang.'
             });
         }
