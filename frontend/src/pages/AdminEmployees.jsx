@@ -673,8 +673,8 @@ export default function AdminEmployees() {
             const row = { 'No': i + 1 };
             if (visibleColumns.includes('employee_id')) row['ID Karyawan'] = emp.employee_id;
             if (visibleColumns.includes('name')) row['Nama'] = emp.name;
-            if (visibleColumns.includes('department')) row['Departemen'] = emp.department || '-';
             if (visibleColumns.includes('division')) row['Divisi'] = emp.division || '-';
+            if (visibleColumns.includes('department')) row['Departemen'] = emp.department || '-';
             if (visibleColumns.includes('position')) row['Jabatan'] = emp.position || '-';
             if (visibleColumns.includes('employment_status')) row['Status Karyawan'] = employmentStatusLabel(emp.employment_status);
             if (visibleColumns.includes('basic_salary')) row['Gaji Pokok'] = parseFloat(emp.basic_salary) || 0;
@@ -759,8 +759,8 @@ export default function AdminEmployees() {
         const pdfHeaders = ['No'];
         if (visibleColumns.includes('employee_id')) pdfHeaders.push('ID Karyawan');
         if (visibleColumns.includes('name')) pdfHeaders.push('Nama');
-        if (visibleColumns.includes('department')) pdfHeaders.push('Departemen');
         if (visibleColumns.includes('division')) pdfHeaders.push('Divisi');
+        if (visibleColumns.includes('department')) pdfHeaders.push('Departemen');
         if (visibleColumns.includes('position')) pdfHeaders.push('Jabatan');
         if (visibleColumns.includes('employment_status')) pdfHeaders.push('Status');
         if (visibleColumns.includes('basic_salary')) pdfHeaders.push('Gaji Pokok');
@@ -780,8 +780,8 @@ export default function AdminEmployees() {
             const row = [i + 1];
             if (visibleColumns.includes('employee_id')) row.push(emp.employee_id);
             if (visibleColumns.includes('name')) row.push(emp.name);
-            if (visibleColumns.includes('department')) row.push(emp.department || '-');
             if (visibleColumns.includes('division')) row.push(emp.division || '-');
+            if (visibleColumns.includes('department')) row.push(emp.department || '-');
             if (visibleColumns.includes('position')) row.push(emp.position || '-');
             if (visibleColumns.includes('employment_status')) row.push(employmentStatusLabel(emp.employment_status));
             if (visibleColumns.includes('basic_salary')) row.push(formatCurrency(emp.basic_salary));
@@ -821,8 +821,8 @@ export default function AdminEmployees() {
         const printHeaders = ['<th class="text-center">No</th>'];
         if (visibleColumns.includes('employee_id')) printHeaders.push('<th>ID Karyawan</th>');
         if (visibleColumns.includes('name')) printHeaders.push('<th>Nama</th>');
-        if (visibleColumns.includes('department')) printHeaders.push('<th>Departemen</th>');
         if (visibleColumns.includes('division')) printHeaders.push('<th>Divisi</th>');
+        if (visibleColumns.includes('department')) printHeaders.push('<th>Departemen</th>');
         if (visibleColumns.includes('position')) printHeaders.push('<th>Jabatan</th>');
         if (visibleColumns.includes('employment_status')) printHeaders.push('<th>Status</th>');
         if (visibleColumns.includes('basic_salary')) printHeaders.push('<th class="text-right">Gaji Pokok</th>');
@@ -842,8 +842,8 @@ export default function AdminEmployees() {
             const cols = [`<td class="text-center">${i + 1}</td>`];
             if (visibleColumns.includes('employee_id')) cols.push(`<td>${emp.employee_id}</td>`);
             if (visibleColumns.includes('name')) cols.push(`<td>${emp.name}</td>`);
-            if (visibleColumns.includes('department')) cols.push(`<td>${emp.department || '-'}</td>`);
             if (visibleColumns.includes('division')) cols.push(`<td>${emp.division || '-'}</td>`);
+            if (visibleColumns.includes('department')) cols.push(`<td>${emp.department || '-'}</td>`);
             if (visibleColumns.includes('position')) cols.push(`<td>${emp.position || '-'}</td>`);
             if (visibleColumns.includes('employment_status')) cols.push(`<td>${employmentStatusLabel(emp.employment_status)}</td>`);
             if (visibleColumns.includes('basic_salary')) cols.push(`<td class="text-right">${formatCurrency(emp.basic_salary)}</td>`);
@@ -1117,14 +1117,14 @@ export default function AdminEmployees() {
                                             Nama <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'name' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('name')}</span>
                                         </th>
                                     )}
-                                    {visibleColumns.includes('department') && (
-                                        <th onClick={() => handleSort('department')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
-                                            Departemen <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'department' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('department')}</span>
-                                        </th>
-                                    )}
                                     {visibleColumns.includes('division') && (
                                         <th onClick={() => handleSort('division')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                             Divisi <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'division' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('division')}</span>
+                                        </th>
+                                    )}
+                                    {visibleColumns.includes('department') && (
+                                        <th onClick={() => handleSort('department')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                            Departemen <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'department' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('department')}</span>
                                         </th>
                                     )}
                                     {visibleColumns.includes('position') && (
@@ -1232,8 +1232,8 @@ export default function AdminEmployees() {
                                                 )}
                                             </td>
                                         )}
-                                        {visibleColumns.includes('department') && <td>{emp.department || '-'}</td>}
                                         {visibleColumns.includes('division') && <td>{emp.division || '-'}</td>}
+                                        {visibleColumns.includes('department') && <td>{emp.department || '-'}</td>}
                                         {visibleColumns.includes('position') && <td>{emp.position || '-'}</td>}
                                         {visibleColumns.includes('employment_status') && <td>{employmentStatusLabel(emp.employment_status)}</td>}
                                         {visibleColumns.includes('basic_salary') && <td>{formatCurrency(emp.basic_salary)}</td>}
@@ -1625,18 +1625,6 @@ export default function AdminEmployees() {
                                 {activeTab === 'work' && (
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                         <div className="form-group">
-                                            <label className="form-label">Departemen</label>
-                                            <select className="form-input form-select" value={formData.department} onChange={e => updateField('department', e.target.value)}>
-                                                <option value="">Pilih Departemen...</option>
-                                                {masterDepartments.map(d => (
-                                                    <option key={d.id} value={d.name}>{d.name}</option>
-                                                ))}
-                                                {formData.department && !masterDepartments.find(d => d.name === formData.department) && (
-                                                    <option value={formData.department}>{formData.department}</option>
-                                                )}
-                                            </select>
-                                        </div>
-                                        <div className="form-group">
                                             <label className="form-label">Divisi</label>
                                             <select className="form-input form-select" value={formData.division} onChange={e => updateField('division', e.target.value)}>
                                                 <option value="">Pilih Divisi...</option>
@@ -1645,6 +1633,18 @@ export default function AdminEmployees() {
                                                 ))}
                                                 {formData.division && !masterDivisions.find(d => d.name === formData.division) && (
                                                     <option value={formData.division}>{formData.division}</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Departemen</label>
+                                            <select className="form-input form-select" value={formData.department} onChange={e => updateField('department', e.target.value)}>
+                                                <option value="">Pilih Departemen...</option>
+                                                {masterDepartments.map(d => (
+                                                    <option key={d.id} value={d.name}>{d.name}</option>
+                                                ))}
+                                                {formData.department && !masterDepartments.find(d => d.name === formData.department) && (
+                                                    <option value={formData.department}>{formData.department}</option>
                                                 )}
                                             </select>
                                         </div>

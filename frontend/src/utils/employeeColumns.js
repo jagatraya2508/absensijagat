@@ -2,8 +2,8 @@
 export const AVAILABLE_EMPLOYEE_COLUMNS = [
     { key: 'employee_id', label: 'ID Karyawan', defaultVisible: true, sortable: true, category: 'Identitas' },
     { key: 'name', label: 'Nama Lengkap', defaultVisible: true, sortable: true, category: 'Identitas', required: true },
-    { key: 'department', label: 'Departemen', defaultVisible: true, sortable: true, category: 'Pekerjaan' },
     { key: 'division', label: 'Divisi', defaultVisible: true, sortable: true, category: 'Pekerjaan' },
+    { key: 'department', label: 'Departemen', defaultVisible: true, sortable: true, category: 'Pekerjaan' },
     { key: 'position', label: 'Jabatan', defaultVisible: true, sortable: true, category: 'Pekerjaan' },
     { key: 'employment_status', label: 'Status Karyawan', defaultVisible: true, sortable: true, category: 'Pekerjaan' },
     { key: 'basic_salary', label: 'Gaji Pokok', defaultVisible: true, sortable: true, category: 'Kompensasi' },
