@@ -1426,8 +1426,8 @@ export default function AdminEmployees() {
 
             {showModal && selectedEmployee && (
                 <div className="modal-overlay">
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 'calc(100vw - 3rem)', maxWidth: '1140px' }}>
-                        <div className="modal-header">
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 'calc(100vw - 3rem)', maxWidth: '1140px', maxHeight: 'calc(100vh - 2rem)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div className="modal-header" style={{ flexShrink: 0 }}>
                             <h3 className="modal-title">
                                 Detail: {selectedEmployee.name} ({selectedEmployee.employee_id})
                             </h3>
@@ -1436,7 +1436,7 @@ export default function AdminEmployees() {
 
                         {/* Tab Navigation */}
                         {visibleTabs.length > 0 && (
-                            <div style={{ display: 'flex', gap: '0.25rem', padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#000000', overflowX: 'auto' }}>
+                            <div style={{ display: 'flex', flexShrink: 0, gap: '0.25rem', padding: '0 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#000000', overflowX: 'auto' }}>
                                 {visibleTabs.map(tab => (
                                     <button
                                         key={tab.id}
@@ -1457,8 +1457,8 @@ export default function AdminEmployees() {
                             </div>
                         )}
 
-                        <form onSubmit={handleSave}>
-                            <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+                        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                            <div className="modal-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
 
                                 {visibleTabs.length === 0 && (
@@ -2351,7 +2351,7 @@ export default function AdminEmployees() {
                                 )}
                             </div>
 
-                            <div className="modal-footer">
+                            <div className="modal-footer" style={{ flexShrink: 0, background: '#fff' }}>
                                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>
                                     {visibleTabs.length > 0 ? 'Batal' : 'Tutup'}
                                 </button>
