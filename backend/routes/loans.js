@@ -76,10 +76,15 @@ router.get('/:id', authenticateToken, canManageLoans, async (req, res) => {
             'SELECT * FROM loan_payments WHERE loan_id = $1 ORDER BY payment_date DESC',
             [id]
         );
+        const scheduleResult = await pool.query(
+            'SELECT id, installment_no, amount, is_paid FROM loan_installments WHERE loan_id = $1 ORDER BY installment_no',
+            [id]
+        );
 
         res.json({
             ...loanResult.rows[0],
-            payments: paymentsResult.rows
+            payments: paymentsResult.rows,
+            schedule: scheduleResult.rows
         });
     } catch (error) {
         console.error('Get loan detail error:', error);
@@ -89,11 +94,42 @@ router.get('/:id', authenticateToken, canManageLoans, async (req, res) => {
 
 // Create new loan
 router.post('/', authenticateToken, canManageLoans, async (req, res) => {
+    const client = await pool.connect();
     try {
         const { user_id, loan_date, amount, installment_amount, total_installments, description } = req.body;
 
         if (!user_id || !amount || !installment_amount || !total_installments) {
             return res.status(400).json({ error: 'Data pinjaman harus lengkap' });
+        }
+
+        const count = parseInt(total_installments, 10);
+        if (!Number.isInteger(count) || count < 1 || count > 120) {
+            return res.status(400).json({ error: 'Jumlah cicilan harus antara 1 dan 120' });
+        }
+
+        const loanAmount = Math.round(parseFloat(amount) * 100) / 100;
+        let schedule = Array.isArray(req.body.schedule) ? req.body.schedule : [];
+        if (schedule.length === 0) {
+            const base = Math.floor(loanAmount / count);
+            const remainder = Math.round((loanAmount - base * count) * 100) / 100;
+            schedule = Array.from({ length: count }, (_, index) => ({
+                installment_no: index + 1,
+                amount: index === count - 1 ? base + remainder : base,
+            }));
+        }
+        if (schedule.length !== count) {
+            return res.status(400).json({ error: 'Jumlah baris tabel cicilan harus sama dengan jumlah cicilan' });
+        }
+        const rows = schedule.map((row, index) => ({
+            installment_no: index + 1,
+            amount: Math.round((parseFloat(row.amount) || 0) * 100) / 100,
+        }));
+        if (rows.some((row) => row.amount < 0)) {
+            return res.status(400).json({ error: 'Nominal cicilan tidak boleh minus' });
+        }
+        const scheduleTotal = Math.round(rows.reduce((sum, row) => sum + row.amount, 0) * 100) / 100;
+        if (Math.abs(scheduleTotal - loanAmount) > 1) {
+            return res.status(400).json({ error: 'Total tabel cicilan harus sama dengan jumlah pinjaman' });
         }
 
         const employee = await pool.query(
@@ -112,16 +148,26 @@ router.post('/', authenticateToken, canManageLoans, async (req, res) => {
             ? requestedPeriod
             : (employee.rows[0]?.salary_type === 'weekly' ? 'weekly' : 'monthly');
 
-        const result = await pool.query(`
+        await client.query('BEGIN');
+        const result = await client.query(`
             INSERT INTO employee_loans (user_id, loan_date, amount, installment_amount, installment_period, total_installments, remaining_balance, description, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $3, $7, $8)
             RETURNING *
-        `, [user_id, loan_date || new Date(), amount, installment_amount, installmentPeriod, total_installments, description || null, req.user.id]);
-
+        `, [user_id, loan_date || new Date(), loanAmount, rows[0].amount, installmentPeriod, count, description || null, req.user.id]);
+        for (const row of rows) {
+            await client.query(
+                `INSERT INTO loan_installments (loan_id, installment_no, amount) VALUES ($1, $2, $3)`,
+                [result.rows[0].id, row.installment_no, row.amount]
+            );
+        }
+        await client.query('COMMIT');
         res.status(201).json(result.rows[0]);
     } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) { /* transaksi belum mulai */ }
         console.error('Create loan error:', error);
         res.status(500).json({ error: 'Terjadi kesalahan server' });
+    } finally {
+        client.release();
     }
 });
 
@@ -193,16 +239,30 @@ router.post('/:id/payment', authenticateToken, canManageLoans, async (req, res) 
         const alreadyPaid = parseInt(loan.paid_installments, 10) || 0;
         const periodsLeft = Math.max(1, totalInstallments - alreadyPaid);
         const periods = Math.min(requestedPeriods, periodsLeft);
+        const dueRows = await client.query(
+            `SELECT id FROM loan_installments
+             WHERE loan_id = $1 AND is_paid = FALSE
+             ORDER BY installment_no
+             LIMIT $2`,
+            [id, periods]
+        );
+        const periodsApplied = dueRows.rows.length > 0 ? dueRows.rows.length : periods;
+        if (dueRows.rows.length > 0) {
+            await client.query(
+                'UPDATE loan_installments SET is_paid = TRUE WHERE id = ANY($1::int[])',
+                [dueRows.rows.map((row) => row.id)]
+            );
+        }
 
         await client.query(`
             INSERT INTO loan_payments (loan_id, payment_date, amount, payment_method, notes, periods)
             VALUES ($1, $2, $3, 'manual', $4, $5)
-        `, [id, payment_date || new Date(), paymentAmount, notes || null, periods]);
+        `, [id, payment_date || new Date(), paymentAmount, notes || null, periodsApplied]);
 
         const newBalance = parseFloat(loan.remaining_balance) - paymentAmount;
         const newPaidInstallments = newBalance <= 0
             ? totalInstallments
-            : Math.min(totalInstallments, alreadyPaid + periods);
+            : Math.min(totalInstallments, alreadyPaid + periodsApplied);
         const newStatus = newBalance <= 0 ? 'paid_off' : 'active';
 
         await client.query(`

@@ -349,6 +349,18 @@ CREATE TABLE IF NOT EXISTS loan_payments (
 
 CREATE INDEX IF NOT EXISTS idx_loan_payment_loan ON loan_payments(loan_id);
 
+-- Jadwal cicilan per periode (nominal boleh berbeda tiap bulan/minggu)
+CREATE TABLE IF NOT EXISTS loan_installments (
+    id SERIAL PRIMARY KEY,
+    loan_id INTEGER NOT NULL REFERENCES employee_loans(id) ON DELETE CASCADE,
+    installment_no INTEGER NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    is_paid BOOLEAN DEFAULT FALSE,
+    UNIQUE (loan_id, installment_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_loan_installments_loan ON loan_installments(loan_id);
+
 -- Tabel Payroll Runs (Master Penggajian)
 CREATE TABLE IF NOT EXISTS payroll_runs (
     id SERIAL PRIMARY KEY,

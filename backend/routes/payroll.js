@@ -94,13 +94,42 @@ function formatPayrollPeriod(run) {
 }
 
 function loanChargeForPeriod(loan, weeklyPeriods) {
-    const installment = parseFloat(loan.installment_amount) || 0;
     const periods = loan.installment_period === 'weekly' ? Math.max(1, weeklyPeriods || 1) : 1;
     const remaining = parseFloat(loan.remaining_balance) || 0;
+    const upcoming = Array.isArray(loan.upcoming) ? loan.upcoming : [];
+    if (upcoming.length > 0) {
+        const slice = upcoming.slice(0, periods);
+        const scheduled = slice.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+        return {
+            periods: slice.length,
+            amount: Math.min(remaining, scheduled),
+            installmentIds: slice.map((row) => row.id),
+        };
+    }
+    const installment = parseFloat(loan.installment_amount) || 0;
     return {
         periods,
         amount: Math.min(remaining, installment * periods),
+        installmentIds: [],
     };
+}
+
+async function attachUpcomingInstallments(db, loans) {
+    if (!loans.length || !loans.some((loan) => loan.id)) return loans;
+    const ids = loans.map((loan) => loan.id);
+    const rows = await db.query(
+        `SELECT id, loan_id, installment_no, amount
+         FROM loan_installments
+         WHERE loan_id = ANY($1::int[]) AND is_paid = FALSE
+         ORDER BY loan_id, installment_no`,
+        [ids]
+    );
+    const byLoan = new Map();
+    for (const row of rows.rows) {
+        if (!byLoan.has(row.loan_id)) byLoan.set(row.loan_id, []);
+        byLoan.get(row.loan_id).push(row);
+    }
+    return loans.map((loan) => ({ ...loan, upcoming: byLoan.get(loan.id) || [] }));
 }
 
 async function getPayslipLogoFile() {
@@ -635,16 +664,17 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
 
             // Weekly loans are charged once per week worked in this payroll month.
             const activeLoans = await client.query(`
-                SELECT installment_amount, installment_period, remaining_balance
+                SELECT id, installment_amount, installment_period, remaining_balance
                 FROM employee_loans
                 WHERE user_id = $1 AND status = 'active'
                 ORDER BY created_at ASC
             `, [emp.id]);
-            const hasWeeklyLoan = activeLoans.rows.some((loan) => loan.installment_period === 'weekly');
+            const loansWithSchedule = await attachUpcomingInstallments(client, activeLoans.rows);
+            const hasWeeklyLoan = loansWithSchedule.some((loan) => loan.installment_period === 'weekly');
             const weeklyPeriods = periodType === 'weekly'
                 ? 1
                 : (hasWeeklyLoan ? (emp._weeksWorked || await weeksWorkedInMonth(client, emp.id, year, month)) : 1);
-            const loanDeduction = activeLoans.rows.reduce((sum, loan) => {
+            const loanDeduction = loansWithSchedule.reduce((sum, loan) => {
                 return sum + loanChargeForPeriod(loan, weeklyPeriods).amount;
             }, 0);
 
@@ -856,32 +886,39 @@ router.put('/:id/finalize', authenticateToken, canManagePayroll, async (req, res
         const run = runResult.rows[0];
         for (const item of items.rows) {
             // Get active loans for this employee
-            const loans = await client.query(
+            const loans = await attachUpcomingInstallments(client, (await client.query(
                 "SELECT * FROM employee_loans WHERE user_id = $1 AND status = 'active' ORDER BY created_at ASC",
                 [item.user_id]
-            );
+            )).rows);
             const weeklyPeriods = run.period_type === 'weekly'
                 ? 1
                 : await weeksWorkedInMonth(client, item.user_id, run.period_year, run.period_month);
 
             let remainingDeduction = parseFloat(item.loan_deduction);
-            for (const loan of loans.rows) {
+            for (const loan of loans) {
                 if (remainingDeduction <= 0) break;
                 const due = loanChargeForPeriod(loan, weeklyPeriods);
                 const payAmount = Math.min(remainingDeduction, due.amount);
                 if (payAmount <= 0) continue;
                 const installment = parseFloat(loan.installment_amount) || 0;
-                const periodsCovered = installment > 0
-                    ? Math.min(due.periods, Math.max(1, Math.round(payAmount / installment)))
-                    : 1;
+                const periodsCovered = due.installmentIds.length > 0
+                    ? due.installmentIds.length
+                    : (installment > 0
+                        ? Math.min(due.periods, Math.max(1, Math.round(payAmount / installment)))
+                        : 1);
 
-                // Record payment
                 await client.query(`
                     INSERT INTO loan_payments (loan_id, payment_date, amount, payment_method, payroll_item_id, periods) 
                     VALUES ($1, CURRENT_DATE, $2, 'payroll_deduction', $3, $4)
                 `, [loan.id, payAmount, item.item_id, periodsCovered]);
 
-                // Update loan balance
+                if (due.installmentIds.length > 0) {
+                    await client.query(
+                        'UPDATE loan_installments SET is_paid = TRUE WHERE id = ANY($1::int[])',
+                        [due.installmentIds]
+                    );
+                }
+
                 const newBalance = parseFloat(loan.remaining_balance) - payAmount;
                 const newPaid = newBalance <= 0
                     ? parseInt(loan.total_installments, 10)

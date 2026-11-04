@@ -60,6 +60,16 @@ pool.query(`
 pool.query(`ALTER TABLE employee_loans ADD COLUMN IF NOT EXISTS installment_period VARCHAR(10) NOT NULL DEFAULT 'monthly'`)
   .catch((err) => console.warn('DB patch installment_period:', err.message));
 pool.query(`
+  CREATE TABLE IF NOT EXISTS loan_installments (
+    id SERIAL PRIMARY KEY,
+    loan_id INTEGER NOT NULL REFERENCES employee_loans(id) ON DELETE CASCADE,
+    installment_no INTEGER NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    is_paid BOOLEAN DEFAULT FALSE,
+    UNIQUE (loan_id, installment_no)
+  )
+`).catch((err) => console.warn('DB patch loan_installments:', err.message));
+pool.query(`
   ALTER TABLE employee_details 
     ADD COLUMN IF NOT EXISTS contract_start_date DATE,
     ADD COLUMN IF NOT EXISTS contract_end_date DATE;

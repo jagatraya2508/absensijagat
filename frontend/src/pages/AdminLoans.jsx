@@ -19,6 +19,7 @@ export default function AdminLoans() {
         amount: '', installment_amount: '', total_installments: '', description: '',
         installment_period: 'monthly'
     });
+    const [schedule, setSchedule] = useState([]);
     const [paymentForm, setPaymentForm] = useState({
         amount: '', payment_date: new Date().toISOString().split('T')[0], notes: ''
     });
@@ -50,16 +51,43 @@ export default function AdminLoans() {
             amount: '', installment_amount: '', total_installments: '', description: '',
             installment_period: 'monthly'
         });
+        setSchedule([]);
         setShowModal(true);
         setError('');
     }
 
+    function buildSchedule(amount, total) {
+        const count = parseInt(total, 10) || 0;
+        if (count < 1) return [];
+        const loan = Math.round(parseFloat(amount) || 0);
+        const base = Math.floor(loan / count);
+        const remainder = loan - base * count;
+        return Array.from({ length: count }, (_, index) => ({
+            no: index + 1,
+            amount: index === count - 1 ? base + remainder : base,
+        }));
+    }
+
     async function handleSubmit(e) {
         e.preventDefault();
-        setSaving(true);
         setError('');
+        const loanAmount = Math.round(parseFloat(formData.amount) || 0);
+        const scheduleTotal = schedule.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+        if (!schedule.length) {
+            setError('Isi jumlah cicilan supaya tabel cicilan muncul');
+            return;
+        }
+        if (Math.abs(scheduleTotal - loanAmount) > 1) {
+            setError(`Total tabel cicilan (${formatCurrency(scheduleTotal)}) harus sama dengan jumlah pinjaman (${formatCurrency(loanAmount)})`);
+            return;
+        }
+        setSaving(true);
         try {
-            await loansAPI.create(formData);
+            await loansAPI.create({
+                ...formData,
+                installment_amount: schedule[0]?.amount || formData.installment_amount,
+                schedule: schedule.map((row) => ({ installment_no: row.no, amount: row.amount })),
+            });
             setSuccess('Pinjaman berhasil dibuat');
             setShowModal(false);
             fetchLoans();
@@ -79,21 +107,35 @@ export default function AdminLoans() {
     function openPayment(loan) {
         const installment = parseFloat(loan.installment_amount) || 0;
         const remaining = parseFloat(loan.remaining_balance) || 0;
+        const unpaid = (loan.schedule || []).filter((row) => !row.is_paid);
+        const suggested = unpaid.length
+            ? Math.min(remaining, parseFloat(unpaid[0].amount) || 0)
+            : (Math.min(remaining, installment) || remaining);
         setSelectedLoan(loan);
         setPaymentForm({
-            amount: Math.min(remaining, installment) || remaining,
+            amount: suggested,
             periods: 1,
             payment_date: new Date().toISOString().split('T')[0], notes: ''
         });
         setShowPaymentModal(true);
         setError('');
+        loansAPI.getById(loan.id).then((detail) => {
+            const nextUnpaid = (detail.schedule || []).filter((row) => !row.is_paid);
+            const nextAmount = nextUnpaid.length
+                ? Math.min(parseFloat(detail.remaining_balance) || 0, parseFloat(nextUnpaid[0].amount) || 0)
+                : suggested;
+            setSelectedLoan(detail);
+            setPaymentForm((prev) => ({ ...prev, amount: nextAmount, periods: 1 }));
+        }).catch(() => {});
     }
 
     function onPaymentPeriodsChange(raw) {
         const periods = Math.max(1, parseInt(raw, 10) || 1);
-        const installment = parseFloat(selectedLoan?.installment_amount) || 0;
         const remaining = parseFloat(selectedLoan?.remaining_balance) || 0;
-        const suggested = Math.min(remaining, installment * periods);
+        const unpaid = (selectedLoan?.schedule || []).filter((row) => !row.is_paid);
+        const scheduled = unpaid.slice(0, periods).reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+        const fallback = (parseFloat(selectedLoan?.installment_amount) || 0) * periods;
+        const suggested = Math.min(remaining, unpaid.length ? scheduled : fallback);
         setPaymentForm((prev) => ({ ...prev, periods, amount: suggested || remaining }));
     }
 
@@ -128,14 +170,25 @@ export default function AdminLoans() {
 
     // Auto-calculate installment
     function onAmountChange(amount) {
-        const a = parseFloat(amount) || 0;
-        const inst = parseInt(formData.total_installments) || 1;
-        setFormData(prev => ({ ...prev, amount, installment_amount: Math.ceil(a / inst) }));
+        const total = formData.total_installments;
+        const rows = buildSchedule(amount, total);
+        const first = rows[0]?.amount ?? '';
+        setSchedule(rows);
+        setFormData(prev => ({ ...prev, amount, installment_amount: first }));
     }
     function onInstallmentsChange(total) {
-        const a = parseFloat(formData.amount) || 0;
-        const inst = parseInt(total) || 1;
-        setFormData(prev => ({ ...prev, total_installments: total, installment_amount: Math.ceil(a / inst) }));
+        const parsed = parseInt(total, 10);
+        if (total !== '' && parsed > 120) {
+            setError('Jumlah cicilan maksimal 120');
+            return;
+        }
+        const rows = buildSchedule(formData.amount, Number.isInteger(parsed) ? parsed : 0);
+        const first = rows[0]?.amount ?? '';
+        setSchedule(rows);
+        setFormData(prev => ({ ...prev, total_installments: total, installment_amount: first }));
+    }
+    function onScheduleAmountChange(index, value) {
+        setSchedule((prev) => prev.map((row, rowIndex) => rowIndex === index ? { ...row, amount: value } : row));
     }
 
     const totalActive = loans.filter(l => l.status === 'active').reduce((s, l) => s + parseFloat(l.remaining_balance), 0);
@@ -270,7 +323,7 @@ export default function AdminLoans() {
             {/* Create Loan Modal */}
             {showModal && (
                 <div className="modal-overlay">
-                    <div className="modal" onClick={e => e.stopPropagation()}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
                         <div className="modal-header">
                             <h3 className="modal-title">Buat Pinjaman Baru</h3>
                             <button className="modal-close" onClick={() => setShowModal(false)}><Icon name="X" size={16} /></button>
@@ -317,13 +370,43 @@ export default function AdminLoans() {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Jumlah Cicilan ({installmentNoun}) *</label>
-                                    <input className="form-input" type="number" min="1" value={formData.total_installments} onChange={e => onInstallmentsChange(e.target.value)} required placeholder={weeklyInstallment ? '8' : '12'} />
+                                    <input className="form-input" type="number" min="1" max="120" value={formData.total_installments} onChange={e => onInstallmentsChange(e.target.value)} required placeholder={weeklyInstallment ? '8' : '12'} />
                                 </div>
-                                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                                    <label className="form-label">Cicilan per {weeklyInstallment ? 'Minggu' : 'Bulan'} (Rp) *</label>
-                                    <input className="form-input" type="number" min="1" value={formData.installment_amount} onChange={e => setFormData({ ...formData, installment_amount: e.target.value })} required />
-                                    <p className="payslip-field-note">Nilai ini boleh diubah. Cicilan terakhir atau kesepakatan karyawan bisa berbeda dari hasil bagi rata.</p>
-                                </div>
+                                {schedule.length > 0 && (
+                                    <div className="form-group">
+                                        <label className="form-label">Tabel cicilan</label>
+                                        <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8 }}>
+                                            <table className="table" style={{ margin: 0 }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>{weeklyInstallment ? 'Minggu ke' : 'Bulan ke'}</th>
+                                                        <th>Nominal (Rp)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {schedule.map((row, index) => (
+                                                        <tr key={row.no}>
+                                                            <td style={{ width: 120 }}>{row.no}</td>
+                                                            <td>
+                                                                <input
+                                                                    className="form-input"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    value={row.amount}
+                                                                    onChange={(e) => onScheduleAmountChange(index, e.target.value)}
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <p className="payslip-field-note">
+                                            Total tabel {formatCurrency(schedule.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0))}.
+                                            Sesuaikan nominal tiap {installmentNoun}, terutama cicilan terakhir, sampai sama dengan jumlah pinjaman.
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Keterangan</label>
                                     <textarea className="form-input" rows={2} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Keperluan pinjaman" />
@@ -397,6 +480,32 @@ export default function AdminLoans() {
                                 <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>{selectedLoan.installment_period === 'weekly' ? 'Cicilan/Minggu' : 'Cicilan/Bulan'}</span><p>{formatCurrency(selectedLoan.installment_amount)}</p></div>
                                 <div><span style={{ color: 'var(--gray-400)', fontSize: '0.8rem' }}>Progress</span><p>{selectedLoan.paid_installments}/{selectedLoan.total_installments} cicilan</p></div>
                             </div>
+
+                            <h4 style={{ marginBottom: '0.75rem' }}>Tabel cicilan</h4>
+                            {selectedLoan.schedule && selectedLoan.schedule.length > 0 ? (
+                                <div className="table-container" style={{ marginBottom: '1.25rem', maxHeight: 220, overflowY: 'auto' }}>
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>{selectedLoan.installment_period === 'weekly' ? 'Minggu ke' : 'Bulan ke'}</th>
+                                                <th>Nominal</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {selectedLoan.schedule.map((row) => (
+                                                <tr key={row.id || row.installment_no}>
+                                                    <td>{row.installment_no}</td>
+                                                    <td>{formatCurrency(row.amount)}</td>
+                                                    <td>{row.is_paid ? 'Lunas' : 'Belum'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <p style={{ color: 'var(--gray-500)', marginBottom: '1rem' }}>Pinjaman ini belum punya tabel cicilan per periode.</p>
+                            )}
 
                             <h4 style={{ marginBottom: '0.75rem', color: 'var(--gray-300)' }}>Riwayat Pembayaran</h4>
                             {selectedLoan.payments && selectedLoan.payments.length > 0 ? (
