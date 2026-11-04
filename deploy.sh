@@ -61,5 +61,38 @@ else
     docker rm -f absensi-postgres absensi-backend absensi-frontend 2>/dev/null || true
     docker compose up -d
     docker compose restart backend
+    echo "[4/4b] Set tunjangan gudang menjadi harian (sekali)..."
+    ready=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if docker compose exec -T db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 3
+    done
+    if [ "$ready" != 1 ]; then
+        echo "Database gudang belum siap, tunjangan harian belum diubah."
+        exit 1
+    fi
+    docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f -' <<'SQL'
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS transport_allowance_period VARCHAR(10) DEFAULT 'monthly';
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS meal_allowance_period VARCHAR(10) DEFAULT 'monthly';
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS appreciation_allowance_period VARCHAR(10) DEFAULT 'monthly';
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_allowance_daily_applied') THEN
+    UPDATE employee_details
+    SET transport_allowance_period = 'daily',
+        meal_allowance_period = 'daily',
+        appreciation_allowance_period = 'daily';
+    INSERT INTO settings (key, value) VALUES ('gudang_allowance_daily_applied', 'done');
+  END IF;
+END $$;
+SELECT COUNT(*) AS karyawan_tunjangan_harian
+FROM employee_details
+WHERE transport_allowance_period = 'daily'
+  AND meal_allowance_period = 'daily'
+  AND appreciation_allowance_period = 'daily';
+SQL
     echo "DEPLOY GUDANG SELESAI"
 fi
