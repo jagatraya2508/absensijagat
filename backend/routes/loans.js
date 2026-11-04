@@ -46,7 +46,7 @@ router.get('/employees', authenticateToken, canManageLoans, async (req, res) => 
                 WHERE user_id = u.id
                 ORDER BY id DESC LIMIT 1
              ) ed ON TRUE
-             WHERE u.role = 'employee'
+             WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk')
              ORDER BY u.name`
         );
         res.json(result.rows);
