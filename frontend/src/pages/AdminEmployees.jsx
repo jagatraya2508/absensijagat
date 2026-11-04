@@ -1426,7 +1426,7 @@ export default function AdminEmployees() {
 
             {showModal && selectedEmployee && (
                 <div className="modal-overlay">
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 'calc(100vw - 3rem)', maxWidth: '1140px' }}>
                         <div className="modal-header">
                             <h3 className="modal-title">
                                 Detail: {selectedEmployee.name} ({selectedEmployee.employee_id})
@@ -1458,7 +1458,7 @@ export default function AdminEmployees() {
                         )}
 
                         <form onSubmit={handleSave}>
-                            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
                                 {error && <div className="alert alert-danger mb-3"><span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span> {error}</div>}
 
                                 {visibleTabs.length === 0 && (
