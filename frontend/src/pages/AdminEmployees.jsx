@@ -369,6 +369,24 @@ export default function AdminEmployees() {
         });
     }
 
+    function isYayasanRecord(record) {
+        return statutoryFields.every((field) => record?.[field] === false);
+    }
+
+    async function toggleYayasan(emp, isYayasan) {
+        const previous = {};
+        statutoryFields.forEach((field) => { previous[field] = emp[field]; });
+        const nextFlags = {};
+        statutoryFields.forEach((field) => { nextFlags[field] = !isYayasan; });
+        setEmployees((prev) => prev.map((item) => (item.id === emp.id ? { ...item, ...nextFlags } : item)));
+        try {
+            await employeesAPI.setStatutoryDeductions([emp.id], !isYayasan);
+        } catch (err) {
+            setEmployees((prev) => prev.map((item) => (item.id === emp.id ? { ...item, ...previous } : item)));
+            alert(err.message || 'Gagal mengubah status yayasan');
+        }
+    }
+
     function toggleEmployeeSelection(id) {
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
     }
@@ -822,7 +840,7 @@ export default function AdminEmployees() {
         <div>
             <div className="page-header">
                 <h1 className="page-title"><Icon name="User" size={16} inline /> Data Karyawan</h1>
-                <p className="page-subtitle">Kelola data lengkap karyawan</p>
+                <p className="page-subtitle">Centang kolom <strong>Yayasan</strong> pada tabel jika gaji karyawan dibayar yayasan. BPJS dan PPh 21 lalu tidak dipotong.</p>
             </div>
 
             {error && !showModal && (
@@ -983,15 +1001,19 @@ export default function AdminEmployees() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th style={{ width: 42, textAlign: 'center' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={filteredEmployees.length > 0 && filteredEmployees.every((emp) => selectedIds.includes(emp.id))}
-                                            onChange={toggleFilteredSelection}
-                                            title="Pilih semua karyawan pada hasil pencarian"
-                                            style={{ width: 18, height: 18, cursor: 'pointer' }}
-                                        />
+                                    <th style={{ width: 42, textAlign: 'center' }} title="Pilih untuk proses massal">
+                                        Pilih
+                                        <div>
+                                            <input
+                                                type="checkbox"
+                                                checked={filteredEmployees.length > 0 && filteredEmployees.every((emp) => selectedIds.includes(emp.id))}
+                                                onChange={toggleFilteredSelection}
+                                                title="Pilih semua karyawan pada hasil pencarian"
+                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                            />
+                                        </div>
                                     </th>
+                                    <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Yayasan</th>
                                     {visibleColumns.includes('employee_id') && (
                                         <th onClick={() => handleSort('employee_id')} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
                                             ID <span style={{ fontSize: '0.7rem', opacity: sortConfig.key === 'employee_id' ? 1 : 0.35, marginLeft: 4 }}>{getSortIcon('employee_id')}</span>
@@ -1087,6 +1109,16 @@ export default function AdminEmployees() {
                                                 type="checkbox"
                                                 checked={selectedIds.includes(emp.id)}
                                                 onChange={() => toggleEmployeeSelection(emp.id)}
+                                                title="Pilih karyawan"
+                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                            />
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={isYayasanRecord(emp)}
+                                                onChange={(e) => toggleYayasan(emp, e.target.checked)}
+                                                title="Karyawan yayasan: BPJS dan PPh 21 tidak dipotong"
                                                 style={{ width: 18, height: 18, cursor: 'pointer' }}
                                             />
                                         </td>
@@ -1873,23 +1905,23 @@ export default function AdminEmployees() {
                                 {/* Tab: BPJS & PPh */}
                                 {activeTab === 'bpjs' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        <div style={{ padding: '1rem', background: statutoryFields.every((field) => formData[field] !== false) ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)', borderRadius: 'var(--radius-md)', border: `1px solid ${statutoryFields.every((field) => formData[field] !== false) ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}` }}>
+                                        <div style={{ padding: '1rem', background: isYayasanRecord(formData) ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: `1px solid ${isYayasanRecord(formData) ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)'}` }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
                                                     <input
                                                         type="checkbox"
-                                                        checked={statutoryFields.every((field) => formData[field] !== false)}
-                                                        onChange={(e) => setAllStatutory(e.target.checked)}
+                                                        checked={isYayasanRecord(formData)}
+                                                        onChange={(e) => setAllStatutory(!e.target.checked)}
                                                         style={{ display: 'none' }}
                                                     />
-                                                    <span style={{ width: 44, height: 24, borderRadius: 12, background: statutoryFields.every((field) => formData[field] !== false) ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--gray-600)', position: 'relative', display: 'inline-block', transition: 'background 0.3s', flexShrink: 0 }}>
-                                                        <span style={{ position: 'absolute', top: 3, left: statutoryFields.every((field) => formData[field] !== false) ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                                                    <span style={{ width: 44, height: 24, borderRadius: 12, background: isYayasanRecord(formData) ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'var(--gray-600)', position: 'relative', display: 'inline-block', transition: 'background 0.3s', flexShrink: 0 }}>
+                                                        <span style={{ position: 'absolute', top: 3, left: isYayasanRecord(formData) ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                                                     </span>
                                                 </label>
                                                 <div>
-                                                    <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Potong BPJS & PPh 21</span>
+                                                    <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Karyawan Yayasan</span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: 2 }}>
-                                                        Matikan untuk karyawan yayasan yang digaji yayasan. Semua komponen di bawah ikut mati, lalu tekan Simpan.
+                                                        Centang jika gaji dibayar yayasan. BPJS dan PPh 21 ikut mati, lalu tekan Simpan.
                                                     </div>
                                                 </div>
                                             </div>
