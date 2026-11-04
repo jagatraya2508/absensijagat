@@ -83,6 +83,7 @@ export default function AdminEmployees() {
     const [success, setSuccess] = useState('');
     const [search, setSearch] = useState('');
     const [tuangFilter, setTuangFilter] = useState('all');
+    const [activeFilter, setActiveFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
@@ -477,6 +478,35 @@ export default function AdminEmployees() {
         }
     }
 
+    async function toggleEmployeeActive(emp) {
+        const nextActive = emp.is_active === false;
+        const verb = nextActive ? 'aktifkan' : 'nonaktifkan';
+        const message = nextActive
+            ? `Aktifkan ${emp.name}? Karyawan ini akan dihitung lagi saat payroll dibuat.`
+            : `Nonaktifkan ${emp.name}? Karyawan ini tidak akan dihitung gajinya.`;
+        if (!confirm(message)) return;
+        setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, is_active: nextActive } : e));
+        try {
+            await employeesAPI.setActive(emp.id, nextActive);
+            setSuccess(nextActive ? `${emp.name} diaktifkan kembali` : `${emp.name} dinonaktifkan dan tidak dihitung gajinya`);
+        } catch (err) {
+            setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, is_active: !nextActive } : e));
+            alert(err.message || `Gagal ${verb} karyawan`);
+        }
+    }
+
+    async function deleteEmployee(emp) {
+        if (!confirm(`Hapus data ${emp.name} (${emp.employee_id})? Absensi dan data terkait ikut terhapus dan tidak bisa dikembalikan.`)) return;
+        try {
+            await employeesAPI.remove(emp.id);
+            setEmployees(prev => prev.filter(e => e.id !== emp.id));
+            setSelectedIds(prev => prev.filter(id => id !== emp.id));
+            setSuccess(`Data ${emp.name} dihapus`);
+        } catch (err) {
+            alert(err.message || 'Gagal menghapus karyawan');
+        }
+    }
+
     function parseMoneyInput(raw) {
         if (raw === '') return '';
         const n = parseFloat(raw);
@@ -560,6 +590,11 @@ export default function AdminEmployees() {
         } else if (tuangFilter === 'no') {
             result = result.filter(e => e.receives_tuang === false);
         }
+        if (activeFilter === 'active') {
+            result = result.filter(e => e.is_active !== false);
+        } else if (activeFilter === 'inactive') {
+            result = result.filter(e => e.is_active === false);
+        }
 
         // Sort
         if (sortConfig.key) {
@@ -583,11 +618,11 @@ export default function AdminEmployees() {
         }
 
         return result;
-    }, [employees, search, tuangFilter, sortConfig]);
+    }, [employees, search, tuangFilter, activeFilter, sortConfig]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, tuangFilter, sortConfig]);
+    }, [search, tuangFilter, activeFilter, sortConfig]);
 
     const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE));
     const pageSafe = Math.min(page, totalPages);
@@ -912,6 +947,17 @@ export default function AdminEmployees() {
                             <option value="yes">Dapat Tuang</option>
                             <option value="no">Tidak Dapat Tuang</option>
                         </select>
+                        <select
+                            className="form-input form-select"
+                            value={activeFilter}
+                            onChange={e => setActiveFilter(e.target.value)}
+                            title="Filter karyawan aktif"
+                            style={{ maxWidth: 170 }}
+                        >
+                            <option value="all">Semua Status</option>
+                            <option value="active">Aktif</option>
+                            <option value="inactive">Tidak Aktif</option>
+                        </select>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <button
                                 className="btn"
@@ -1150,7 +1196,7 @@ export default function AdminEmployees() {
                             </thead>
                             <tbody>
                                 {pagedEmployees.map(emp => (
-                                    <tr key={emp.id}>
+                                    <tr key={emp.id} style={emp.is_active === false ? { background: 'rgba(148, 163, 184, 0.14)' } : undefined}>
                                         <td style={{ textAlign: 'center' }}>
                                             <input
                                                 type="checkbox"
@@ -1173,7 +1219,12 @@ export default function AdminEmployees() {
                                         {visibleColumns.includes('employee_id') && <td style={{ fontWeight: 500 }}>{emp.employee_id}</td>}
                                         {visibleColumns.includes('name') && (
                                             <td>
-                                                <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                                                <div style={{ fontWeight: 600, color: emp.is_active === false ? 'var(--gray-500)' : undefined }}>{emp.name}</div>
+                                                {emp.is_active === false && (
+                                                    <span className="badge" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', marginTop: '2px', display: 'inline-flex', background: '#fee2e2', color: '#b91c1c' }}>
+                                                        Tidak aktif
+                                                    </span>
+                                                )}
                                                 {emp.require_different_checkout && (
                                                     <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                                         <Icon name="Compass" size={11} inline /> Beda Titik Pulang
@@ -1227,9 +1278,27 @@ export default function AdminEmployees() {
                                         {visibleColumns.includes('gender') && <td>{emp.gender || '-'}</td>}
                                         {visibleColumns.includes('actions') && (
                                             <td>
-                                                <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }} onClick={() => openDetail(emp)}>
-                                                    <Icon name="FileText" size={16} inline /> Detail
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                    <button className="btn btn-primary" style={{ padding: '0.45rem 0.8rem', fontSize: '0.78rem' }} onClick={() => openDetail(emp)}>
+                                                        <Icon name="FileText" size={16} inline /> Detail
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline"
+                                                        style={{ padding: '0.45rem 0.7rem', fontSize: '0.78rem' }}
+                                                        onClick={() => toggleEmployeeActive(emp)}
+                                                    >
+                                                        {emp.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline"
+                                                        style={{ padding: '0.45rem 0.7rem', fontSize: '0.78rem', color: '#b91c1c', borderColor: '#fecaca' }}
+                                                        onClick={() => deleteEmployee(emp)}
+                                                    >
+                                                        <Icon name="Trash2" size={14} inline /> Hapus
+                                                    </button>
+                                                </div>
                                             </td>
                                         )}
                                     </tr>

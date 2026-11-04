@@ -270,6 +270,7 @@ router.get('/', authenticateToken, hasPermission('admin.employees'), async (req,
     try {
         const result = await pool.query(`
             SELECT u.id, u.employee_id, u.name, u.email, u.role, u.created_at,
+                   COALESCE(u.is_active, true) AS is_active,
                    ed.nik, ed.phone, ed.department, ed.division, ed.position, ed.employment_status, ed.join_date,
                    ed.contract_start_date, ed.contract_end_date,
                    ed.basic_salary, ed.salary_type, ed.gender, ed.bpjs_kesehatan_no, ed.npwp,
@@ -1143,6 +1144,65 @@ router.patch('/:id/receives-tuang', authenticateToken, hasPermission('admin.empl
         res.json({ receives_tuang: result.rows[0].receives_tuang });
     } catch (error) {
         console.error('Update receives_tuang error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
+    }
+});
+
+router.patch('/:id/active', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id)) {
+            return res.status(400).json({ error: 'Karyawan tidak valid' });
+        }
+        if (Number(req.user.id) === id) {
+            return res.status(400).json({ error: 'Akun yang sedang login tidak bisa dinonaktifkan dari sini' });
+        }
+        const isActive = req.body.is_active !== false;
+        const updated = await pool.query(
+            `UPDATE users
+             SET is_active = $1
+             WHERE id = $2
+               AND role NOT IN ('admin', 'super_admin', 'superadmin')
+             RETURNING id, employee_id, name, is_active`,
+            [isActive, id]
+        );
+        if (updated.rows.length === 0) {
+            return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+        }
+        res.json(updated.rows[0]);
+    } catch (error) {
+        console.error('Update employee active error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
+    }
+});
+
+router.delete('/:id', authenticateToken, hasPermission('admin.employees'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id)) {
+            return res.status(400).json({ error: 'Karyawan tidak valid' });
+        }
+        if (Number(req.user.id) === id) {
+            return res.status(400).json({ error: 'Akun yang sedang login tidak bisa dihapus' });
+        }
+        const existing = await pool.query(
+            `SELECT id, employee_id, name, role FROM users WHERE id = $1`,
+            [id]
+        );
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ error: 'Karyawan tidak ditemukan' });
+        }
+        if (['admin', 'super_admin', 'superadmin'].includes(existing.rows[0].role)) {
+            return res.status(400).json({ error: 'Akun admin tidak bisa dihapus dari daftar karyawan' });
+        }
+        await pool.query('UPDATE driver_activities SET created_by = NULL WHERE created_by = $1', [id]).catch(() => {});
+        await pool.query('DELETE FROM users WHERE id = $1', [id]);
+        res.json({ message: 'Data karyawan dihapus', id, name: existing.rows[0].name });
+    } catch (error) {
+        console.error('Delete employee error:', error);
+        if (error.code === '23503') {
+            return res.status(400).json({ error: 'Karyawan masih dipakai data lain, jadi belum bisa dihapus. Nonaktifkan saja supaya tidak dihitung gajinya.' });
+        }
         res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
     }
 });

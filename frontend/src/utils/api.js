@@ -719,6 +719,11 @@ export const employeesAPI = {
         method: 'POST',
         body: JSON.stringify({ user_ids: userIds, enabled }),
     }),
+    setActive: (id, isActive) => request(`/employees/${id}/active`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: isActive }),
+    }),
+    remove: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
     getDocuments: (id) => request(`/employees/${id}/documents`),
     uploadDocument: (id, formData) => request(`/employees/${id}/documents`, {
         method: 'POST',

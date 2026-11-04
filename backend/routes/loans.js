@@ -47,6 +47,7 @@ router.get('/employees', authenticateToken, canManageLoans, async (req, res) => 
                 ORDER BY id DESC LIMIT 1
              ) ed ON TRUE
              WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk')
+               AND COALESCE(u.is_active, true) = true
              ORDER BY u.name`
         );
         res.json(result.rows);

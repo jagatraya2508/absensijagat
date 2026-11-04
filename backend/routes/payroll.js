@@ -372,6 +372,7 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             LEFT JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN positions pos ON LOWER(TRIM(COALESCE(ed.position, ''))) = LOWER(TRIM(pos.name))
             WHERE u.role NOT IN ('admin', 'super_admin', 'superadmin', 'kiosk')
+              AND COALESCE(u.is_active, true) = true
         `);
         const payrollEmployees = employees.rows.filter((emp) => {
             const salaryType = canonicalSalaryType(emp.salary_type);
