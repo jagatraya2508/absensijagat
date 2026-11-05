@@ -1,11 +1,46 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from './Icon';
+
+// Laptop dan kiosk tidak punya GPS. Lokasi jaringan (Wi-Fi) biasanya cukup
+// untuk radius kantor dan jauh lebih cepat daripada menunggu satelit.
+const NETWORK_FIX = {
+    enableHighAccuracy: false,
+    timeout: 12000,
+    maximumAge: 60 * 1000,
+};
+
+const NETWORK_RETRY = {
+    enableHighAccuracy: false,
+    timeout: 20000,
+    maximumAge: 5 * 60 * 1000,
+};
+
+function requestPosition(options) {
+    return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+}
+
+function locationErrorMessage(err) {
+    switch (err?.code) {
+        case 1:
+            return 'Izin lokasi ditolak. Izinkan lokasi di browser, lalu tekan Coba Lagi.';
+        case 2:
+            return 'Lokasi tidak tersedia. Nyalakan Wi-Fi dan layanan lokasi Windows, lalu coba lagi.';
+        case 3:
+            return 'Lokasi belum terbaca. Laptop memakai jaringan, bukan GPS. Nyalakan Wi-Fi dan layanan lokasi, lalu coba lagi.';
+        default:
+            return 'Gagal mendapatkan lokasi.';
+    }
+}
 
 export default function LocationTracker({ onLocationUpdate, targetLocation }) {
     const [location, setLocation] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [searchLabel, setSearchLabel] = useState('Mencari lokasi...');
     const [distance, setDistance] = useState(null);
+    const requestId = useRef(0);
 
     const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
         const R = 6371000; // Earth's radius in meters
@@ -21,9 +56,37 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
         return Math.round(R * c);
     }, []);
 
-    const getLocation = useCallback(() => {
+    const applyPosition = useCallback((position) => {
+        const coords = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+        };
+
+        setLocation(coords);
+        setError(null);
+        setLoading(false);
+
+        if (targetLocation) {
+            const dist = calculateDistance(
+                coords.latitude,
+                coords.longitude,
+                parseFloat(targetLocation.latitude),
+                parseFloat(targetLocation.longitude)
+            );
+            setDistance(dist);
+        }
+
+        if (onLocationUpdate) {
+            onLocationUpdate(coords);
+        }
+    }, [onLocationUpdate, targetLocation, calculateDistance]);
+
+    const getLocation = useCallback(async (fresh = false) => {
+        const id = ++requestId.current;
         setLoading(true);
         setError(null);
+        setSearchLabel('Mencari lokasi...');
 
         if (!navigator.geolocation) {
             setError('Geolocation tidak didukung oleh browser ini');
@@ -31,55 +94,29 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
             return;
         }
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const coords = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy,
-                };
+        const stillCurrent = () => id === requestId.current;
+        const firstOptions = fresh
+            ? { ...NETWORK_FIX, maximumAge: 0, timeout: 20000 }
+            : NETWORK_FIX;
 
-                setLocation(coords);
-                setLoading(false);
-
-                // Calculate distance if target location provided
-                if (targetLocation) {
-                    const dist = calculateDistance(
-                        coords.latitude,
-                        coords.longitude,
-                        parseFloat(targetLocation.latitude),
-                        parseFloat(targetLocation.longitude)
-                    );
-                    setDistance(dist);
-                }
-
-                if (onLocationUpdate) {
-                    onLocationUpdate(coords);
-                }
-            },
-            (err) => {
-                setLoading(false);
-                switch (err.code) {
-                    case err.PERMISSION_DENIED:
-                        setError('Izin lokasi ditolak. Mohon izinkan akses lokasi di browser.');
-                        break;
-                    case err.POSITION_UNAVAILABLE:
-                        setError('Informasi lokasi tidak tersedia.');
-                        break;
-                    case err.TIMEOUT:
-                        setError('Waktu pencarian lokasi habis.');
-                        break;
-                    default:
-                        setError('Gagal mendapatkan lokasi.');
-                }
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
+        try {
+            let position;
+            try {
+                position = await requestPosition(firstOptions);
+            } catch (err) {
+                // Izin ditolak atau layanan lokasi mati: jangan buat pengguna menunggu percobaan kedua.
+                if (!stillCurrent() || err.code === 1 || err.code === 2) throw err;
+                setSearchLabel('Masih mencari lewat jaringan...');
+                position = await requestPosition(NETWORK_RETRY);
             }
-        );
-    }, [onLocationUpdate, targetLocation, calculateDistance]);
+            if (!stillCurrent()) return;
+            applyPosition(position);
+        } catch (err) {
+            if (!stillCurrent()) return;
+            setLoading(false);
+            setError(locationErrorMessage(err));
+        }
+    }, [applyPosition]);
 
     useEffect(() => {
         getLocation();
@@ -104,7 +141,7 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
                 <span className="location-info-icon"><Icon name="LoaderCircle" size={20} /></span>
                 <div className="location-info-content">
                     <div className="location-info-label">Lokasi</div>
-                    <div className="location-info-value">Mencari lokasi...</div>
+                    <div className="location-info-value">{searchLabel}</div>
                 </div>
                 <div className="loading-spinner" style={{ width: 24, height: 24, borderWidth: 2 }} />
             </div>
@@ -116,7 +153,7 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
                 <span className="alert-icon"><Icon name="AlertTriangle" size={16} inline /></span>
                 <div style={{ flex: 1 }}>
                     <p>{error}</p>
-                    <button className="btn btn-outline" onClick={getLocation} style={{ marginTop:'0.5rem', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+                    <button className="btn btn-outline" onClick={() => getLocation(true)} style={{ marginTop:'0.5rem', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
                     >
                         Coba Lagi
                     </button>
@@ -137,7 +174,7 @@ export default function LocationTracker({ onLocationUpdate, targetLocation }) {
                     <div className="location-info-label">Koordinat Anda</div>
                     <div className="location-info-value"> {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)} </div>
                 </div>
-                <button className="btn btn-outline" onClick={getLocation} style={{ padding:'0.5rem', fontSize: '1rem' }}
+                <button className="btn btn-outline" onClick={() => getLocation(true)} style={{ padding:'0.5rem', fontSize: '1rem' }}
                     title="Refresh lokasi"
                 >
                     <Icon name="RefreshCw" size={16} />
