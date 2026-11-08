@@ -200,6 +200,26 @@ SQL
         echo "Gagal menyamakan departemen karyawan gudang."
         exit 1
     fi
+    echo "[4/4b6] Set jabatan semua karyawan gudang menjadi Naker (sekali)..."
+    docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f -' <<'SQL'
+INSERT INTO positions (name, description)
+VALUES ('Naker', 'Jabatan karyawan gudang')
+ON CONFLICT (name) DO NOTHING;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_position_naker_20261108') THEN
+    UPDATE employee_details
+    SET position = 'Naker',
+        updated_at = CURRENT_TIMESTAMP;
+
+    INSERT INTO settings (key, value) VALUES ('gudang_position_naker_20261108', 'done');
+  END IF;
+END $$;
+SELECT position, COUNT(*) AS jumlah
+FROM employee_details
+GROUP BY position
+ORDER BY jumlah DESC;
+SQL
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
