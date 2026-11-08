@@ -2,9 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { departmentsAPI, divisionsAPI, driverSalaryRatesAPI, positionsAPI, vehicleTypesAPI } from '../utils/api';
 import Icon from '../components/Icon';
 
+const SALARY_TYPES = [
+    { value: 'monthly', label: 'Bulanan', suffix: 'bulan' },
+    { value: 'weekly', label: 'Mingguan', suffix: 'minggu' },
+    { value: 'daily', label: 'Harian', suffix: 'hari' }
+];
+
+function salaryTypeMeta(type) {
+    return SALARY_TYPES.find((item) => item.value === type) || SALARY_TYPES[2];
+}
+
 const EMPTY_FORM = {
     id: null,
     crew_role: 'supir',
+    salary_type: 'daily',
     division_id: '',
     department_id: '',
     position_id: '',
@@ -60,6 +71,7 @@ export default function AdminDriverSalaryRates() {
         setFormData(row ? {
             id: row.id,
             crew_role: row.crew_role,
+            salary_type: row.salary_type || 'daily',
             division_id: row.division_id,
             department_id: row.department_id,
             position_id: row.position_id,
@@ -112,6 +124,7 @@ export default function AdminDriverSalaryRates() {
         if (!keyword) return rates;
         return rates.filter((row) => [
             row.crew_role === 'kenek' ? 'kenek' : 'supir',
+            salaryTypeMeta(row.salary_type).label,
             row.division_name,
             row.department_name,
             row.position_name,
@@ -124,7 +137,7 @@ export default function AdminDriverSalaryRates() {
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
                     <h1 className="page-title"><Icon name="Banknote" size={16} inline /> Gaji Supir & Kenek</h1>
-                    <p className="page-subtitle">Standar gaji harian berdasarkan divisi, departemen, jabatan, dan jenis mobil</p>
+                    <p className="page-subtitle">Standar gaji berdasarkan tipe gaji, divisi, departemen, jabatan, dan jenis mobil</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => openModal()}>
                     <Icon name="Plus" size={16} inline /> Tambah Standar Gaji
@@ -138,7 +151,7 @@ export default function AdminDriverSalaryRates() {
                 <div className="card-header">
                     <input
                         className="form-input"
-                        placeholder="Cari peran, divisi, departemen, jabatan, atau mobil..."
+                        placeholder="Cari peran, tipe gaji, divisi, departemen, jabatan, atau mobil..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={{ maxWidth: 420 }}
@@ -156,6 +169,7 @@ export default function AdminDriverSalaryRates() {
                             <thead>
                                 <tr>
                                     <th>Peran</th>
+                                    <th>Tipe Gaji</th>
                                     <th>Divisi</th>
                                     <th>Departemen</th>
                                     <th>Jabatan</th>
@@ -172,11 +186,12 @@ export default function AdminDriverSalaryRates() {
                                                 {row.crew_role === 'kenek' ? 'Kenek' : 'Supir'}
                                             </span>
                                         </td>
+                                        <td>{salaryTypeMeta(row.salary_type).label}</td>
                                         <td>{row.division_name}</td>
                                         <td>{row.department_name}</td>
                                         <td>{row.position_name}</td>
                                         <td>{row.vehicle_type_name}</td>
-                                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(row.standard_salary)} / hari</td>
+                                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(row.standard_salary)} / {salaryTypeMeta(row.salary_type).suffix}</td>
                                         <td style={{ textAlign: 'right' }}>
                                             <button className="btn btn-sm btn-outline" onClick={() => openModal(row)}><Icon name="Pencil" size={14} inline /> Edit</button>
                                             <button className="btn btn-sm btn-outline" style={{ marginLeft: 8, color: '#ef4444' }} onClick={() => handleDelete(row)}><Icon name="Trash2" size={14} inline /></button>
@@ -204,6 +219,12 @@ export default function AdminDriverSalaryRates() {
                                     <select className="form-input form-select" value={formData.crew_role} onChange={(e) => setFormData({ ...formData, crew_role: e.target.value })} required>
                                         <option value="supir">Supir</option>
                                         <option value="kenek">Kenek</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Tipe Gaji</label>
+                                    <select className="form-input form-select" value={formData.salary_type} onChange={(e) => setFormData({ ...formData, salary_type: e.target.value })} required>
+                                        {SALARY_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -235,7 +256,7 @@ export default function AdminDriverSalaryRates() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Standar Gaji / Hari</label>
+                                    <label className="form-label">Standar Gaji / {salaryTypeMeta(formData.salary_type).label}</label>
                                     <input
                                         className="form-input"
                                         type="number"

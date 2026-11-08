@@ -600,6 +600,8 @@ function AppRoutes() {
                 }
             />
 
+            <Route path="/admin/driver-vehicles" element={<Navigate to="/admin/driver-activities" replace />} />
+
             <Route
                 path="/admin/driver-activities"
                 element={

@@ -67,7 +67,8 @@ async function main() {
                        AND keep.crew_role = extra.crew_role
                        AND keep.department_id = extra.department_id
                        AND keep.position_id = extra.position_id
-                       AND keep.vehicle_type_id = extra.vehicle_type_id`,
+                       AND keep.vehicle_type_id = extra.vehicle_type_id
+                       AND keep.salary_type = extra.salary_type`,
                     [row.id, driverId]
                 );
                 await client.query(

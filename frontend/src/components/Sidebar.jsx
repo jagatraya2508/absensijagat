@@ -11,7 +11,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
     const location = useLocation();
     const [openMenus, setOpenMenus] = useState(() => {
         const phone = window.matchMedia('(max-width: 768px)').matches;
-        return { master: !phone, laporanKerja: !phone, standardReport: !phone };
+        return { master: !phone, laporanKerja: !phone, standardReport: !phone, supirKendaraan: !phone, persetujuan: !phone };
     });
 
     function toggleMenu(key) {
@@ -58,10 +58,10 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/', icon: 'LayoutDashboard', label: 'Dashboard' },
         { path: '/attendance', icon: 'Camera', label: 'Absensi' },
         ...(hasPermission('admin.kiosk') ? [{ path: '/kiosk', icon: 'Monitor', label: 'Mode Kiosk' }] : []),
+        { path: '/overtime', icon: 'Clock', label: 'Pengajuan Lembur' },
         { path: '/manual-attendance', icon: 'ClipboardPen', label: 'Pengajuan Absen' },
         { path: '/history', icon: 'History', label: 'Riwayat' },
         { path: '/leaves', icon: 'FileText', label: 'Izin & Cuti' },
-        { path: '/overtime', icon: 'Clock', label: 'Pengajuan Lembur' },
         { path: '/schedule', icon: 'CalendarClock', label: 'Jadwal & Shift' },
         ...((user?.use_tracking || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin') ? [{ path: '/driver-tracking', icon: 'MapPin', label: 'Tracking' }] : []),
     ];
@@ -93,20 +93,26 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/customers', icon: 'Store', label: 'Master Customer', permissionKey: 'admin.customers' },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)));
 
-    const pimpinanItems = [
+    const supirKendaraanItems = [
         { path: '/admin/driver-activities', icon: 'Truck', label: 'Aktivitas Driver', permissionKey: 'admin.driver_activities' },
-        { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals', showIfManager: true },
         { path: '/admin/driver-tracking', icon: 'MapPin', label: 'Tracking Kunjungan', permissionKey: 'admin.driver_tracking' },
+    ].filter(item => hasPermission(item.permissionKey));
+
+    const persetujuanItems = [
+        { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals', showIfManager: true },
         { path: '/leave-approvals', icon: 'ClipboardCheck', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
         { path: '/admin/work-schedule?tab=shift_requests', icon: 'Repeat', label: 'Persetujuan Shift', permissionKey: 'admin.work_schedule', extraKeys: ['manager.approvals'], showIfSupervisor: true },
-        { path: '/admin/leaves', icon: 'FileText', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
         { path: '/admin/manual-attendance', icon: 'ClipboardList', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
+    ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor) || (item.showIfManager && (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin')));
+
+    const pimpinanItems = [
+        { path: '/admin/leaves', icon: 'FileText', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
         { path: '/off-days', icon: 'CalendarOff', label: 'Atur Libur', permissionKey: 'admin.off_days' },
         { path: '/admin/announcements', icon: 'Megaphone', label: 'Kelola Pengumuman', permissionKey: 'admin.announcements' },
         { path: '/admin/tuang', icon: 'Banknote', label: 'Insentif Tuang', permissionKey: 'manager.tuang' },
         { path: '/admin/loans', icon: 'Wallet', label: 'Pinjaman', permissionKey: 'admin.loans' },
         { path: '/admin/payroll', icon: 'Banknote', label: 'Payroll', permissionKey: 'admin.payroll' },
-        { path: '/admin/assessments', icon: 'ClipboardList', label: 'Penilaian', permissionKey: 'admin.assessments' },
+        { path: '/admin/assessments', icon: 'ClipboardList', label: 'Nilai Kedisiplinan', permissionKey: 'admin.assessments' },
         { path: '/admin/recruitment', icon: 'Briefcase', label: 'Recruitment', permissionKey: 'admin.recruitment' },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)) || (item.showIfSupervisor && user?.is_supervisor) || (item.showIfManager && (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin')));
 
@@ -128,11 +134,27 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
     const visibleMenuItemsTop = menuItemsTop.filter(item => isItemVisible(item.path));
     const visibleLaporanKerjaItems = laporanKerjaItems.filter(item => isItemVisible(item.path));
     const visibleMenuItemsBottom = menuItemsBottom.filter(item => isItemVisible(item.path));
+    const visibleSupirKendaraanItems = supirKendaraanItems.filter(item => isItemVisible(item.path));
+    const visiblePersetujuanItems = persetujuanItems.filter(item => isItemVisible(item.path));
     const visiblePimpinanItems = pimpinanItems.filter(item => isItemVisible(item.path));
     const visibleStandardReportItems = standardReportItems.filter(item => isItemVisible(item.path));
     const visibleMasterItems = masterItems.filter(item => isItemVisible(item.path));
     const visibleAdminItems = adminItems.filter(item => isItemVisible(item.path));
 
+    function menuPathActive(itemPath) {
+        const [pathname, search = ''] = itemPath.split('?');
+        if (location.pathname !== pathname) return false;
+        if (!search) return true;
+        const expected = new URLSearchParams(search);
+        const actual = new URLSearchParams(location.search);
+        for (const [key, value] of expected) {
+            if (actual.get(key) !== value) return false;
+        }
+        return true;
+    }
+
+    const isSupirKendaraanActive = visibleSupirKendaraanItems.some(item => location.pathname === item.path);
+    const isPersetujuanActive = visiblePersetujuanItems.some(item => menuPathActive(item.path));
     const isLaporanKerjaActive = visibleLaporanKerjaItems.some(item => location.pathname === item.path);
     const isStandardReportActive = visibleStandardReportItems.some(item => location.pathname === item.path);
     const isMasterActive = visibleMasterItems.some(item => location.pathname === item.path);
@@ -143,8 +165,10 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
             master: masterItems.some(item => item.path === location.pathname),
             laporanKerja: laporanKerjaItems.some(item => item.path === location.pathname),
             standardReport: standardReportItems.some(item => item.path === location.pathname),
+            supirKendaraan: supirKendaraanItems.some(item => item.path.split('?')[0] === location.pathname),
+            persetujuan: persetujuanItems.some(item => menuPathActive(item.path)),
         });
-    }, [location.pathname]);
+    }, [location.pathname, location.search]);
 
     return (
         <>
@@ -325,13 +349,91 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                         </NavLink>
                     ))}
 
-                    {(visiblePimpinanItems.length > 0 || visibleStandardReportItems.length > 0) && !kioskOnly && (
+                    {(visiblePimpinanItems.length > 0 || visibleSupirKendaraanItems.length > 0 || visiblePersetujuanItems.length > 0 || visibleStandardReportItems.length > 0) && !kioskOnly && (
                         <>
                             <div className="sidebar-section">
                                 <span>Task Pimpinan</span>
                                 <span style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
                             </div>
-                            
+
+                            {visibleSupirKendaraanItems.length > 0 && (
+                                <>
+                                    <div
+                                        onClick={() => toggleMenu('supirKendaraan')}
+                                        className={`sidebar-group${isSupirKendaraanActive ? ' is-active' : ''}`}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                            <span className="sidebar-link-icon"><Icon name="Car" size={18} /></span>
+                                            Supir & Kendaraan
+                                        </div>
+                                        <span style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            width: '22px', height: '22px', borderRadius: '6px',
+                                            background: 'rgba(255,255,255,0.12)',
+                                            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease',
+                                            transform: openMenus.supirKendaraan ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        }}><Icon name="ChevronDown" size={16} /></span>
+                                    </div>
+                                    <div
+                                        className={`sidebar-submenu${openMenus.supirKendaraan ? ' is-open' : ''}`}
+                                        style={{ maxHeight: openMenus.supirKendaraan ? '240px' : '0px' }}
+                                    >
+                                        {visibleSupirKendaraanItems.map((item) => (
+                                            <NavLink
+                                                key={item.path}
+                                                to={item.path}
+                                                onClick={onNavigate}
+                                                className={({ isActive }) =>
+                                                    `sidebar-link ${isActive ? 'active' : ''}`
+                                                }
+                                            >
+                                                <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
+                                                {item.label}
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {visiblePersetujuanItems.length > 0 && (
+                                <>
+                                    <div
+                                        onClick={() => toggleMenu('persetujuan')}
+                                        className={`sidebar-group${isPersetujuanActive ? ' is-active' : ''}`}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                            <span className="sidebar-link-icon"><Icon name="CheckCircle2" size={18} /></span>
+                                            Persetujuan
+                                        </div>
+                                        <span style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            width: '22px', height: '22px', borderRadius: '6px',
+                                            background: 'rgba(255,255,255,0.12)',
+                                            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease',
+                                            transform: openMenus.persetujuan ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        }}><Icon name="ChevronDown" size={16} /></span>
+                                    </div>
+                                    <div
+                                        className={`sidebar-submenu${openMenus.persetujuan ? ' is-open' : ''}`}
+                                        style={{ maxHeight: openMenus.persetujuan ? '320px' : '0px' }}
+                                    >
+                                        {visiblePersetujuanItems.map((item) => (
+                                            <NavLink
+                                                key={item.path}
+                                                to={item.path}
+                                                onClick={onNavigate}
+                                                className={() =>
+                                                    `sidebar-link ${menuPathActive(item.path) ? 'active' : ''}`
+                                                }
+                                            >
+                                                <span className="sidebar-link-icon"><Icon name={item.icon} size={18} /></span>
+                                                {item.label}
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
                             {visiblePimpinanItems.map((item) => (
                                 <NavLink
                                     key={item.path}
@@ -589,7 +691,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
                                 { category: '📌 Menu Utama', items: menuItemsTop },
                                 { category: '📋 Laporan Kerja', items: laporanKerjaItems },
                                 { category: '📦 Manajemen & Profil', items: menuItemsBottom },
-                                { category: '👔 Task Pimpinan', items: pimpinanItems },
+                                { category: '👔 Task Pimpinan', items: [...supirKendaraanItems, ...persetujuanItems, ...pimpinanItems] },
                                 { category: '📊 Standart Report', items: standardReportItems },
                                 { category: '📦 Master Data', items: masterItems },
                                 { category: '⚙️ Administrasi Sistem', items: adminItems }

@@ -526,6 +526,18 @@ router.post('/assignments/bulk', ...canManage, async (req, res) => {
             return res.status(400).json({ error: 'Data karyawan, shift, dan tanggal harus diisi' });
         }
 
+        const blocked = await client.query(
+            `SELECT u.name
+             FROM users u
+             LEFT JOIN employee_details ed ON ed.user_id = u.id
+             WHERE u.id = ANY($1::int[]) AND COALESCE(ed.uses_shift, false) = false`,
+            [user_ids.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id))]
+        );
+        if (blocked.rows.length > 0) {
+            const names = blocked.rows.map((row) => row.name).join(', ');
+            return res.status(400).json({ error: `Karyawan ini tidak kena shift: ${names}` });
+        }
+
         await client.query('BEGIN');
 
         let insertedCount = 0;
@@ -1087,7 +1099,7 @@ router.get('/helpers/employees', authenticateToken, async (req, res) => {
     try {
         const { department } = req.query;
         let query = `
-            SELECT u.id, u.name, u.employee_id, ed.department, ed.position
+            SELECT u.id, u.name, u.employee_id, ed.department, ed.position, COALESCE(ed.uses_shift, false) AS uses_shift
             FROM users u
             LEFT JOIN employee_details ed ON ed.user_id = u.id
             WHERE u.role != 'kiosk'

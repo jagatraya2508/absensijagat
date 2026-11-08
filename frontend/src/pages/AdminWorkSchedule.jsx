@@ -1101,6 +1101,18 @@ export default function AdminWorkSchedule() {
                                 {departments.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
                             </select>
                         </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Nama Karyawan</label>
+                            <select className="form-input form-select" value={assignFilter.user_id}
+                                onChange={e => setAssignFilter(f => ({ ...f, user_id: e.target.value }))}>
+                                <option value="">Semua</option>
+                                {employees.map(emp => (
+                                    <option key={emp.id} value={emp.id}>
+                                        {emp.name}{emp.employee_id ? ` (${emp.employee_id})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <button className="btn btn-primary" style={{ height: '44px' }} onClick={fetchAssignments}>Filter</button>
                     </div>
                 </div>
@@ -1771,15 +1783,16 @@ export default function AdminWorkSchedule() {
 
                         {/* Employee pagination */}
                         {(() => {
-                            const empTotalPages = Math.max(1, Math.ceil(employees.length / EMP_PAGE_SIZE));
+                            const shiftEmployees = employees.filter(emp => emp.uses_shift === true);
+                            const empTotalPages = Math.max(1, Math.ceil(shiftEmployees.length / EMP_PAGE_SIZE));
                             const empPageSafe = Math.min(empPage, empTotalPages);
-                            const pagedEmployees = employees.slice((empPageSafe - 1) * EMP_PAGE_SIZE, empPageSafe * EMP_PAGE_SIZE);
+                            const pagedEmployees = shiftEmployees.slice((empPageSafe - 1) * EMP_PAGE_SIZE, empPageSafe * EMP_PAGE_SIZE);
                             return (
                         <div className="form-group">
                             <label className="form-label">Pilih Karyawan * ({assignForm.user_ids.length} dipilih)</label>
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                                 <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
-                                    onClick={() => setAssignForm(f => ({ ...f, user_ids: employees.map(e => e.id) }))}>Pilih Semua</button>
+                                    onClick={() => setAssignForm(f => ({ ...f, user_ids: shiftEmployees.map(e => e.id) }))}>Pilih Semua</button>
                                 <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
                                     onClick={() => setAssignForm(f => ({ ...f, user_ids: [] }))}>Hapus Semua</button>
                             </div>
@@ -1799,11 +1812,11 @@ export default function AdminWorkSchedule() {
                                         {emp.department && <span style={{ fontSize: '0.7rem', color: 'var(--gray-600)', marginLeft: 'auto' }}>{emp.department}</span>}
                                     </label>
                                 ))}
-                                {employees.length === 0 && (
-                                    <p style={{ margin: 0, padding: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>Tidak ada karyawan.</p>
+                                {shiftEmployees.length === 0 && (
+                                    <p style={{ margin: 0, padding: '0.5rem', fontSize: '0.85rem', color: 'var(--gray-600)' }}>Tidak ada karyawan kena shift.</p>
                                 )}
                             </div>
-                            {employees.length > EMP_PAGE_SIZE && (
+                            {shiftEmployees.length > EMP_PAGE_SIZE && (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.6rem', gap: '0.5rem' }}>
                                     <button type="button" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
                                         disabled={empPageSafe <= 1}

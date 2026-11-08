@@ -357,6 +357,10 @@ export default function Dashboard() {
                             <span className="menu-label">Mode Kiosk</span>
                         </Link>
                     )}
+                    <Link to="/overtime" className="menu-item">
+                        <MenuIcon name="Clock" className="bg-orange-100 text-orange-600" />
+                        <span className="menu-label">Lembur</span>
+                    </Link>
                     <Link to="/manual-attendance" className="menu-item">
                         <MenuIcon name="ClipboardPen" className="bg-amber-100 text-amber-600" />
                         <span className="menu-label">Pengajuan Absen</span>
@@ -368,10 +372,6 @@ export default function Dashboard() {
                     <Link to="/leaves" className="menu-item">
                         <MenuIcon name="FileText" className="bg-green-100 text-green-600" />
                         <span className="menu-label">Izin & Cuti</span>
-                    </Link>
-                    <Link to="/overtime" className="menu-item">
-                        <MenuIcon name="Clock" className="bg-orange-100 text-orange-600" />
-                        <span className="menu-label">Lembur</span>
                     </Link>
                     <Link to="/schedule" className="menu-item">
                         <MenuIcon name="Calendar" className="bg-purple-100 text-purple-600" />
@@ -409,7 +409,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ===== MENU MANAGER ===== */}
-                {(user?.role === 'manager' || hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || hasPermission('manager.tuang') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.daily_work_report')) && (
+                {(user?.role === 'manager' || hasPermission('manager.approvals') || hasPermission('manager.leave_approvals') || hasPermission('manager.tuang') || user?.is_supervisor || hasPermission('admin.leaves') || hasPermission('admin.work_schedule') || hasPermission('admin.manual_attendance') || hasPermission('admin.off_days') || hasPermission('admin.announcements') || hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking') || hasPermission('admin.loans') || hasPermission('admin.payroll') || hasPermission('admin.assessments') || hasPermission('admin.recruitment') || hasPermission('admin.assets') || hasPermission('admin.reports') || hasPermission('admin.daily_work_report')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -418,16 +418,15 @@ export default function Dashboard() {
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
+                            {(hasPermission('admin.driver_activities') || hasPermission('admin.driver_tracking')) && (
+                                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, color: 'var(--gray-600)', fontSize: '0.85rem' }}>
+                                    <Icon name="Car" size={16} /> Supir & Kendaraan
+                                </div>
+                            )}
                             {hasPermission('admin.driver_activities') && (
                                 <Link to="/admin/driver-activities" className="menu-item">
                                     <MenuIcon name="Truck" className="bg-orange-100 text-orange-600" />
                                     <span className="menu-label">Aktivitas Driver</span>
-                                </Link>
-                            )}
-                            {(user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin' || hasPermission('manager.approvals')) && (
-                                <Link to="/approvals" className="menu-item">
-                                    <MenuIcon name="CheckCircle2" className="bg-emerald-100 text-emerald-600" />
-                                    <span className="menu-label">Persetujuan Lembur</span>
                                 </Link>
                             )}
                             {hasPermission('admin.driver_tracking') && (
@@ -436,22 +435,39 @@ export default function Dashboard() {
                                     <span className="menu-label">Tracking Kunjungan</span>
                                 </Link>
                             )}
+                            {((user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin' || hasPermission('manager.approvals')) || (hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves')) || (hasPermission('admin.work_schedule') || hasPermission('manager.approvals') || user?.is_supervisor) || hasPermission('admin.manual_attendance')) && (
+                                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, color: 'var(--gray-600)', fontSize: '0.85rem' }}>
+                                    <Icon name="CheckCircle2" size={16} /> Persetujuan
+                                </div>
+                            )}
+                            {(user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin' || hasPermission('manager.approvals')) && (
+                                <Link to="/approvals" className="menu-item">
+                                    <MenuIcon name="CheckCircle2" className="bg-emerald-100 text-emerald-600" />
+                                    <span className="menu-label">Persetujuan Lembur</span>
+                                </Link>
+                            )}
                             {(hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves')) && (
                                 <Link to="/leave-approvals" className="menu-item">
                                     <MenuIcon name="ClipboardCheck" className="bg-lime-100 text-lime-600" />
                                     <span className="menu-label">Persetujuan Izin</span>
                                 </Link>
                             )}
-                            {hasPermission('admin.leaves') && (
-                                <Link to="/admin/leaves" className="menu-item">
-                                    <MenuIcon name="FileText" className="bg-green-100 text-green-600" />
-                                    <span className="menu-label">Kelola Izin</span>
+                            {(hasPermission('admin.work_schedule') || hasPermission('manager.approvals') || user?.is_supervisor) && (
+                                <Link to="/admin/work-schedule?tab=shift_requests" className="menu-item">
+                                    <MenuIcon name="Repeat" className="bg-violet-100 text-violet-600" />
+                                    <span className="menu-label">Persetujuan Shift</span>
                                 </Link>
                             )}
                             {hasPermission('admin.manual_attendance') && (
                                 <Link to="/admin/manual-attendance" className="menu-item">
                                     <MenuIcon name="ClipboardList" className="bg-cyan-100 text-cyan-600" />
                                     <span className="menu-label">Persetujuan Absen</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.leaves') && (
+                                <Link to="/admin/leaves" className="menu-item">
+                                    <MenuIcon name="FileText" className="bg-green-100 text-green-600" />
+                                    <span className="menu-label">Kelola Izin</span>
                                 </Link>
                             )}
                             {hasPermission('admin.off_days') && (
@@ -487,7 +503,7 @@ export default function Dashboard() {
                             {hasPermission('admin.assessments') && (
                                 <Link to="/admin/assessments" className="menu-item">
                                     <MenuIcon name="ClipboardList" className="bg-indigo-100 text-indigo-600" />
-                                    <span className="menu-label">Penilaian</span>
+                                    <span className="menu-label">Nilai Kedisiplinan</span>
                                 </Link>
                             )}
                             {hasPermission('admin.recruitment') && (

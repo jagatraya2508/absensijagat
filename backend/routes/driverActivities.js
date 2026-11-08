@@ -61,10 +61,10 @@ router.get('/summary', authenticateToken, canManageDriverActivities, async (req,
 
         const result = await pool.query(`
             SELECT da.user_id, u.name as user_name, u.employee_id,
-                   COUNT(*) as total_days,
-                   SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
+                   COUNT(DISTINCT da.activity_date) as total_days,
+                   COUNT(DISTINCT da.activity_date) FILTER (WHERE da.is_subuh) as total_subuh,
                    SUM(da.rit_count) as total_rit,
-                   SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
+                   COUNT(DISTINCT da.activity_date) FILTER (WHERE da.is_overnight) as total_overnight,
                    SUM(COALESCE(da.ritase_dekat, 0)) as total_ritase_dekat,
                    SUM(COALESCE(da.ritase_jauh, 0)) as total_ritase_jauh,
                    COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
@@ -160,17 +160,6 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
         const result = await pool.query(`
             INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh, vehicle_type_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (user_id, activity_date) DO UPDATE SET
-                is_subuh = EXCLUDED.is_subuh,
-                departure_time = EXCLUDED.departure_time,
-                rit_count = EXCLUDED.rit_count,
-                rit_notes = EXCLUDED.rit_notes,
-                is_overnight = EXCLUDED.is_overnight,
-                notes = EXCLUDED.notes,
-                ritase_dekat = EXCLUDED.ritase_dekat,
-                ritase_jauh = EXCLUDED.ritase_jauh,
-                vehicle_type_id = EXCLUDED.vehicle_type_id,
-                updated_at = CURRENT_TIMESTAMP
             RETURNING *
         `, [
             user_id, activity_date,
@@ -189,6 +178,9 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
         res.status(201).json(result.rows[0]);
     } catch (error) {
         console.error('Create driver activity error:', error);
+        if (error.code === '23505') {
+            return res.status(400).json({ error: 'Driver ini sudah punya aktivitas dengan jumlah RIT yang sama pada tanggal tersebut' });
+        }
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
@@ -197,18 +189,23 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
 router.put('/:id', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
         const { id } = req.params;
-        const { is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh, vehicle_type_id } = req.body;
+        const { activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, ritase_dekat, ritase_jauh, vehicle_type_id } = req.body;
+        if (!activity_date) {
+            return res.status(400).json({ error: 'Tanggal harus diisi' });
+        }
 
         const result = await pool.query(`
             UPDATE driver_activities SET
-                is_subuh = $1, departure_time = $2, rit_count = $3, rit_notes = $4,
-                is_overnight = $5, notes = $6, ritase_dekat = $7, ritase_jauh = $8,
-                vehicle_type_id = $9, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $10
+                activity_date = $1,
+                is_subuh = $2, departure_time = $3, rit_count = $4, rit_notes = $5,
+                is_overnight = $6, notes = $7, ritase_dekat = $8, ritase_jauh = $9,
+                vehicle_type_id = $10, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $11
             RETURNING *
         `, [
+            activity_date,
             is_subuh || false, departure_time || null, rit_count || 1,
-            rit_notes || null, is_overnight || false, notes || null, 
+            rit_notes || null, is_overnight || false, notes || null,
             ritase_dekat || 0, ritase_jauh || 0, vehicle_type_id || null, id
         ]);
 
@@ -218,6 +215,9 @@ router.put('/:id', authenticateToken, canManageDriverActivities, async (req, res
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Update driver activity error:', error);
+        if (error.code === '23505') {
+            return res.status(400).json({ error: 'Driver ini sudah punya aktivitas dengan jumlah RIT yang sama pada tanggal tersebut' });
+        }
         res.status(500).json({ error: 'Terjadi kesalahan server' });
     }
 });
@@ -253,7 +253,7 @@ router.post('/bulk', authenticateToken, canManageDriverActivities, async (req, r
             const result = await client.query(`
                 INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh, vehicle_type_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                ON CONFLICT (user_id, activity_date) DO UPDATE SET
+                ON CONFLICT (user_id, activity_date, rit_count) DO UPDATE SET
                     is_subuh = EXCLUDED.is_subuh,
                     departure_time = EXCLUDED.departure_time,
                     rit_count = EXCLUDED.rit_count,
@@ -311,10 +311,10 @@ router.get('/export/summary/pdf', authenticateToken, canManageDriverActivities, 
 
         const result = await pool.query(`
             SELECT da.user_id, u.name as user_name, u.employee_id,
-                   COUNT(*) as total_days,
-                   SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
+                   COUNT(DISTINCT da.activity_date) as total_days,
+                   COUNT(DISTINCT da.activity_date) FILTER (WHERE da.is_subuh) as total_subuh,
                    SUM(da.rit_count) as total_rit,
-                   SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
+                   COUNT(DISTINCT da.activity_date) FILTER (WHERE da.is_overnight) as total_overnight,
                    SUM(COALESCE(da.ritase_dekat, 0)) as total_ritase_dekat,
                    SUM(COALESCE(da.ritase_jauh, 0)) as total_ritase_jauh,
                    COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,
@@ -437,10 +437,10 @@ router.get('/export/summary/excel', authenticateToken, canManageDriverActivities
 
         const result = await pool.query(`
             SELECT da.user_id, u.name as user_name, u.employee_id,
-                   COUNT(*) as total_days,
-                   SUM(CASE WHEN da.is_subuh THEN 1 ELSE 0 END) as total_subuh,
+                   COUNT(DISTINCT da.activity_date) as total_days,
+                   COUNT(DISTINCT da.activity_date) FILTER (WHERE da.is_subuh) as total_subuh,
                    SUM(da.rit_count) as total_rit,
-                   SUM(CASE WHEN da.is_overnight THEN 1 ELSE 0 END) as total_overnight,
+                   COUNT(DISTINCT da.activity_date) FILTER (WHERE da.is_overnight) as total_overnight,
                    SUM(COALESCE(da.ritase_dekat, 0)) as total_ritase_dekat,
                    SUM(COALESCE(da.ritase_jauh, 0)) as total_ritase_jauh,
                    COALESCE(ed.driver_subuh_allowance, 0) as tarif_subuh,

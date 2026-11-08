@@ -903,7 +903,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
             no_kk,
-            location_ids, vehicle_type_id, supervisor_id, receives_tuang,
+            location_ids, vehicle_type_id, supervisor_id, receives_tuang, uses_shift,
             require_different_checkout
         } = req.body;
 
@@ -952,11 +952,12 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                 division,
                 department,
                 position,
-                vehicleTypeId: vehicle_type_id
+                vehicleTypeId: vehicle_type_id,
+                salaryType: salary_type || 'monthly'
             });
             if (listed == null) {
                 return res.status(400).json({
-                    error: 'Tidak ada standar gaji yang cocok. Samakan divisi, departemen, jabatan, peran supir/kenek, dan jenis mobil dengan Daftar Gaji, atau matikan centang Ambil dari Daftar Gaji.'
+                    error: 'Tidak ada standar gaji yang cocok. Samakan tipe gaji, divisi, departemen, jabatan, peran supir/kenek, dan jenis mobil dengan Daftar Gaji, atau matikan centang Ambil dari Daftar Gaji.'
                 });
             }
             resolvedBasicSalary = listed;
@@ -1127,6 +1128,13 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             await pool.query(
                 `UPDATE employee_details SET receives_tuang = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
                 [receives_tuang !== false, id]
+            );
+        }
+
+        if (uses_shift !== undefined) {
+            await pool.query(
+                `UPDATE employee_details SET uses_shift = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+                [uses_shift === true, id]
             );
         }
 

@@ -11,7 +11,9 @@ function sameSalaryText(left, right) {
 
 function findEmployeeSalaryRate(data, rates) {
     const role = data.is_driver && data.driver_role === 'kenek' ? 'kenek' : 'supir';
+    const salaryType = data.salary_type || 'monthly';
     return (rates || []).find((rate) => rate.crew_role === role
+        && (rate.salary_type || 'daily') === salaryType
         && String(rate.vehicle_type_id) === String(data.vehicle_type_id)
         && sameSalaryText(rate.division_name, data.division)
         && sameSalaryText(rate.department_name, data.department)
@@ -125,7 +127,7 @@ export default function AdminEmployees() {
         nik: '', no_kk: '', phone: '', address: '', birth_date: '', birth_place: '',
         gender: '', marital_status: 'Belum Menikah', religion: '', education: '',
         department: '', division: '', position: '', employment_status: '', join_date: '', supervisor_id: '',
-        contract_start_date: '', contract_end_date: '',
+        contract_start_date: '', contract_end_date: '', uses_shift: false,
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
         basic_salary: 0, use_salary_list: false, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0,
@@ -166,6 +168,7 @@ export default function AdminEmployees() {
         formData.vehicle_type_id,
         formData.driver_role,
         formData.is_driver,
+        formData.salary_type,
         salaryRates
     ]);
 
@@ -302,6 +305,7 @@ export default function AdminEmployees() {
                 join_date: d.join_date ? d.join_date.split('T')[0] : '',
                 contract_start_date: d.contract_start_date ? d.contract_start_date.split('T')[0] : '',
                 contract_end_date: d.contract_end_date ? d.contract_end_date.split('T')[0] : '',
+                uses_shift: d.uses_shift === true,
                 bank_name: d.bank_name || '', bank_account: d.bank_account || '',
                 bank_holder: d.bank_holder || '',
                 npwp: d.npwp || '', bpjs_kesehatan_no: d.bpjs_kesehatan_no || '',
@@ -1763,6 +1767,19 @@ export default function AdminEmployees() {
                                                 Dipakai untuk rantai approval izin & cuti. Bisa juga diatur di menu Struktur Organisasi.
                                             </small>
                                         </div>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 600, cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.uses_shift === true}
+                                                    onChange={e => updateField('uses_shift', e.target.checked)}
+                                                />
+                                                Kena Shift
+                                            </label>
+                                            <small style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>
+                                                Centang jika karyawan ini kena shift. Kosongkan jika tidak kena shift.
+                                            </small>
+                                        </div>
                                     </div>
                                 )}
 
@@ -1840,7 +1857,7 @@ export default function AdminEmployees() {
                                             {formData.use_salary_list && (
                                                 <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: findEmployeeSalaryRate(formData, salaryRates) ? '#047857' : '#b45309' }}>
                                                     {findEmployeeSalaryRate(formData, salaryRates)
-                                                        ? 'Nominal mengikuti Daftar Gaji sesuai peran, divisi, departemen, jabatan, dan jenis mobil.'
+                                                        ? 'Nominal mengikuti Daftar Gaji sesuai tipe gaji, peran, divisi, departemen, jabatan, dan jenis mobil.'
                                                         : 'Belum ada baris Daftar Gaji yang cocok. Lengkapi data kerja dan jenis mobil, atau isi standar gajinya dulu.'}
                                                 </div>
                                             )}

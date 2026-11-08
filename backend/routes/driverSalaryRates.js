@@ -37,7 +37,7 @@ function listSql(whereSql = '') {
         JOIN positions ps ON ps.id = r.position_id
         JOIN vehicle_types vt ON vt.id = r.vehicle_type_id
         ${whereSql}
-        ORDER BY r.crew_role ASC, dv.name ASC, dp.name ASC, ps.name ASC, vt.name ASC
+        ORDER BY r.crew_role ASC, r.salary_type ASC, dv.name ASC, dp.name ASC, ps.name ASC, vt.name ASC
     `;
 }
 
@@ -47,8 +47,10 @@ function parsePayload(body) {
     const departmentId = parseInt(body.department_id, 10);
     const positionId = parseInt(body.position_id, 10);
     const vehicleTypeId = parseInt(body.vehicle_type_id, 10);
+    const salaryType = ['daily', 'weekly', 'monthly'].includes(body.salary_type) ? body.salary_type : '';
     const standardSalary = parseFloat(body.standard_salary);
     if (!crewRole) return { error: 'Pilih supir atau kenek' };
+    if (!salaryType) return { error: 'Tipe gaji harus dipilih' };
     if (!divisionId) return { error: 'Divisi harus dipilih' };
     if (!departmentId) return { error: 'Departemen harus dipilih' };
     if (!positionId) return { error: 'Jabatan harus dipilih' };
@@ -60,6 +62,7 @@ function parsePayload(body) {
         departmentId,
         positionId,
         vehicleTypeId,
+        salaryType,
         standardSalary
     };
 }
@@ -80,8 +83,8 @@ router.post('/', ...canManage, async (req, res) => {
     try {
         const result = await pool.query(`
             INSERT INTO driver_salary_rates (
-                crew_role, division_id, department_id, position_id, vehicle_type_id, standard_salary, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+                crew_role, division_id, department_id, position_id, vehicle_type_id, salary_type, standard_salary, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
             RETURNING *
         `, [
             payload.crewRole,
@@ -89,6 +92,7 @@ router.post('/', ...canManage, async (req, res) => {
             payload.departmentId,
             payload.positionId,
             payload.vehicleTypeId,
+            payload.salaryType,
             payload.standardSalary
         ]);
         const full = await pool.query(listSql('WHERE r.id = $1'), [result.rows[0].id]);
@@ -96,7 +100,7 @@ router.post('/', ...canManage, async (req, res) => {
     } catch (err) {
         console.error('Create driver salary rate error:', err);
         if (err.code === '23505') {
-            return res.status(400).json({ error: 'Kombinasi supir/kenek, divisi, departemen, jabatan, dan mobil ini sudah ada' });
+            return res.status(400).json({ error: 'Kombinasi supir/kenek, tipe gaji, divisi, departemen, jabatan, dan mobil ini sudah ada' });
         }
         res.status(500).json({ error: 'Gagal menyimpan standar gaji' });
     }
@@ -113,9 +117,10 @@ router.put('/:id', ...canManage, async (req, res) => {
                 department_id = $3,
                 position_id = $4,
                 vehicle_type_id = $5,
-                standard_salary = $6,
+                salary_type = $6,
+                standard_salary = $7,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $7
+            WHERE id = $8
             RETURNING id
         `, [
             payload.crewRole,
@@ -123,6 +128,7 @@ router.put('/:id', ...canManage, async (req, res) => {
             payload.departmentId,
             payload.positionId,
             payload.vehicleTypeId,
+            payload.salaryType,
             payload.standardSalary,
             req.params.id
         ]);
@@ -132,7 +138,7 @@ router.put('/:id', ...canManage, async (req, res) => {
     } catch (err) {
         console.error('Update driver salary rate error:', err);
         if (err.code === '23505') {
-            return res.status(400).json({ error: 'Kombinasi supir/kenek, divisi, departemen, jabatan, dan mobil ini sudah ada' });
+            return res.status(400).json({ error: 'Kombinasi supir/kenek, tipe gaji, divisi, departemen, jabatan, dan mobil ini sudah ada' });
         }
         res.status(500).json({ error: 'Gagal memperbarui standar gaji' });
     }

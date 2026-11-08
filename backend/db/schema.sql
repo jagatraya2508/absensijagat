@@ -129,10 +129,11 @@ CREATE TABLE IF NOT EXISTS driver_salary_rates (
     department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
     position_id INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
     vehicle_type_id INTEGER NOT NULL REFERENCES vehicle_types(id) ON DELETE CASCADE,
+    salary_type VARCHAR(10) NOT NULL DEFAULT 'daily' CHECK (salary_type IN ('daily', 'weekly', 'monthly')),
     standard_salary DECIMAL(15,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (crew_role, division_id, department_id, position_id, vehicle_type_id)
+    UNIQUE (crew_role, division_id, department_id, position_id, vehicle_type_id, salary_type)
 );
 
 -- Tabel Attendance Records (Rekam Absensi)
@@ -267,6 +268,7 @@ CREATE TABLE IF NOT EXISTS employee_details (
     is_sales BOOLEAN DEFAULT FALSE,
     use_tracking BOOLEAN DEFAULT FALSE,
     receives_tuang BOOLEAN DEFAULT TRUE,
+    uses_shift BOOLEAN DEFAULT FALSE,
     driver_subuh_allowance DECIMAL(15,2) DEFAULT 0,
     driver_rit_allowance DECIMAL(15,2) DEFAULT 0,
     driver_inap_allowance DECIMAL(15,2) DEFAULT 0,
@@ -1058,7 +1060,7 @@ CREATE TABLE IF NOT EXISTS driver_activities (
     created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, activity_date)
+    UNIQUE(user_id, activity_date, rit_count)
 );
 
 -- Tracking kunjungan driver / collector
@@ -1109,6 +1111,7 @@ ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_role VARCHAR(10);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS receives_tuang BOOLEAN DEFAULT TRUE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS uses_shift BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_tracking BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS supervisor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS employment_status VARCHAR(150);

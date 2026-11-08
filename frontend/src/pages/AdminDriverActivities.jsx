@@ -13,11 +13,19 @@ function findStandardSalary(rates, driver, vehicleTypeId) {
     if (!driver || !vehicleTypeId) return null;
     const role = driver.driver_role === 'kenek' ? 'kenek' : 'supir';
     const match = rates.find((rate) => rate.crew_role === role
+        && (rate.salary_type || 'daily') === 'daily'
         && String(rate.vehicle_type_id) === String(vehicleTypeId)
         && sameText(rate.division_name, driver.division)
         && sameText(rate.department_name, driver.department)
         && sameText(rate.position_name, driver.position));
     return match ? parseFloat(match.standard_salary) : null;
+}
+
+function activityNote(activity) {
+    const parts = [activity?.rit_notes, activity?.notes]
+        .map((value) => String(value || '').trim())
+        .filter((value, index, all) => value && all.indexOf(value) === index);
+    return parts.join('\n');
 }
 
 function driverOptionLabel(driver) {
@@ -44,7 +52,7 @@ export default function AdminDriverActivities() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [activeView, setActiveView] = useState('calendar'); // 'calendar' or 'summary'
+    const [activeView, setActiveView] = useState('list');
 
     const [formData, setFormData] = useState({
         user_id: '', activity_date: '', is_subuh: false,
@@ -77,7 +85,6 @@ export default function AdminDriverActivities() {
         try {
             const data = await driverActivitiesAPI.getDrivers();
             setDrivers(data);
-            if (data.length > 0) setSelectedDriver(data[0].id);
         } catch (e) {
             console.error('Failed to fetch drivers:', e);
         }
@@ -106,6 +113,13 @@ export default function AdminDriverActivities() {
         }
     }
 
+    function todayInputDate() {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${now.getFullYear()}-${month}-${day}`;
+    }
+
     function openAddModal(date) {
         if (!canManage) return alert('Anda tidak memiliki akses untuk menambah data.');
         setEditData(null);
@@ -113,7 +127,7 @@ export default function AdminDriverActivities() {
         const dObj = drivers.find(d => String(d.id) === String(dId));
         setFormData({
             user_id: dId,
-            activity_date: date || '',
+            activity_date: date || todayInputDate(),
             is_subuh: false, departure_time: '', rit_count: 1,
             rit_notes: '', is_overnight: false, notes: '',
             ritase_dekat: 0, ritase_jauh: 0,
@@ -132,9 +146,9 @@ export default function AdminDriverActivities() {
             is_subuh: act.is_subuh,
             departure_time: act.departure_time || '',
             rit_count: act.rit_count || 1,
-            rit_notes: act.rit_notes || '',
+            rit_notes: '',
             is_overnight: act.is_overnight,
-            notes: act.notes || '',
+            notes: activityNote(act),
             ritase_dekat: act.ritase_dekat || 0,
             ritase_jauh: act.ritase_jauh || 0,
             vehicle_type_id: act.vehicle_type_id || act.driver_default_vehicle_id || ''
@@ -219,8 +233,8 @@ export default function AdminDriverActivities() {
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const dayOfWeek = new Date(year, month - 1, d).getDay();
-            const act = activities.find(a => a.activity_date.split('T')[0] === dateStr);
-            days.push({ date: d, dateStr, dayOfWeek, activity: act });
+            const dayActivities = activities.filter(a => a.activity_date.split('T')[0] === dateStr);
+            days.push({ date: d, dateStr, dayOfWeek, activities: dayActivities });
         }
         return days;
     }, [activities, month, year]);
@@ -297,18 +311,18 @@ export default function AdminDriverActivities() {
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => setActiveView('calendar')}
-                            style={{
-                                padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
-                                background: activeView === 'calendar' ? 'linear-gradient(135deg, #6366f1, #818cf8)' : 'var(--gray-700)',
-                                color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
-                            }}><Icon name="Calendar" size={16} inline /> Kalender</button>
                         <button onClick={() => setActiveView('list')}
                             style={{
                                 padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
                                 background: activeView === 'list' ? 'linear-gradient(135deg, #3b82f6, #60a5fa)' : 'var(--gray-700)',
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
                             }}><Icon name="FileText" size={16} inline /> Daftar</button>
+                        <button onClick={() => setActiveView('calendar')}
+                            style={{
+                                padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
+                                background: activeView === 'calendar' ? 'linear-gradient(135deg, #6366f1, #818cf8)' : 'var(--gray-700)',
+                                color: '#fff', cursor: 'pointer', transition: 'all 0.2s'
+                            }}><Icon name="Calendar" size={16} inline /> Kalender</button>
                         <button onClick={() => setActiveView('summary')}
                             style={{
                                 padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, border: 'none', borderRadius: 'var(--radius-md)',
@@ -373,12 +387,15 @@ export default function AdminDriverActivities() {
                                     <div key={`empty-${i}`} />
                                 ))}
                                 {calendarDays.map(day => {
-                                    const act = day.activity;
+                                    const dayActivities = day.activities || [];
                                     const isWeekend = day.dayOfWeek === 0 || day.dayOfWeek === 6;
-                                    const hasData = !!act;
+                                    const hasData = dayActivities.length > 0;
                                     return (
                                         <div key={day.date}
-                                            onClick={() => hasData ? openEditModal(act) : openAddModal(day.dateStr)}
+                                            onClick={() => {
+                                                if (dayActivities.length === 0) openAddModal(day.dateStr);
+                                                else if (dayActivities.length === 1) openEditModal(dayActivities[0]);
+                                            }}
                                             style={{
                                                 minHeight: 80, padding: '0.4rem', borderRadius: 'var(--radius-sm)',
                                                 background: hasData ? 'rgba(99,102,241,0.1)' : isWeekend ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)',
@@ -390,8 +407,15 @@ export default function AdminDriverActivities() {
                                                 fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem',
                                                 color: isWeekend ? '#ef4444' : 'var(--gray-300)'
                                             }}>{day.date}</div>
-                                            {hasData && (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            {dayActivities.map((act) => (
+                                                <div key={act.id}
+                                                    onClick={(e) => {
+                                                        if (dayActivities.length < 2) return;
+                                                        e.stopPropagation();
+                                                        openEditModal(act);
+                                                    }}
+                                                    style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: 4 }}
+                                                >
                                                     {act.vehicle_type_name && (
                                                         <span style={{ 
                                                             fontSize: '0.6rem', 
@@ -424,7 +448,7 @@ export default function AdminDriverActivities() {
                                                         <span style={{ fontSize: '0.6rem', background: 'rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: 4, color: '#fca5a5' }}><Icon name="Building2" size={16} inline /> Inap</span>
                                                     )}
                                                 </div>
-                                            )}
+                                            ))}
                                             {!hasData && !isWeekend && (
                                                 <div style={{ fontSize: '0.6rem', color: 'var(--gray-600)', textAlign: 'center', marginTop: 8 }}>+ tambah</div>
                                             )}
@@ -552,7 +576,7 @@ export default function AdminDriverActivities() {
                                         <th style={{ textAlign: 'center' }}>Ritase Dekat</th>
                                         <th style={{ textAlign: 'center' }}>Ritase Jauh</th>
                                         <th style={{ textAlign: 'center' }}>Menginap</th>
-                                        <th>Catatan Rute</th>
+                                        <th>Keterangan</th>
                                         {canManage && <th style={{ textAlign: 'right' }}>Aksi</th>}
                                     </tr>
                                 </thead>
@@ -589,7 +613,7 @@ export default function AdminDriverActivities() {
                                             <td style={{ textAlign: 'center' }}>
                                                 {act.is_overnight ? <span style={{ color: '#ef4444' }}><Icon name="Building2" size={16} inline /> Ya</span> : '-'}
                                             </td>
-                                            <td>{act.rit_notes || '-'}</td>
+                                            <td style={{ whiteSpace: 'pre-line' }}>{activityNote(act) || '-'}</td>
                                             {canManage && (
                                                 <td style={{ textAlign: 'right' }}>
                                                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -638,7 +662,7 @@ export default function AdminDriverActivities() {
                                         <label className="form-label">Tanggal</label>
                                         <input className="form-input" type="date" value={formData.activity_date}
                                             onChange={e => setFormData(prev => ({ ...prev, activity_date: e.target.value }))}
-                                            disabled={!!editData} required />
+                                            required />
                                     </div>
                                 </div>
 
@@ -838,17 +862,10 @@ export default function AdminDriverActivities() {
                                 )}
 
                                 <div className="form-group">
-                                    <label className="form-label">Catatan Rute/RIT</label>
-                                    <input className="form-input" value={formData.rit_notes}
-                                        onChange={e => setFormData(prev => ({ ...prev, rit_notes: e.target.value }))}
-                                        placeholder="Contoh: Jakarta - Surabaya - Jakarta" />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Catatan Lain</label>
+                                    <label className="form-label">Keterangan</label>
                                     <textarea className="form-input" rows={2} value={formData.notes}
                                         onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                        placeholder="Catatan tambahan (opsional)" />
+                                        placeholder="Keterangan (opsional)" />
                                 </div>
                             </div>
                             <div className="modal-footer">

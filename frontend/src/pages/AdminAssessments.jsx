@@ -245,7 +245,7 @@ export default function AdminAssessments() {
         <div>
             <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 className="page-title"><Icon name="ClipboardList" size={16} inline /> Penilaian Kedisiplinan</h1>
+                    <h1 className="page-title"><Icon name="ClipboardList" size={16} inline /> Nilai Kedisiplinan</h1>
                     <p className="page-subtitle">Evaluasi kedisiplinan pegawai berdasarkan kehadiran</p>
                 </div>
                 <button className="btn btn-primary" onClick={openNew} style={{ marginTop: '0.25rem' }}>+ Buat Penilaian</button>

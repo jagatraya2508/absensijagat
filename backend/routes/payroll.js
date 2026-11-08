@@ -475,7 +475,8 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                     division: emp.division,
                     department: emp.department,
                     position: emp.position,
-                    vehicleTypeId: emp.default_vehicle_type_id
+                    vehicleTypeId: emp.default_vehicle_type_id,
+                    salaryType
                 });
                 if (listed != null) baseSalaryRate = listed;
             }
@@ -519,7 +520,14 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                               AND activity_date >= $2::date
                               AND activity_date < $3::date
                         ) d
-                        LEFT JOIN driver_activities da ON da.user_id = $1 AND da.activity_date = d.work_date
+                        LEFT JOIN LATERAL (
+                            SELECT picked.vehicle_type_id
+                            FROM driver_activities picked
+                            LEFT JOIN vehicle_types picked_vehicle ON picked_vehicle.id = picked.vehicle_type_id
+                            WHERE picked.user_id = $1 AND picked.activity_date = d.work_date
+                            ORDER BY COALESCE(picked_vehicle.daily_rate, 0) DESC, picked.id DESC
+                            LIMIT 1
+                        ) da ON TRUE
                         LEFT JOIN vehicle_types vt ON vt.id = COALESCE(da.vehicle_type_id, $8)
                         LEFT JOIN LATERAL (
                             SELECT r.standard_salary
@@ -528,6 +536,7 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                             JOIN departments dp ON dp.id = r.department_id
                             JOIN positions ps ON ps.id = r.position_id
                             WHERE r.crew_role = $4
+                              AND r.salary_type = 'daily'
                               AND r.vehicle_type_id = COALESCE(da.vehicle_type_id, $8)
                               AND lower(btrim(dv.name)) = lower(btrim(COALESCE($5, '')))
                               AND lower(btrim(dp.name)) = lower(btrim(COALESCE($6, '')))
@@ -613,9 +622,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
             if (emp.is_driver) {
                 const driverResult = await client.query(`
                     SELECT 
-                        COALESCE(SUM(CASE WHEN is_subuh THEN 1 ELSE 0 END), 0) as total_subuh,
+                        COALESCE(COUNT(DISTINCT activity_date) FILTER (WHERE is_subuh), 0) as total_subuh,
                         COALESCE(SUM(rit_count), 0) as total_rit,
-                        COALESCE(SUM(CASE WHEN is_overnight THEN 1 ELSE 0 END), 0) as total_overnight,
+                        COALESCE(COUNT(DISTINCT activity_date) FILTER (WHERE is_overnight), 0) as total_overnight,
                         COALESCE(SUM(ritase_dekat), 0) as extra_rit_dekat,
                         COALESCE(SUM(ritase_jauh), 0) as extra_rit_jauh
                     FROM driver_activities

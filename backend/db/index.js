@@ -48,6 +48,53 @@ pool.query(`
     UNIQUE (crew_role, division_id, department_id, position_id, vehicle_type_id)
   )
 `).catch((err) => console.warn('DB patch driver_salary_rates:', err.message));
+pool.query(`
+  ALTER TABLE driver_salary_rates ADD COLUMN IF NOT EXISTS salary_type VARCHAR(10) DEFAULT 'daily';
+  UPDATE driver_salary_rates SET salary_type = 'daily' WHERE salary_type IS NULL OR btrim(salary_type) = '';
+  ALTER TABLE driver_salary_rates ALTER COLUMN salary_type SET DEFAULT 'daily';
+  ALTER TABLE driver_salary_rates ALTER COLUMN salary_type SET NOT NULL;
+  ALTER TABLE driver_salary_rates DROP CONSTRAINT IF EXISTS driver_salary_rates_salary_type_check;
+  ALTER TABLE driver_salary_rates
+    ADD CONSTRAINT driver_salary_rates_salary_type_check
+    CHECK (salary_type IN ('daily', 'weekly', 'monthly'));
+  DO $$
+  DECLARE
+    old_unique text;
+  BEGIN
+    SELECT con.conname INTO old_unique
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    WHERE rel.relname = 'driver_salary_rates'
+      AND con.contype = 'u'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(con.conkey) AS key_num
+        JOIN pg_attribute attr ON attr.attrelid = rel.oid AND attr.attnum = key_num
+        WHERE attr.attname = 'salary_type'
+      )
+    LIMIT 1;
+    IF old_unique IS NOT NULL THEN
+      EXECUTE format('ALTER TABLE driver_salary_rates DROP CONSTRAINT %I', old_unique);
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      WHERE rel.relname = 'driver_salary_rates'
+        AND con.contype = 'u'
+        AND EXISTS (
+          SELECT 1
+          FROM unnest(con.conkey) AS key_num
+          JOIN pg_attribute attr ON attr.attrelid = rel.oid AND attr.attnum = key_num
+          WHERE attr.attname = 'salary_type'
+        )
+    ) THEN
+      ALTER TABLE driver_salary_rates
+        ADD CONSTRAINT driver_salary_rates_unique
+        UNIQUE (crew_role, division_id, department_id, position_id, vehicle_type_id, salary_type);
+    END IF;
+  END $$;
+`).catch((err) => console.warn('DB patch driver_salary_rates salary_type:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_salary_list BOOLEAN DEFAULT FALSE')
   .catch((err) => console.warn('DB patch use_salary_list:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE')
@@ -95,6 +142,19 @@ pool.query(`
   )
 `).catch((err) => console.warn('DB patch loan_installments:', err.message));
 pool.query(`
+  ALTER TABLE employee_details
+    ADD COLUMN IF NOT EXISTS uses_shift BOOLEAN DEFAULT FALSE;
+  ALTER TABLE employee_details
+    ALTER COLUMN uses_shift SET DEFAULT FALSE;
+  DO $$
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'uses_shift_default_off') THEN
+      UPDATE employee_details SET uses_shift = FALSE;
+      INSERT INTO settings (key, value) VALUES ('uses_shift_default_off', '1');
+    END IF;
+  END $$;
+`).catch((err) => console.warn('DB patch uses_shift:', err.message));
+pool.query(`
   ALTER TABLE employee_details 
     ADD COLUMN IF NOT EXISTS contract_start_date DATE,
     ADD COLUMN IF NOT EXISTS contract_end_date DATE;
@@ -103,6 +163,45 @@ pool.query(`
   ALTER TABLE driver_activities
     ADD COLUMN IF NOT EXISTS vehicle_type_id INTEGER REFERENCES vehicle_types(id) ON DELETE SET NULL;
 `).catch((err) => console.warn('DB patch vehicle rate & contracts:', err.message));
+pool.query(`
+  DO $$
+  DECLARE
+    old_unique text;
+  BEGIN
+    SELECT con.conname INTO old_unique
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    WHERE rel.relname = 'driver_activities'
+      AND con.contype = 'u'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(con.conkey) AS key_num
+        JOIN pg_attribute attr ON attr.attrelid = rel.oid AND attr.attnum = key_num
+        WHERE attr.attname = 'rit_count'
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM unnest(con.conkey) AS key_num
+        JOIN pg_attribute attr ON attr.attrelid = rel.oid AND attr.attnum = key_num
+        WHERE attr.attname = 'activity_date'
+      )
+    LIMIT 1;
+    IF old_unique IS NOT NULL THEN
+      EXECUTE format('ALTER TABLE driver_activities DROP CONSTRAINT %I', old_unique);
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      WHERE rel.relname = 'driver_activities'
+        AND con.conname = 'driver_activities_user_date_rit_key'
+    ) THEN
+      ALTER TABLE driver_activities
+        ADD CONSTRAINT driver_activities_user_date_rit_key
+        UNIQUE (user_id, activity_date, rit_count);
+    END IF;
+  END $$;
+`).catch((err) => console.warn('DB patch driver activity rit unique:', err.message));
 pool.query(`
   ALTER TABLE leave_settings 
     ADD COLUMN IF NOT EXISTS leave_calculation_mode VARCHAR(20) DEFAULT 'both',
