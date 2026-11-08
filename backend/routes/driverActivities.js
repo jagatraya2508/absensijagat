@@ -116,14 +116,14 @@ router.get('/drivers', authenticateToken, canManageDriverActivities, async (req,
         const params = [];
         const where = driverPickerWhere(config, params);
         const result = await pool.query(`
-            SELECT u.id, u.name, u.employee_id, ed.vehicle_type_id,
+            SELECT u.id, u.name, u.employee_id, ed.vehicle_type_id, ed.driver_role,
                    vt.name as vehicle_type_name, COALESCE(vt.daily_rate, 0) as vehicle_daily_rate,
                    COALESCE(ed.basic_salary, 0) as basic_salary
             FROM users u
             JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN vehicle_types vt ON ed.vehicle_type_id = vt.id
             WHERE ${where}
-            ORDER BY u.name ASC
+            ORDER BY CASE WHEN ed.driver_role = 'kenek' THEN 1 ELSE 0 END, u.name ASC
         `, params);
         res.json(result.rows);
     } catch (error) {

@@ -25,6 +25,15 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
+pool.query(`
+  ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_role VARCHAR(10);
+  UPDATE employee_details
+  SET driver_role = CASE
+    WHEN position ILIKE '%kenek%' THEN 'kenek'
+    ELSE 'supir'
+  END
+  WHERE is_driver = TRUE AND driver_role IS NULL
+`).catch((err) => console.warn('DB patch driver_role:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE')
   .catch((err) => console.warn('DB patch is_sales:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS receives_tuang BOOLEAN DEFAULT TRUE')

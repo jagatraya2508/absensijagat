@@ -898,7 +898,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             basic_salary, salary_type, transport_allowance, meal_allowance, appreciation_allowance, overtime_rate,
             transport_allowance_period, meal_allowance_period, appreciation_allowance_period,
             tax_status, emergency_contact_name, emergency_contact_phone,
-            is_driver, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
+            is_driver, driver_role, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
             bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
@@ -1037,6 +1037,14 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             bpjs_jp_employee_rate || null, bpjs_jp_company_rate || null, bpjs_jkk_rate || null, bpjs_jkm_rate || null,
             no_kk || null, vehicle_type_id || null, require_different_checkout || false
         ]);
+
+        const driverRole = is_driver
+            ? (String(driver_role || '').toLowerCase() === 'kenek' ? 'kenek' : 'supir')
+            : null;
+        await pool.query(
+            'UPDATE employee_details SET driver_role = $2 WHERE user_id = $1',
+            [id, driverRole]
+        );
 
         await pool.query(`
             UPDATE employee_details

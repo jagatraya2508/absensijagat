@@ -248,6 +248,7 @@ CREATE TABLE IF NOT EXISTS employee_details (
     vehicle_type_id INTEGER REFERENCES vehicle_types(id) ON DELETE SET NULL,
     no_kk VARCHAR(20),
     is_driver BOOLEAN DEFAULT FALSE,
+    driver_role VARCHAR(10) CHECK (driver_role IN ('supir', 'kenek')),
     is_collector BOOLEAN DEFAULT FALSE,
     is_sales BOOLEAN DEFAULT FALSE,
     use_tracking BOOLEAN DEFAULT FALSE,
@@ -1090,6 +1091,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS off_day VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS no_kk VARCHAR(20);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_driver BOOLEAN DEFAULT FALSE;
+ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS driver_role VARCHAR(10);
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_collector BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS receives_tuang BOOLEAN DEFAULT TRUE;

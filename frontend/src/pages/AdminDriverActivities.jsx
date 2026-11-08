@@ -5,6 +5,12 @@ import Icon from '../components/Icon';
 
 const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
+function driverOptionLabel(driver) {
+    const role = driver.driver_role === 'kenek' ? 'Kenek' : (driver.driver_role === 'supir' ? 'Supir' : '');
+    const detail = [role, driver.vehicle_type_name].filter(Boolean).join(' · ');
+    return detail ? `${driver.name} (${detail})` : driver.name;
+}
+
 export default function AdminDriverActivities() {
     const { hasPermission } = useAuth();
     const canManage = hasPermission('admin.driver_activities');
@@ -250,7 +256,7 @@ export default function AdminDriverActivities() {
                         <select className="form-input form-select" value={selectedDriver}
                             onChange={e => setSelectedDriver(e.target.value)} style={{ width: 200 }}>
                             <option value="">Semua Driver</option>
-                            {drivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.employee_id})</option>)}
+                            {drivers.map(d => <option key={d.id} value={d.id}>{driverOptionLabel(d)}</option>)}
                         </select>
                         {drivers.length === 0 && (
                             <span style={{ fontSize: '0.78rem', color: 'var(--gray-500)' }}>
@@ -603,7 +609,7 @@ export default function AdminDriverActivities() {
                                             onChange={e => handleDriverSelect(parseInt(e.target.value))}
                                             disabled={!!editData} required>
                                             <option value="">Pilih Driver...</option>
-                                            {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle_type_name ? `(${d.vehicle_type_name})` : ''}</option>)}
+                                            {drivers.map(d => <option key={d.id} value={d.id}>{driverOptionLabel(d)}</option>)}
                                         </select>
                                         {drivers.length === 0 && (
                                             <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: 'var(--gray-500)' }}>

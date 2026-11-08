@@ -117,7 +117,7 @@ export default function AdminEmployees() {
         basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0,
         transport_allowance_period: 'monthly', meal_allowance_period: 'monthly', appreciation_allowance_period: 'monthly',
         overtime_rate: 50000,
-        is_driver: false, is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
+        is_driver: false, driver_role: 'supir', is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
         vehicle_type_id: '', tax_status: 'TK/0', emergency_contact_name: '', emergency_contact_phone: '',
         location_ids: [],
         require_different_checkout: false,
@@ -276,6 +276,7 @@ export default function AdminEmployees() {
                 appreciation_allowance_period: d.appreciation_allowance_period || 'monthly',
                 overtime_rate: d.overtime_rate || 50000,
                 is_driver: d.is_driver || false,
+                driver_role: d.driver_role === 'kenek' || (!d.driver_role && /kenek/i.test(d.position || '')) ? 'kenek' : 'supir',
                 is_collector: d.is_collector || false,
                 is_sales: d.is_sales || false,
                 use_tracking: d.use_tracking || false,
@@ -462,6 +463,9 @@ export default function AdminEmployees() {
             const next = { ...prev, [field]: value };
             if ((field === 'is_driver' || field === 'is_collector' || field === 'is_sales') && value) {
                 next.use_tracking = true;
+            }
+            if (field === 'is_driver' && value && !prev.driver_role) {
+                next.driver_role = /kenek/i.test(prev.position || '') ? 'kenek' : 'supir';
             }
             return next;
         });
@@ -1881,13 +1885,42 @@ export default function AdminEmployees() {
                                                 </label>
                                                 <div>
                                                     <span style={{ fontWeight: 600, color: formData.is_driver ? 'var(--primary-300)' : 'var(--gray-300)', fontSize: '0.9rem' }}>
-                                                        <Icon name="Truck" size={16} inline /> Driver & Kenek
+                                                        <Icon name="Truck" size={16} inline /> Supir & Kenek
                                                     </span>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginTop: 2 }}>
-                                                        Aktifkan jika karyawan ini adalah driver atau kenek. Menu tracking pengiriman ikut terbuka.
+                                                        Aktifkan jika karyawan ini adalah supir atau kenek. Menu tracking pengiriman ikut terbuka.
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {formData.is_driver && (
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                                                    {[
+                                                        { id: 'supir', label: 'Supir' },
+                                                        { id: 'kenek', label: 'Kenek' }
+                                                    ].map(option => {
+                                                        const active = (formData.driver_role || 'supir') === option.id;
+                                                        return (
+                                                            <button
+                                                                key={option.id}
+                                                                type="button"
+                                                                onClick={() => updateField('driver_role', option.id)}
+                                                                style={{
+                                                                    padding: '0.4rem 0.9rem',
+                                                                    borderRadius: 999,
+                                                                    border: `1px solid ${active ? '#7c3aed' : 'var(--gray-300)'}`,
+                                                                    background: active ? 'rgba(124, 58, 237, 0.15)' : 'transparent',
+                                                                    color: active ? '#6d28d9' : 'var(--gray-600)',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                {option.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
 
                                             {formData.is_driver && (
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', animation: 'fadeIn 0.3s ease' }}>
