@@ -252,6 +252,11 @@ export default function AdminDriverActivities() {
                             <option value="">Semua Driver</option>
                             {drivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.employee_id})</option>)}
                         </select>
+                        {drivers.length === 0 && (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--gray-500)' }}>
+                                Daftar kosong. Atur sumbernya di Pengaturan, bagian Daftar Pilihan Driver.
+                            </span>
+                        )}
                         
                         <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }} className="hide-on-print">
                             <button onClick={handlePrint} className="btn btn-outline btn-sm" title="Print Data"
@@ -600,6 +605,11 @@ export default function AdminDriverActivities() {
                                             <option value="">Pilih Driver...</option>
                                             {drivers.map(d => <option key={d.id} value={d.id}>{d.name} {d.vehicle_type_name ? `(${d.vehicle_type_name})` : ''}</option>)}
                                         </select>
+                                        {drivers.length === 0 && (
+                                            <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: 'var(--gray-500)' }}>
+                                                Belum ada karyawan yang cocok. Atur divisi, departemen, atau jabatan di Pengaturan.
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Tanggal</label>

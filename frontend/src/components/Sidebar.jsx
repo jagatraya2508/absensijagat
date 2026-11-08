@@ -79,15 +79,15 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
 
     // Master submenu items
     const masterItems = [
+        { path: '/admin/employees', icon: 'User', label: 'Data Karyawan', permissionKey: 'admin.employees' },
+        { path: '/admin/face-registration', icon: 'ScanFace', label: 'Registrasi Wajah', permissionKey: 'admin.face_registration' },
         { path: '/admin/locations', icon: 'MapPin', label: 'Kelola Lokasi', permissionKey: 'admin.locations' },
         { path: '/admin/departments', icon: 'Building2', label: 'Master Departemen', permissionKey: 'admin.departments' },
         { path: '/admin/positions', icon: 'Award', label: 'Master Jabatan', permissionKey: 'admin.positions' },
         { path: '/admin/employment-statuses', icon: 'Briefcase', label: 'Master Status Karyawan', permissionKey: 'admin.employment_statuses' },
         { path: '/admin/divisions', icon: 'Folder', label: 'Master Divisi', permissionKey: 'admin.divisions' },
         { path: '/admin/vehicle-types', icon: 'Truck', label: 'Master Kendaraan', permissionKey: 'admin.vehicle_types' },
-        { path: '/admin/employees', icon: 'User', label: 'Data Karyawan', permissionKey: 'admin.employees' },
         { path: '/admin/organization', icon: 'Network', label: 'Struktur Organisasi', permissionKey: 'admin.organization', extraKeys: ['admin.employees'] },
-        { path: '/admin/face-registration', icon: 'ScanFace', label: 'Registrasi Wajah', permissionKey: 'admin.face_registration' },
         { path: '/admin/work-schedule', icon: 'CalendarClock', label: 'Jadwal Kerja', permissionKey: 'admin.work_schedule' },
         { path: '/admin/customers', icon: 'Store', label: 'Master Customer', permissionKey: 'admin.customers' },
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)));

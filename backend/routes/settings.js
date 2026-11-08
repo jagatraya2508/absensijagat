@@ -853,6 +853,57 @@ router.put('/late-deduction', authenticateToken, hasPermission('admin.settings')
     }
 });
 
+router.get('/driver-picker', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const { getDriverPickerConfig } = require('../utils/driverPicker');
+        const config = await getDriverPickerConfig();
+        const [divisions, departments, positions] = await Promise.all([
+            pool.query('SELECT id, name FROM divisions ORDER BY name ASC'),
+            pool.query('SELECT id, name FROM departments ORDER BY name ASC'),
+            pool.query('SELECT id, name FROM positions ORDER BY name ASC'),
+        ]);
+        res.json({
+            mode: config.mode,
+            values: config.values,
+            options: {
+                division: divisions.rows,
+                department: departments.rows,
+                position: positions.rows,
+            },
+        });
+    } catch (error) {
+        console.error('Get driver picker settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
+router.put('/driver-picker', authenticateToken, hasPermission('admin.settings'), async (req, res) => {
+    try {
+        const { DRIVER_PICKER_MODES, normalizeDriverPickerValues } = require('../utils/driverPicker');
+        const mode = DRIVER_PICKER_MODES.includes(req.body?.mode) ? req.body.mode : 'flag';
+        const values = normalizeDriverPickerValues(req.body?.values);
+        if (mode !== 'flag' && values[mode].length === 0) {
+            return res.status(400).json({ error: 'Pilih minimal satu nama yang boleh muncul di daftar driver' });
+        }
+
+        const entries = [
+            ['driver_picker_mode', mode],
+            ['driver_picker_values', JSON.stringify(values)],
+        ];
+        for (const [key, val] of entries) {
+            await pool.query(
+                `INSERT INTO settings (key, value) VALUES ($1, $2)
+                 ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+                [key, val]
+            );
+        }
+        res.json({ message: 'Pengaturan daftar driver berhasil disimpan', mode, values });
+    } catch (error) {
+        console.error('Update driver picker settings error:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan server' });
+    }
+});
+
 module.exports = router;
 
 

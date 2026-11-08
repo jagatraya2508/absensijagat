@@ -516,6 +516,18 @@ export default function Dashboard() {
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
+                            {hasPermission('admin.employees') && (
+                                <Link to="/admin/employees" className="menu-item">
+                                    <MenuIcon name="User" className="bg-purple-100 text-purple-600" />
+                                    <span className="menu-label">Data Karyawan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.face_registration') && (
+                                <Link to="/admin/face-registration" className="menu-item">
+                                    <MenuIcon name="ScanFace" className="bg-indigo-100 text-indigo-600" />
+                                    <span className="menu-label">Registrasi Wajah</span>
+                                </Link>
+                            )}
                             {hasPermission('admin.locations') && (
                                 <Link to="/admin/locations" className="menu-item">
                                     <MenuIcon name="MapPin" className="bg-red-100 text-red-600" />
@@ -552,22 +564,10 @@ export default function Dashboard() {
                                     <span className="menu-label">Kendaraan</span>
                                 </Link>
                             )}
-                            {hasPermission('admin.employees') && (
-                                <Link to="/admin/employees" className="menu-item">
-                                    <MenuIcon name="User" className="bg-purple-100 text-purple-600" />
-                                    <span className="menu-label">Data Karyawan</span>
-                                </Link>
-                            )}
                             {(hasPermission('admin.employees') || hasPermission('admin.organization')) && (
                                 <Link to="/admin/organization" className="menu-item">
                                     <MenuIcon name="Network" className="bg-slate-100 text-slate-600" />
                                     <span className="menu-label">Struktur Organisasi</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.face_registration') && (
-                                <Link to="/admin/face-registration" className="menu-item">
-                                    <MenuIcon name="ScanFace" className="bg-indigo-100 text-indigo-600" />
-                                    <span className="menu-label">Registrasi Wajah</span>
                                 </Link>
                             )}
                             {hasPermission('admin.work_schedule') && (

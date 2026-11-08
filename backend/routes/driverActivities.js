@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, hasPermission } = require('../middleware/auth');
+const { getDriverPickerConfig, driverPickerWhere, findAllowedDriver } = require('../utils/driverPicker');
 const canManageDriverActivities = hasPermission('admin.driver_activities');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
@@ -111,6 +112,9 @@ router.get('/summary', authenticateToken, canManageDriverActivities, async (req,
 // Get all drivers (for dropdown)
 router.get('/drivers', authenticateToken, canManageDriverActivities, async (req, res) => {
     try {
+        const config = await getDriverPickerConfig();
+        const params = [];
+        const where = driverPickerWhere(config, params);
         const result = await pool.query(`
             SELECT u.id, u.name, u.employee_id, ed.vehicle_type_id,
                    vt.name as vehicle_type_name, COALESCE(vt.daily_rate, 0) as vehicle_daily_rate,
@@ -118,9 +122,9 @@ router.get('/drivers', authenticateToken, canManageDriverActivities, async (req,
             FROM users u
             JOIN employee_details ed ON u.id = ed.user_id
             LEFT JOIN vehicle_types vt ON ed.vehicle_type_id = vt.id
-            WHERE u.role = 'employee' AND ed.is_driver = true
+            WHERE ${where}
             ORDER BY u.name ASC
-        `);
+        `, params);
         res.json(result.rows);
     } catch (error) {
         console.error('Get drivers error:', error);
@@ -137,18 +141,20 @@ router.post('/', authenticateToken, canManageDriverActivities, async (req, res) 
             return res.status(400).json({ error: 'Driver dan tanggal harus diisi' });
         }
 
-        // Verify user is a driver and get default vehicle
-        const driverCheck = await pool.query(
-            'SELECT ed.is_driver, ed.vehicle_type_id FROM employee_details ed WHERE ed.user_id = $1',
-            [user_id]
-        );
-        if (driverCheck.rows.length === 0 || !driverCheck.rows[0].is_driver) {
-            return res.status(400).json({ error: 'Karyawan ini bukan driver' });
+        const driverCheck = await findAllowedDriver(user_id);
+        if (!driverCheck.row) {
+            const emptyOrg = driverCheck.config.mode !== 'flag'
+                && (driverCheck.config.values[driverCheck.config.mode] || []).length === 0;
+            return res.status(400).json({
+                error: emptyOrg
+                    ? 'Daftar driver belum diatur. Pilih divisi, departemen, atau jabatan di Pengaturan.'
+                    : 'Karyawan ini tidak termasuk daftar driver yang diizinkan'
+            });
         }
 
         const effectiveVehicleTypeId = vehicle_type_id !== undefined && vehicle_type_id !== null && vehicle_type_id !== ''
             ? vehicle_type_id
-            : (driverCheck.rows[0].vehicle_type_id || null);
+            : (driverCheck.row.vehicle_type_id || null);
 
         const result = await pool.query(`
             INSERT INTO driver_activities (user_id, activity_date, is_subuh, departure_time, rit_count, rit_notes, is_overnight, notes, created_by, ritase_dekat, ritase_jauh, vehicle_type_id)

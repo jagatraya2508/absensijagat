@@ -139,7 +139,7 @@ function LogoUploader({ title, type, currentLogoUrl, updateLogoFn }) {
 
 
 const TABS = [
-    { id: 'general', label: 'Umum & Tampilan', icon: 'Building2', count: 4, desc: 'Identitas, logo, tema & kolom' },
+    { id: 'general', label: 'Umum & Tampilan', icon: 'Building2', count: 5, desc: 'Identitas, logo, tema, kolom & daftar driver' },
     { id: 'attendance', label: 'Aturan Absensi', icon: 'MapPin', count: 2, desc: 'Validasi pulang & kemiripan wajah' },
     { id: 'payroll', label: 'Gaji & Lembur', icon: 'Banknote', count: 3, desc: 'Potongan telat, lembur libur & slip gaji' },
     { id: 'leave', label: 'Cuti & Izin', icon: 'Palmtree', count: 1, desc: 'Kuota, satuan, approval & cuti besar' },
@@ -319,6 +319,63 @@ export default function AdminSettings() {
     const [empColumns, setEmpColumns] = useState(() => getInitialVisibleColumns());
     const [empColumnsLoading, setEmpColumnsLoading] = useState(false);
     const [empColumnsMessage, setEmpColumnsMessage] = useState({ type: '', text: '' });
+
+    const [driverPicker, setDriverPicker] = useState({
+        mode: 'flag',
+        values: { division: [], department: [], position: [] },
+        options: { division: [], department: [], position: [] }
+    });
+    const [driverPickerLoading, setDriverPickerLoading] = useState(false);
+    const [driverPickerMessage, setDriverPickerMessage] = useState({ type: '', text: '' });
+    const [driverPickerSearch, setDriverPickerSearch] = useState('');
+
+    useEffect(() => {
+        settingsAPI.getDriverPicker().then(res => {
+            if (!res) return;
+            setDriverPicker({
+                mode: res.mode || 'flag',
+                values: {
+                    division: res.values?.division || [],
+                    department: res.values?.department || [],
+                    position: res.values?.position || []
+                },
+                options: {
+                    division: res.options?.division || [],
+                    department: res.options?.department || [],
+                    position: res.options?.position || []
+                }
+            });
+        }).catch(err => {
+            console.warn('Failed to load driver picker settings:', err);
+        });
+    }, []);
+
+    const toggleDriverPickerValue = (name) => {
+        setDriverPicker(prev => {
+            const current = prev.values[prev.mode] || [];
+            const exists = current.some(item => item.toLowerCase() === name.toLowerCase());
+            const next = exists
+                ? current.filter(item => item.toLowerCase() !== name.toLowerCase())
+                : [...current, name];
+            return { ...prev, values: { ...prev.values, [prev.mode]: next } };
+        });
+    };
+
+    const handleDriverPickerSave = async () => {
+        setDriverPickerLoading(true);
+        setDriverPickerMessage({ type: '', text: '' });
+        try {
+            await settingsAPI.updateDriverPicker({
+                mode: driverPicker.mode,
+                values: driverPicker.values
+            });
+            setDriverPickerMessage({ type: 'success', text: 'Pengaturan daftar driver berhasil disimpan.' });
+        } catch (error) {
+            setDriverPickerMessage({ type: 'danger', text: error.message || 'Gagal menyimpan pengaturan daftar driver' });
+        } finally {
+            setDriverPickerLoading(false);
+        }
+    };
 
     useEffect(() => {
         settingsAPI.getEmployeeColumns().then(res => {
@@ -1449,6 +1506,143 @@ export default function AdminSettings() {
                                 )}
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <div className="card" style={{ overflow: 'visible' }}>
+                    <div className="card-header">
+                        <h2 className="card-title"><Icon name="Truck" size={16} inline /> Daftar Pilihan Driver</h2>
+                    </div>
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {driverPickerMessage.text && (
+                            <div className={`alert alert-${driverPickerMessage.type}`} style={{ marginBottom: '1rem' }}>
+                                <span className="alert-icon">{driverPickerMessage.type === 'success' ? 'CheckCircle2' : 'AlertTriangle'}</span>
+                                {driverPickerMessage.text}
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', marginBottom: '1.25rem' }}>
+                            Tentukan siapa yang muncul pada pilihan <strong>Driver</strong> di menu Aktivitas Driver.
+                        </p>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                            {[
+                                { id: 'flag', title: 'Tanda Driver', text: 'Hanya karyawan yang dicentang sebagai Driver di Data Karyawan.' },
+                                { id: 'division', title: 'Divisi', text: 'Munculkan karyawan dari divisi yang dipilih.' },
+                                { id: 'department', title: 'Departemen', text: 'Munculkan karyawan dari departemen yang dipilih.' },
+                                { id: 'position', title: 'Jabatan', text: 'Munculkan karyawan dari jabatan yang dipilih.' }
+                            ].map(option => {
+                                const active = driverPicker.mode === option.id;
+                                return (
+                                    <div
+                                        key={option.id}
+                                        onClick={() => {
+                                            setDriverPicker(prev => ({ ...prev, mode: option.id }));
+                                            setDriverPickerSearch('');
+                                        }}
+                                        style={{
+                                            padding: '1rem',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: `2px solid ${active ? 'var(--primary-500)' : 'var(--gray-200)'}`,
+                                            background: active ? 'rgba(59, 130, 246, 0.08)' : 'white',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                            <input
+                                                type="radio"
+                                                name="driver_picker_mode"
+                                                checked={active}
+                                                onChange={() => {}}
+                                                style={{ cursor: 'pointer', accentColor: 'var(--primary-500)' }}
+                                            />
+                                            <span style={{ fontWeight: 700, fontSize: '0.92rem', color: active ? 'var(--primary-600)' : 'var(--gray-800)' }}>
+                                                {option.title}
+                                            </span>
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--gray-600)', lineHeight: 1.4, paddingLeft: '1.5rem' }}>
+                                            {option.text}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {driverPicker.mode !== 'flag' && (() => {
+                            const options = driverPicker.options[driverPicker.mode] || [];
+                            const selected = driverPicker.values[driverPicker.mode] || [];
+                            const keyword = driverPickerSearch.trim().toLowerCase();
+                            const visible = options.filter(item => !keyword || item.name.toLowerCase().includes(keyword));
+                            const label = driverPicker.mode === 'division' ? 'divisi' : driverPicker.mode === 'department' ? 'departemen' : 'jabatan';
+                            return (
+                                <div style={{ marginBottom: '1.25rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                                        <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--gray-800)' }}>
+                                            {label.charAt(0).toUpperCase() + label.slice(1)} yang muncul ({selected.length} dipilih)
+                                        </label>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline btn-sm"
+                                                onClick={() => setDriverPicker(prev => ({
+                                                    ...prev,
+                                                    values: { ...prev.values, [prev.mode]: options.map(item => item.name) }
+                                                }))}
+                                            >
+                                                Pilih semua
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline btn-sm"
+                                                onClick={() => setDriverPicker(prev => ({
+                                                    ...prev,
+                                                    values: { ...prev.values, [prev.mode]: [] }
+                                                }))}
+                                            >
+                                                Kosongkan
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <input
+                                        className="form-input"
+                                        placeholder={`Cari ${label}...`}
+                                        value={driverPickerSearch}
+                                        onChange={e => setDriverPickerSearch(e.target.value)}
+                                        style={{ marginBottom: '0.75rem', maxWidth: 320 }}
+                                    />
+                                    {options.length === 0 ? (
+                                        <p style={{ fontSize: '0.82rem', color: 'var(--gray-500)' }}>
+                                            Master {label} masih kosong. Isi dulu di menu Master Data.
+                                        </p>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.45rem', maxHeight: 280, overflowY: 'auto' }}>
+                                            {visible.map(item => {
+                                                const checked = selected.some(name => name.toLowerCase() === item.name.toLowerCase());
+                                                return (
+                                                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.6rem', border: '1px solid var(--gray-200)', borderRadius: 8, cursor: 'pointer', background: checked ? 'rgba(59, 130, 246, 0.06)' : 'white' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => toggleDriverPickerValue(item.name)}
+                                                        />
+                                                        <span style={{ fontSize: '0.86rem' }}>{item.name}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleDriverPickerSave}
+                            disabled={driverPickerLoading}
+                            style={{ minWidth: '180px', height: '42px' }}
+                        >
+                            {driverPickerLoading ? 'Menyimpan...' : 'Simpan Daftar Driver'}
+                        </button>
                     </div>
                 </div>
                     </>

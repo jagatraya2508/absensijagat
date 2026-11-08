@@ -640,6 +640,11 @@ export const settingsAPI = {
         method: 'PUT',
         body: JSON.stringify(data),
     }),
+    getDriverPicker: () => request('/settings/driver-picker'),
+    updateDriverPicker: (data) => request('/settings/driver-picker', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
 };
 
 // Database backup & restore (admin only)
