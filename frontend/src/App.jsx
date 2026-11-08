@@ -38,6 +38,7 @@ import AdminPositions from './pages/AdminPositions';
 import AdminEmploymentStatuses from './pages/AdminEmploymentStatuses';
 import AdminDivisions from './pages/AdminDivisions';
 import AdminVehicleTypes from './pages/AdminVehicleTypes';
+import AdminDriverSalaryRates from './pages/AdminDriverSalaryRates';
 import ManagerApprovals from './pages/ManagerApprovals';
 import Overtime from './pages/Overtime';
 import AdminDriverActivities from './pages/AdminDriverActivities';
@@ -572,6 +573,17 @@ function AppRoutes() {
                     <ProtectedRoute permission="admin.divisions">
                         <AppLayout>
                             <AdminDivisions />
+                        </AppLayout>
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/admin/driver-salary-rates"
+                element={
+                    <ProtectedRoute permission="admin.driver_salary_rates">
+                        <AppLayout>
+                            <AdminDriverSalaryRates />
                         </AppLayout>
                     </ProtectedRoute>
                 }

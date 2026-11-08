@@ -122,6 +122,19 @@ CREATE TABLE IF NOT EXISTS vehicle_types (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS driver_salary_rates (
+    id SERIAL PRIMARY KEY,
+    crew_role VARCHAR(10) NOT NULL CHECK (crew_role IN ('supir', 'kenek')),
+    division_id INTEGER NOT NULL REFERENCES divisions(id) ON DELETE CASCADE,
+    department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+    position_id INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+    vehicle_type_id INTEGER NOT NULL REFERENCES vehicle_types(id) ON DELETE CASCADE,
+    standard_salary DECIMAL(15,2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (crew_role, division_id, department_id, position_id, vehicle_type_id)
+);
+
 -- Tabel Attendance Records (Rekam Absensi)
 CREATE TABLE IF NOT EXISTS attendance_records (
     id SERIAL PRIMARY KEY,
@@ -248,6 +261,7 @@ CREATE TABLE IF NOT EXISTS employee_details (
     vehicle_type_id INTEGER REFERENCES vehicle_types(id) ON DELETE SET NULL,
     no_kk VARCHAR(20),
     is_driver BOOLEAN DEFAULT FALSE,
+    use_salary_list BOOLEAN DEFAULT FALSE,
     driver_role VARCHAR(10) CHECK (driver_role IN ('supir', 'kenek')),
     is_collector BOOLEAN DEFAULT FALSE,
     is_sales BOOLEAN DEFAULT FALSE,

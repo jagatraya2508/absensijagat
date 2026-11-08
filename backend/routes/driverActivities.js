@@ -117,6 +117,7 @@ router.get('/drivers', authenticateToken, canManageDriverActivities, async (req,
         const where = driverPickerWhere(config, params);
         const result = await pool.query(`
             SELECT u.id, u.name, u.employee_id, ed.vehicle_type_id, ed.driver_role,
+                   ed.division, ed.department, ed.position,
                    vt.name as vehicle_type_name, COALESCE(vt.daily_rate, 0) as vehicle_daily_rate,
                    COALESCE(ed.basic_salary, 0) as basic_salary
             FROM users u

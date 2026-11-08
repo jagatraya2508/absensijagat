@@ -887,6 +887,19 @@ export const employmentStatusesAPI = {
     delete: (id) => request(`/employment-statuses/${id}`, { method: 'DELETE' }),
 };
 
+export const driverSalaryRatesAPI = {
+    getAll: () => request('/driver-salary-rates'),
+    create: (data) => request('/driver-salary-rates', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    }),
+    update: (id, data) => request(`/driver-salary-rates/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
+    delete: (id) => request(`/driver-salary-rates/${id}`, { method: 'DELETE' }),
+};
+
 export const divisionsAPI = {
     getAll: () => request('/divisions'),
     create: (data) => request('/divisions', {
@@ -1272,6 +1285,7 @@ export default {
     departmentsAPI,
     employmentStatusesAPI,
     divisionsAPI,
+    driverSalaryRatesAPI,
     positionsAPI,
     driverActivitiesAPI,
     driverTrackingAPI,

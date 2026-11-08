@@ -87,6 +87,7 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
         { path: '/admin/employment-statuses', icon: 'Briefcase', label: 'Master Status Karyawan', permissionKey: 'admin.employment_statuses' },
         { path: '/admin/divisions', icon: 'Folder', label: 'Master Divisi', permissionKey: 'admin.divisions' },
         { path: '/admin/vehicle-types', icon: 'Truck', label: 'Master Kendaraan', permissionKey: 'admin.vehicle_types' },
+        { path: '/admin/driver-salary-rates', icon: 'Banknote', label: 'Gaji Supir & Kenek', permissionKey: 'admin.driver_salary_rates' },
         { path: '/admin/organization', icon: 'Network', label: 'Struktur Organisasi', permissionKey: 'admin.organization', extraKeys: ['admin.employees'] },
         { path: '/admin/work-schedule', icon: 'CalendarClock', label: 'Jadwal Kerja', permissionKey: 'admin.work_schedule' },
         { path: '/admin/customers', icon: 'Store', label: 'Master Customer', permissionKey: 'admin.customers' },

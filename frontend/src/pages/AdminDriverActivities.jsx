@@ -1,9 +1,24 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { driverActivitiesAPI, vehicleTypesAPI } from '../utils/api';
+import { driverActivitiesAPI, driverSalaryRatesAPI, vehicleTypesAPI } from '../utils/api';
 import Icon from '../components/Icon';
 
 const MONTHS = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function sameText(left, right) {
+    return String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase();
+}
+
+function findStandardSalary(rates, driver, vehicleTypeId) {
+    if (!driver || !vehicleTypeId) return null;
+    const role = driver.driver_role === 'kenek' ? 'kenek' : 'supir';
+    const match = rates.find((rate) => rate.crew_role === role
+        && String(rate.vehicle_type_id) === String(vehicleTypeId)
+        && sameText(rate.division_name, driver.division)
+        && sameText(rate.department_name, driver.department)
+        && sameText(rate.position_name, driver.position));
+    return match ? parseFloat(match.standard_salary) : null;
+}
 
 function driverOptionLabel(driver) {
     const role = driver.driver_role === 'kenek' ? 'Kenek' : (driver.driver_role === 'supir' ? 'Supir' : '');
@@ -22,6 +37,7 @@ export default function AdminDriverActivities() {
     const [activities, setActivities] = useState([]);
     const [summary, setSummary] = useState([]);
     const [vehicleTypes, setVehicleTypes] = useState([]);
+    const [salaryRates, setSalaryRates] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editData, setEditData] = useState(null);
@@ -40,6 +56,7 @@ export default function AdminDriverActivities() {
     useEffect(() => {
         fetchDrivers();
         fetchVehicleTypes();
+        driverSalaryRatesAPI.getAll().then(setSalaryRates).catch(() => setSalaryRates([]));
     }, []);
 
     async function fetchVehicleTypes() {
@@ -630,8 +647,14 @@ export default function AdminDriverActivities() {
                                     const modalDriver = drivers.find(d => String(d.id) === String(formData.user_id));
                                     const defaultVeh = vehicleTypes.find(v => String(v.id) === String(modalDriver?.vehicle_type_id));
                                     const currentVeh = vehicleTypes.find(v => String(v.id) === String(formData.vehicle_type_id));
-                                    const defaultRate = parseFloat(defaultVeh?.daily_rate) || parseFloat(modalDriver?.vehicle_daily_rate) || parseFloat(modalDriver?.basic_salary) || 0;
-                                    const currentRate = parseFloat(currentVeh?.daily_rate) || defaultRate;
+                                    const defaultMaster = findStandardSalary(salaryRates, modalDriver, modalDriver?.vehicle_type_id);
+                                    const currentMaster = findStandardSalary(salaryRates, modalDriver, formData.vehicle_type_id || modalDriver?.vehicle_type_id);
+                                    const defaultRate = defaultMaster != null
+                                        ? defaultMaster
+                                        : (parseFloat(defaultVeh?.daily_rate) || parseFloat(modalDriver?.vehicle_daily_rate) || parseFloat(modalDriver?.basic_salary) || 0);
+                                    const currentRate = currentMaster != null
+                                        ? currentMaster
+                                        : (parseFloat(currentVeh?.daily_rate) || defaultRate);
                                     const isUpgraded = currentVeh && defaultVeh && currentRate > defaultRate;
                                     const isLowered = currentVeh && defaultVeh && currentRate < defaultRate;
 
@@ -651,11 +674,15 @@ export default function AdminDriverActivities() {
                                                 onChange={e => setFormData(prev => ({ ...prev, vehicle_type_id: e.target.value ? parseInt(e.target.value) : '' }))}
                                             >
                                                 <option value="">Ikuti Kendaraan Standar Driver</option>
-                                                {vehicleTypes.map(vt => (
-                                                    <option key={vt.id} value={vt.id}>
-                                                        {vt.name} — {formatCurrency(vt.daily_rate)} / hari
-                                                    </option>
-                                                ))}
+                                                {vehicleTypes.map(vt => {
+                                                    const masterRate = findStandardSalary(salaryRates, modalDriver, vt.id);
+                                                    const shownRate = masterRate != null ? masterRate : vt.daily_rate;
+                                                    return (
+                                                        <option key={vt.id} value={vt.id}>
+                                                            {vt.name} — {formatCurrency(shownRate)} / hari
+                                                        </option>
+                                                    );
+                                                })}
                                             </select>
                                             {isUpgraded && (
                                                 <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(16,185,129,0.1)', padding: '0.4rem 0.6rem', borderRadius: 6 }}>

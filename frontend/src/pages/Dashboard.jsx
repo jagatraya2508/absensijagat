@@ -507,7 +507,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ===== MENU ADMIN - MASTER DATA ===== */}
-                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.employment_statuses') || hasPermission('admin.divisions') || hasPermission('admin.vehicle_types') || hasPermission('admin.employees') || hasPermission('admin.organization') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
+                {(hasPermission('admin.locations') || hasPermission('admin.departments') || hasPermission('admin.positions') || hasPermission('admin.employment_statuses') || hasPermission('admin.divisions') || hasPermission('admin.vehicle_types') || hasPermission('admin.driver_salary_rates') || hasPermission('admin.employees') || hasPermission('admin.organization') || hasPermission('admin.face_registration') || hasPermission('admin.work_schedule') || hasPermission('admin.customers')) && (
                     <>
                         <div className="dashboard-section-header">
                             <span className="dashboard-section-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -562,6 +562,12 @@ export default function Dashboard() {
                                 <Link to="/admin/vehicle-types" className="menu-item">
                                     <MenuIcon name="Truck" className="bg-cyan-100 text-cyan-600" />
                                     <span className="menu-label">Kendaraan</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.driver_salary_rates') && (
+                                <Link to="/admin/driver-salary-rates" className="menu-item">
+                                    <MenuIcon name="Banknote" className="bg-emerald-100 text-emerald-600" />
+                                    <span className="menu-label">Gaji Supir & Kenek</span>
                                 </Link>
                             )}
                             {(hasPermission('admin.employees') || hasPermission('admin.organization')) && (

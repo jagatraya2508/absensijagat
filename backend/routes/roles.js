@@ -15,6 +15,7 @@ const AVAILABLE_PERMISSIONS = [
     { key: 'admin.employment_statuses', label: 'Master Status Karyawan', category: 'Master' },
     { key: 'admin.divisions', label: 'Master Divisi', category: 'Master' },
     { key: 'admin.vehicle_types', label: 'Master Kendaraan', category: 'Master' },
+    { key: 'admin.driver_salary_rates', label: 'Gaji Supir & Kenek', category: 'Master' },
     { key: 'admin.employees', label: 'Data Karyawan', category: 'Master' },
     { key: 'employees.tab_personal', label: 'Tab Data Pribadi', category: 'Tab Data Karyawan' },
     { key: 'employees.tab_work', label: 'Tab Data Kerja', category: 'Tab Data Karyawan' },

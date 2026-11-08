@@ -34,6 +34,22 @@ pool.query(`
   END
   WHERE is_driver = TRUE AND driver_role IS NULL
 `).catch((err) => console.warn('DB patch driver_role:', err.message));
+pool.query(`
+  CREATE TABLE IF NOT EXISTS driver_salary_rates (
+    id SERIAL PRIMARY KEY,
+    crew_role VARCHAR(10) NOT NULL CHECK (crew_role IN ('supir', 'kenek')),
+    division_id INTEGER NOT NULL REFERENCES divisions(id) ON DELETE CASCADE,
+    department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+    position_id INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+    vehicle_type_id INTEGER NOT NULL REFERENCES vehicle_types(id) ON DELETE CASCADE,
+    standard_salary DECIMAL(15,2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (crew_role, division_id, department_id, position_id, vehicle_type_id)
+  )
+`).catch((err) => console.warn('DB patch driver_salary_rates:', err.message));
+pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS use_salary_list BOOLEAN DEFAULT FALSE')
+  .catch((err) => console.warn('DB patch use_salary_list:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS is_sales BOOLEAN DEFAULT FALSE')
   .catch((err) => console.warn('DB patch is_sales:', err.message));
 pool.query('ALTER TABLE employee_details ADD COLUMN IF NOT EXISTS receives_tuang BOOLEAN DEFAULT TRUE')

@@ -373,6 +373,8 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                    COALESCE(ed.overtime_rate, 50000) as overtime_rate,
                    COALESCE(ed.tax_status, 'TK/0') as tax_status,
                    COALESCE(ed.is_driver, false) as is_driver,
+                   ed.driver_role, ed.division, ed.department, ed.position, ed.vehicle_type_id as default_vehicle_type_id,
+                   COALESCE(ed.use_salary_list, false) as use_salary_list,
                    COALESCE(ed.driver_subuh_allowance, 0) as driver_subuh_allowance,
                    COALESCE(ed.driver_rit_allowance, 0) as driver_rit_allowance,
                    COALESCE(ed.driver_inap_allowance, 0) as driver_inap_allowance,
@@ -465,7 +467,18 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
         });
         for (const emp of payrollEmployees) {
             const salaryType = emp.salary_type || 'monthly';
-            const baseSalaryRate = parseFloat(emp.basic_salary);
+            let baseSalaryRate = parseFloat(emp.basic_salary) || 0;
+            if (emp.use_salary_list) {
+                const { findStandardSalary } = require('../utils/driverSalaryRate');
+                const listed = await findStandardSalary(client, {
+                    crewRole: emp.driver_role === 'kenek' ? 'kenek' : 'supir',
+                    division: emp.division,
+                    department: emp.department,
+                    position: emp.position,
+                    vehicleTypeId: emp.default_vehicle_type_id
+                });
+                if (listed != null) baseSalaryRate = listed;
+            }
             let transportAllowance = 0;
             let mealAllowance = 0;
             let appreciationAllowance = 0;
@@ -490,7 +503,8 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                         SELECT 
                             d.work_date,
                             COALESCE(vt.daily_rate, 0) as vehicle_daily_rate,
-                            vt.name as vehicle_name
+                            vt.name as vehicle_name,
+                            rate.standard_salary
                         FROM (
                             SELECT DISTINCT DATE(recorded_at) as work_date
                             FROM attendance_records
@@ -506,9 +520,31 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                               AND activity_date < $3::date
                         ) d
                         LEFT JOIN driver_activities da ON da.user_id = $1 AND da.activity_date = d.work_date
-                        LEFT JOIN vehicle_types vt ON da.vehicle_type_id = vt.id
+                        LEFT JOIN vehicle_types vt ON vt.id = COALESCE(da.vehicle_type_id, $8)
+                        LEFT JOIN LATERAL (
+                            SELECT r.standard_salary
+                            FROM driver_salary_rates r
+                            JOIN divisions dv ON dv.id = r.division_id
+                            JOIN departments dp ON dp.id = r.department_id
+                            JOIN positions ps ON ps.id = r.position_id
+                            WHERE r.crew_role = $4
+                              AND r.vehicle_type_id = COALESCE(da.vehicle_type_id, $8)
+                              AND lower(btrim(dv.name)) = lower(btrim(COALESCE($5, '')))
+                              AND lower(btrim(dp.name)) = lower(btrim(COALESCE($6, '')))
+                              AND lower(btrim(ps.name)) = lower(btrim(COALESCE($7, '')))
+                            LIMIT 1
+                        ) rate ON TRUE
                         ORDER BY d.work_date ASC
-                    `, [emp.id, rangeStart, rangeEnd]);
+                    `, [
+                        emp.id,
+                        rangeStart,
+                        rangeEnd,
+                        emp.driver_role === 'kenek' ? 'kenek' : 'supir',
+                        emp.division || '',
+                        emp.department || '',
+                        emp.position || '',
+                        emp.default_vehicle_type_id || null
+                    ]);
 
                     const actualDays = driverDays.rows.length;
                     workingDays = actualDays > 0 ? actualDays : daysWorked;
@@ -516,8 +552,9 @@ router.post('/generate', authenticateToken, canManagePayroll, async (req, res) =
                         let totalDaily = 0;
                         for (const row of driverDays.rows) {
                             const vehicleRate = parseFloat(row.vehicle_daily_rate) || 0;
-                            // Asas tidak merugikan driver: ambil tarif tertinggi antara base supir vs tarif mobil yang dibawa
-                            const effectiveDayRate = Math.max(baseSalaryRate, vehicleRate);
+                            const masterRate = row.standard_salary == null ? null : parseFloat(row.standard_salary);
+                            const standardRate = masterRate != null && !Number.isNaN(masterRate) ? masterRate : vehicleRate;
+                            const effectiveDayRate = Math.max(baseSalaryRate, standardRate);
                             totalDaily += effectiveDayRate;
                         }
                         basicSalary = totalDaily;

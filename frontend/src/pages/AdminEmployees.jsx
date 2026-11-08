@@ -1,9 +1,22 @@
 import Icon from '../components/Icon';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI, employmentStatusesAPI, divisionsAPI } from '../utils/api';
+import { employeesAPI, authAPI, departmentsAPI, positionsAPI, locationsAPI, settingsAPI, vehicleTypesAPI, organizationAPI, employmentStatusesAPI, divisionsAPI, driverSalaryRatesAPI } from '../utils/api';
 import { AVAILABLE_EMPLOYEE_COLUMNS, DEFAULT_VISIBLE_COLUMNS, STORAGE_KEY_EMPLOYEE_COLUMNS, getInitialVisibleColumns } from '../utils/employeeColumns';
 import jsPDF from 'jspdf';
+
+function sameSalaryText(left, right) {
+    return String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase();
+}
+
+function findEmployeeSalaryRate(data, rates) {
+    const role = data.is_driver && data.driver_role === 'kenek' ? 'kenek' : 'supir';
+    return (rates || []).find((rate) => rate.crew_role === role
+        && String(rate.vehicle_type_id) === String(data.vehicle_type_id)
+        && sameSalaryText(rate.division_name, data.division)
+        && sameSalaryText(rate.department_name, data.department)
+        && sameSalaryText(rate.position_name, data.position)) || null;
+}
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
@@ -66,6 +79,7 @@ export default function AdminEmployees() {
     const [masterDivisions, setMasterDivisions] = useState([]);
     const [masterLocations, setMasterLocations] = useState([]);
     const [masterVehicleTypes, setMasterVehicleTypes] = useState([]);
+    const [salaryRates, setSalaryRates] = useState([]);
     const [orgMembers, setOrgMembers] = useState([]);
     const [bpjsDefaults, setBpjsDefaults] = useState({});
     const [loading, setLoading] = useState(true);
@@ -114,7 +128,7 @@ export default function AdminEmployees() {
         contract_start_date: '', contract_end_date: '',
         bank_name: '', bank_account: '', bank_holder: '',
         npwp: '', bpjs_kesehatan_no: '', bpjs_ketenagakerjaan_no: '',
-        basic_salary: 0, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0,
+        basic_salary: 0, use_salary_list: false, salary_type: 'monthly', transport_allowance: 0, meal_allowance: 0, appreciation_allowance: 0,
         transport_allowance_period: 'monthly', meal_allowance_period: 'monthly', appreciation_allowance_period: 'monthly',
         overtime_rate: 50000,
         is_driver: false, driver_role: 'supir', is_collector: false, is_sales: false, use_tracking: false, receives_tuang: true, driver_subuh_allowance: 0, driver_rit_allowance: 0, driver_inap_allowance: 0, driver_ritase_allowance: 0,
@@ -134,6 +148,26 @@ export default function AdminEmployees() {
         fetchMasters();
         fetchColumnSettings();
     }, []);
+
+    useEffect(() => {
+        if (!formData.use_salary_list) return;
+        const match = findEmployeeSalaryRate(formData, salaryRates);
+        if (!match) return;
+        const amount = parseFloat(match.standard_salary) || 0;
+        setFormData((prev) => {
+            if (!prev.use_salary_list || Number(prev.basic_salary) === amount) return prev;
+            return { ...prev, basic_salary: amount };
+        });
+    }, [
+        formData.use_salary_list,
+        formData.division,
+        formData.department,
+        formData.position,
+        formData.vehicle_type_id,
+        formData.driver_role,
+        formData.is_driver,
+        salaryRates
+    ]);
 
     async function fetchColumnSettings() {
         try {
@@ -213,6 +247,11 @@ export default function AdminEmployees() {
             setMasterLocations(loc.filter(l => l.is_active));
             setMasterVehicleTypes(vts);
             try {
+                setSalaryRates(await driverSalaryRatesAPI.getAll());
+            } catch (e) {
+                setSalaryRates([]);
+            }
+            try {
                 const members = await organizationAPI.getMembers();
                 setOrgMembers(members);
             } catch (e) {
@@ -267,7 +306,7 @@ export default function AdminEmployees() {
                 bank_holder: d.bank_holder || '',
                 npwp: d.npwp || '', bpjs_kesehatan_no: d.bpjs_kesehatan_no || '',
                 bpjs_ketenagakerjaan_no: d.bpjs_ketenagakerjaan_no || '',
-                basic_salary: d.basic_salary || 0, salary_type: d.salary_type || 'monthly',
+                basic_salary: d.basic_salary || 0, use_salary_list: !!d.use_salary_list, salary_type: d.salary_type || 'monthly',
                 transport_allowance: d.transport_allowance || 0,
                 meal_allowance: d.meal_allowance || 0,
                 appreciation_allowance: d.appreciation_allowance || 0,
@@ -1785,7 +1824,26 @@ export default function AdminEmployees() {
                                             <label className="form-label">
                                                 {formData.salary_type === 'daily' ? 'Gaji per Hari (Rp)' : formData.salary_type === 'weekly' ? 'Gaji per Minggu (Rp)' : 'Gaji per Bulan (Rp)'}
                                             </label>
-                                            <input {...moneyInputProps('basic_salary')} />
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.45rem', fontSize: '0.82rem', fontWeight: 600 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!formData.use_salary_list}
+                                                    onChange={(e) => updateField('use_salary_list', e.target.checked)}
+                                                />
+                                                Ambil dari Daftar Gaji
+                                            </label>
+                                            <input
+                                                {...moneyInputProps('basic_salary')}
+                                                disabled={!!formData.use_salary_list}
+                                                readOnly={!!formData.use_salary_list}
+                                            />
+                                            {formData.use_salary_list && (
+                                                <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: findEmployeeSalaryRate(formData, salaryRates) ? '#047857' : '#b45309' }}>
+                                                    {findEmployeeSalaryRate(formData, salaryRates)
+                                                        ? 'Nominal mengikuti Daftar Gaji sesuai peran, divisi, departemen, jabatan, dan jenis mobil.'
+                                                        : 'Belum ada baris Daftar Gaji yang cocok. Lengkapi data kerja dan jenis mobil, atau isi standar gajinya dulu.'}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Tunjangan Transport (Rp)</label>

@@ -898,7 +898,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             basic_salary, salary_type, transport_allowance, meal_allowance, appreciation_allowance, overtime_rate,
             transport_allowance_period, meal_allowance_period, appreciation_allowance_period,
             tax_status, emergency_contact_name, emergency_contact_phone,
-            is_driver, driver_role, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
+            is_driver, driver_role, use_salary_list, is_collector, is_sales, use_tracking, driver_subuh_allowance, driver_rit_allowance, driver_inap_allowance, driver_ritase_dekat_allowance, driver_ritase_jauh_allowance,
             bpjs_kes_enrolled, bpjs_jht_enrolled, bpjs_jp_enrolled, bpjs_jkk_enrolled, bpjs_jkm_enrolled, pph21_enabled,
             bpjs_kes_employee_rate, bpjs_kes_company_rate, bpjs_jht_employee_rate, bpjs_jht_company_rate,
             bpjs_jp_employee_rate, bpjs_jp_company_rate, bpjs_jkk_rate, bpjs_jkm_rate,
@@ -938,6 +938,28 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
                     error: 'Tidak bisa menetapkan atasan ini karena akan membuat siklus pelaporan'
                 });
             }
+        }
+
+        const driverRole = is_driver
+            ? (String(driver_role || '').toLowerCase() === 'kenek' ? 'kenek' : 'supir')
+            : null;
+        const salaryFromList = !!use_salary_list;
+        let resolvedBasicSalary = basic_salary || 0;
+        if (salaryFromList) {
+            const { findStandardSalary } = require('../utils/driverSalaryRate');
+            const listed = await findStandardSalary(pool, {
+                crewRole: driverRole || 'supir',
+                division,
+                department,
+                position,
+                vehicleTypeId: vehicle_type_id
+            });
+            if (listed == null) {
+                return res.status(400).json({
+                    error: 'Tidak ada standar gaji yang cocok. Samakan divisi, departemen, jabatan, peran supir/kenek, dan jenis mobil dengan Daftar Gaji, atau matikan centang Ambil dari Daftar Gaji.'
+                });
+            }
+            resolvedBasicSalary = listed;
         }
 
         // Upsert employee details
@@ -1029,7 +1051,7 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             department || null, position || null, join_date || null,
             bank_name || null, bank_account || null, bank_holder || null,
             npwp || null, bpjs_kesehatan_no || null, bpjs_ketenagakerjaan_no || null,
-            basic_salary || 0, salary_type || 'monthly', transport_allowance || 0, meal_allowance || 0, appreciation_allowance || 0, overtime_rate || 50000,
+            resolvedBasicSalary, salary_type || 'monthly', transport_allowance || 0, meal_allowance || 0, appreciation_allowance || 0, overtime_rate || 50000,
             tax_status || 'TK/0', emergency_contact_name || null, emergency_contact_phone || null,
             is_driver || false, is_collector || false, is_sales || false, trackingEnabled, driver_subuh_allowance || 0, driver_rit_allowance || 0, driver_inap_allowance || 0, driver_ritase_dekat_allowance || 0, driver_ritase_jauh_allowance || 0,
             bpjs_kes_enrolled !== false, bpjs_jht_enrolled !== false, bpjs_jp_enrolled !== false, bpjs_jkk_enrolled !== false, bpjs_jkm_enrolled !== false, pph21_enabled !== false,
@@ -1038,12 +1060,9 @@ router.put('/:id', authenticateToken, hasPermission('admin.employees'), async (r
             no_kk || null, vehicle_type_id || null, require_different_checkout || false
         ]);
 
-        const driverRole = is_driver
-            ? (String(driver_role || '').toLowerCase() === 'kenek' ? 'kenek' : 'supir')
-            : null;
         await pool.query(
-            'UPDATE employee_details SET driver_role = $2 WHERE user_id = $1',
-            [id, driverRole]
+            'UPDATE employee_details SET driver_role = $2, use_salary_list = $3 WHERE user_id = $1',
+            [id, driverRole, salaryFromList]
         );
 
         await pool.query(`

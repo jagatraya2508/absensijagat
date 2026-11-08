@@ -49,7 +49,8 @@ function sqlLiteral(val) {
     if (val instanceof Date) return `'${val.toISOString()}'`;
     if (Buffer.isBuffer(val)) return `'\\x${val.toString('hex')}'`;
     if (Array.isArray(val)) {
-        return `ARRAY[${val.map(sqlLiteral).join(', ')}]`;
+        const json = JSON.stringify(val).replace(/\\/g, '\\\\').replace(/'/g, "''");
+        return `'${json}'::jsonb`;
     }
     if (typeof val === 'object') {
         const json = JSON.stringify(val).replace(/\\/g, '\\\\').replace(/'/g, "''");
@@ -310,6 +311,25 @@ function stripCommentLines(statement) {
         .trim();
 }
 
+function normalizeArrayLiterals(sql) {
+    return sql.replace(/\bARRAY\[([^\[\]]*)\]/g, (full, inner) => {
+        const body = inner.trim();
+        if (!body) return "'[]'::jsonb";
+        try {
+            const jsonish = body
+                .replace(/'(?:[^']|'')*'/g, (token) => JSON.stringify(token.slice(1, -1).replace(/''/g, "'")))
+                .replace(/\bTRUE\b/gi, 'true')
+                .replace(/\bFALSE\b/gi, 'false')
+                .replace(/\bNULL\b/gi, 'null');
+            const parsed = JSON.parse(`[${jsonish}]`);
+            const json = JSON.stringify(parsed).replace(/\\/g, '\\\\').replace(/'/g, "''");
+            return `'${json}'::jsonb`;
+        } catch (_) {
+            return full;
+        }
+    });
+}
+
 function parseInsertHeader(sql) {
     const m = sql.match(/^INSERT\s+INTO\s+"?([a-zA-Z0-9_]+)"?\s*\(([\s\S]*?)\)\s*VALUES/i);
     if (!m) return null;
@@ -468,11 +488,12 @@ async function restoreSqlBackup(content) {
         if (/^TRUNCATE\b/i.test(compact)) continue;
 
         if (/^INSERT\s+INTO\b/i.test(compact)) {
-            const parsed = parseInsertHeader(cleaned);
+            const sql = normalizeArrayLiterals(cleaned);
+            const parsed = parseInsertHeader(sql);
             tableInserts.push({
                 table: parsed ? parsed.table : 'unknown',
                 columns: parsed ? parsed.columns : [],
-                sql: cleaned,
+                sql,
             });
             continue;
         }

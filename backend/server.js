@@ -66,6 +66,7 @@ app.use('/api/driver-tracking', require('./routes/driverTracking'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/assets', require('./routes/assets'));
 app.use('/api/vehicle-types', require('./routes/vehicleTypes'));
+app.use('/api/driver-salary-rates', require('./routes/driverSalaryRates'));
 app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/manual-attendances', require('./routes/manual_attendances'));
 app.use('/api/roles', require('./routes/roles'));
