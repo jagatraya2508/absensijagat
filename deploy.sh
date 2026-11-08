@@ -200,25 +200,46 @@ SQL
         echo "Gagal menyamakan departemen karyawan gudang."
         exit 1
     fi
-    echo "[4/4b6] Set jabatan semua karyawan gudang menjadi Naker (sekali)..."
+    echo "[4/4b6] Set jabatan semua karyawan gudang ke master NAKER (sekali)..."
     docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f -' <<'SQL'
-INSERT INTO positions (name, description)
-VALUES ('Naker', 'Jabatan karyawan gudang')
-ON CONFLICT (name) DO NOTHING;
 DO $$
+DECLARE
+  naker_id INTEGER;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_position_naker_20261108') THEN
-    UPDATE employee_details
-    SET position = 'Naker',
-        updated_at = CURRENT_TIMESTAMP;
+  SELECT id INTO naker_id FROM positions WHERE name = 'NAKER' LIMIT 1;
+  IF naker_id IS NULL THEN
+    SELECT id INTO naker_id
+    FROM positions
+    WHERE lower(btrim(name)) IN ('naker', 'nake')
+    ORDER BY id
+    LIMIT 1;
+    IF naker_id IS NULL THEN
+      INSERT INTO positions (name, description)
+      VALUES ('NAKER', 'Jabatan karyawan gudang')
+      RETURNING id INTO naker_id;
+    ELSE
+      UPDATE positions
+      SET name = 'NAKER', updated_at = CURRENT_TIMESTAMP
+      WHERE id = naker_id;
+    END IF;
+  END IF;
 
-    INSERT INTO settings (key, value) VALUES ('gudang_position_naker_20261108', 'done');
+  DELETE FROM positions
+  WHERE id <> naker_id
+    AND lower(btrim(name)) IN ('naker', 'nake');
+
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'gudang_position_naker_exact') THEN
+    UPDATE employee_details
+    SET position = 'NAKER',
+        updated_at = CURRENT_TIMESTAMP;
+    INSERT INTO settings (key, value) VALUES ('gudang_position_naker_exact', 'done');
   END IF;
 END $$;
-SELECT position, COUNT(*) AS jumlah
-FROM employee_details
-GROUP BY position
-ORDER BY jumlah DESC;
+SELECT p.name AS master_jabatan, COUNT(ed.id) AS jumlah_karyawan
+FROM positions p
+LEFT JOIN employee_details ed ON ed.position = p.name
+WHERE p.name = 'NAKER'
+GROUP BY p.name;
 SQL
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
