@@ -418,10 +418,22 @@ export default function Dashboard() {
                             <span className="dashboard-section-line" />
                         </div>
                         <div className="menu-grid">
+                            {hasPermission('admin.driver_activities') && (
+                                <Link to="/admin/driver-activities" className="menu-item">
+                                    <MenuIcon name="Truck" className="bg-orange-100 text-orange-600" />
+                                    <span className="menu-label">Aktivitas Driver</span>
+                                </Link>
+                            )}
                             {(user?.role === 'manager' || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'superadmin' || hasPermission('manager.approvals')) && (
                                 <Link to="/approvals" className="menu-item">
                                     <MenuIcon name="CheckCircle2" className="bg-emerald-100 text-emerald-600" />
                                     <span className="menu-label">Persetujuan Lembur</span>
+                                </Link>
+                            )}
+                            {hasPermission('admin.driver_tracking') && (
+                                <Link to="/admin/driver-tracking" className="menu-item">
+                                    <MenuIcon name="MapPin" className="bg-teal-100 text-teal-600" />
+                                    <span className="menu-label">Tracking Kunjungan</span>
                                 </Link>
                             )}
                             {(hasPermission('manager.leave_approvals') || user?.is_supervisor || hasPermission('admin.leaves')) && (
@@ -454,22 +466,10 @@ export default function Dashboard() {
                                     <span className="menu-label">Pengumuman</span>
                                 </Link>
                             )}
-                            {hasPermission('admin.driver_activities') && (
-                                <Link to="/admin/driver-activities" className="menu-item">
-                                    <MenuIcon name="Truck" className="bg-orange-100 text-orange-600" />
-                                    <span className="menu-label">Aktivitas Driver</span>
-                                </Link>
-                            )}
                             {hasPermission('manager.tuang') && (
                                 <Link to="/admin/tuang" className="menu-item">
                                     <MenuIcon name="Banknote" className="bg-orange-100 text-orange-600" />
                                     <span className="menu-label">Insentif Tuang</span>
-                                </Link>
-                            )}
-                            {hasPermission('admin.driver_tracking') && (
-                                <Link to="/admin/driver-tracking" className="menu-item">
-                                    <MenuIcon name="MapPin" className="bg-teal-100 text-teal-600" />
-                                    <span className="menu-label">Tracking Kunjungan</span>
                                 </Link>
                             )}
                             {hasPermission('admin.loans') && (

@@ -93,16 +93,16 @@ export default function Sidebar({ isOpen = false, onNavigate }) {
     ].filter(item => hasPermission(item.permissionKey) || (item.extraKeys || []).some(k => hasPermission(k)));
 
     const pimpinanItems = [
+        { path: '/admin/driver-activities', icon: 'Truck', label: 'Aktivitas Driver', permissionKey: 'admin.driver_activities' },
         { path: '/approvals', icon: 'CheckCircle2', label: 'Persetujuan Lembur', permissionKey: 'manager.approvals', showIfManager: true },
+        { path: '/admin/driver-tracking', icon: 'MapPin', label: 'Tracking Kunjungan', permissionKey: 'admin.driver_tracking' },
         { path: '/leave-approvals', icon: 'ClipboardCheck', label: 'Persetujuan Izin', permissionKey: 'manager.leave_approvals', extraKeys: ['admin.leaves'], showIfSupervisor: true },
         { path: '/admin/work-schedule?tab=shift_requests', icon: 'Repeat', label: 'Persetujuan Shift', permissionKey: 'admin.work_schedule', extraKeys: ['manager.approvals'], showIfSupervisor: true },
         { path: '/admin/leaves', icon: 'FileText', label: 'Kelola Izin', permissionKey: 'admin.leaves' },
         { path: '/admin/manual-attendance', icon: 'ClipboardList', label: 'Persetujuan Absen', permissionKey: 'admin.manual_attendance' },
         { path: '/off-days', icon: 'CalendarOff', label: 'Atur Libur', permissionKey: 'admin.off_days' },
         { path: '/admin/announcements', icon: 'Megaphone', label: 'Kelola Pengumuman', permissionKey: 'admin.announcements' },
-        { path: '/admin/driver-activities', icon: 'Truck', label: 'Aktivitas Driver', permissionKey: 'admin.driver_activities' },
         { path: '/admin/tuang', icon: 'Banknote', label: 'Insentif Tuang', permissionKey: 'manager.tuang' },
-        { path: '/admin/driver-tracking', icon: 'MapPin', label: 'Tracking Kunjungan', permissionKey: 'admin.driver_tracking' },
         { path: '/admin/loans', icon: 'Wallet', label: 'Pinjaman', permissionKey: 'admin.loans' },
         { path: '/admin/payroll', icon: 'Banknote', label: 'Payroll', permissionKey: 'admin.payroll' },
         { path: '/admin/assessments', icon: 'ClipboardList', label: 'Penilaian', permissionKey: 'admin.assessments' },
