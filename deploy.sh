@@ -61,6 +61,8 @@ if [ "$use_pm2" = true ]; then
         || pm2 restart backend
     echo "[4/4b] Set tunjangan apresiasi menjadi harian..."
     (cd "$CD_DIR/backend" && node scripts/set-appreciation-daily.js)
+    echo "[4/4c] Samakan divisi Driver ke master DRIVER (sekali)..."
+    (cd "$CD_DIR/backend" && node scripts/set-division-driver.js)
     echo "DEPLOY JAGAT SELESAI"
 else
     echo "[4/4] Restart Docker containers..."
@@ -241,6 +243,19 @@ LEFT JOIN employee_details ed ON ed.position = p.name
 WHERE p.name = 'NAKER'
 GROUP BY p.name;
 SQL
+    echo "[4/4b7] Samakan divisi Driver ke master DRIVER (sekali)..."
+    divapplied=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if docker compose exec -T backend node scripts/set-division-driver.js; then
+            divapplied=1
+            break
+        fi
+        sleep 3
+    done
+    if [ "$divapplied" != 1 ]; then
+        echo "Gagal menyamakan divisi DRIVER."
+        exit 1
+    fi
     echo "[4/4c] Set tunjangan apresiasi menjadi harian..."
     applied=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
